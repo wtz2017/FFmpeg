@@ -15,8 +15,6 @@ public class API {
     }
 
     public native String stringFromJNI();
-    public native void testSimpleThread();
-    public native void startProduceConsumeThread();
-    public native void stopProduceConsumeThread();
     public native void testFFmpeg();
+
 }

@@ -8,11 +8,14 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.wtz.ffmpegapi.API;
+import com.wtz.ffmpegapi.CppThreadDemo;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "FFmpegActivity";
 
     private API api;
+
+    private CppThreadDemo cppThreadDemo;
     private boolean isProducing;
 
     @Override
@@ -21,6 +24,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
 
         api = new API();
+        cppThreadDemo = new CppThreadDemo();
 
         TextView tv = findViewById(R.id.sample_text);
         tv.setText(api.stringFromJNI());
@@ -37,17 +41,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Log.d(TAG, "onClick " + view);
         switch (view.getId()) {
             case R.id.btn_simple_pthread:
-                api.testSimpleThread();
+                cppThreadDemo.testSimpleThread();
                 break;
             case R.id.btn_start_product_consumer:
                 if (!isProducing) {
                     isProducing = true;
-                    api.startProduceConsumeThread();
+                    cppThreadDemo.startProduceConsumeThread();
                 }
                 break;
             case R.id.btn_stop_product_consumer:
                 if (isProducing) {
-                    api.stopProduceConsumeThread();
+                    cppThreadDemo.stopProduceConsumeThread();
                     isProducing = false;
                 }
                 break;

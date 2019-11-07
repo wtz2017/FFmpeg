@@ -9,7 +9,12 @@ add_library(
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
-        ffmpeg_api.cpp)
+        ffmpeg_api.cpp )
+
+add_library(
+        thread_demo
+        SHARED
+        thread_demo.cpp )
 
 add_library( avcodec SHARED IMPORTED )
 set_target_properties( avcodec
@@ -74,7 +79,10 @@ target_link_libraries(
         swscale
 
         # Links the target library to the log library included in the NDK.
-        ${log-lib})
+        ${log-lib} )
 
+target_link_libraries(
+        thread_demo
 
+        ${log-lib} )
 
