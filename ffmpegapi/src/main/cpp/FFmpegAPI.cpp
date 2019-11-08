@@ -1,6 +1,6 @@
 #include <jni.h>
-#include <AndroidLog.h>
 #include <string>
+#include "AndroidLog.h"
 
 extern "C"
 {
@@ -18,21 +18,21 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_API_testFFmpeg(JNIEnv *env, jobject thiz) {
     av_register_all();
-    AVCodec *c_temp = av_codec_next(NULL);
-    while (c_temp != NULL)
+    AVCodec *codec = av_codec_next(NULL);
+    while (codec != NULL)
     {
-        switch (c_temp->type)
+        switch (codec->type)
         {
             case AVMEDIA_TYPE_VIDEO:
-                LOGI("[Video]:%s", c_temp->name);
+                LOGI("[Video]:%s", codec->name);
                 break;
             case AVMEDIA_TYPE_AUDIO:
-                LOGI("[Audio]:%s", c_temp->name);
+                LOGI("[Audio]:%s", codec->name);
                 break;
             default:
-                LOGI("[Other]:%s", c_temp->name);
+                LOGI("[Other]:%s", codec->name);
                 break;
         }
-        c_temp = c_temp->next;
+        codec = codec->next;
     }
 }

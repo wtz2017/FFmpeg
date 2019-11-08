@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_simple_pthread).setOnClickListener(this);
         findViewById(R.id.btn_start_product_consumer).setOnClickListener(this);
         findViewById(R.id.btn_stop_product_consumer).setOnClickListener(this);
+        findViewById(R.id.btn_c_thread_call_java).setOnClickListener(this);
 
         api.testFFmpeg();
     }
@@ -54,6 +55,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     cppThreadDemo.stopProduceConsumeThread();
                     isProducing = false;
                 }
+                break;
+            case R.id.btn_c_thread_call_java:
+                cppThreadDemo.setOnResultListener(new CppThreadDemo.OnResultListener() {
+                    @Override
+                    public void onResult(int code, String msg) {
+                        Log.d(TAG, "OnResultListener code: " + code + "; msg: " + msg);
+                    }
+                });
+                cppThreadDemo.callbackFromC();
                 break;
         }
     }
