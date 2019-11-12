@@ -95,12 +95,22 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_startProduceConsumeThread(JNIEnv *env, jobj
     pthread_create(&consumerThread, NULL, consumerCallback, NULL);
 }
 
+void clearQueue(std::queue<int> &queue) {
+    std::queue<int> empty;
+    swap(empty, queue);
+}
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_CppThreadDemo_stopProduceConsumeThread(JNIEnv *env, jobject thiz) {
     LOGI("Call stopProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
     stopProduce = true;
+
     pthread_cond_signal(&productCond);// 唤醒还在等待的消费者
+    pthread_cond_destroy(&productCond);
+    pthread_mutex_destroy(&productMutex);
+
+    clearQueue(productQueue);
 }
 
 void *callJavaThreadCallback(void *data) {
