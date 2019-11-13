@@ -116,6 +116,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_stopProduceConsumeThread(JNIEnv *env, jobje
 void *callJavaThreadCallback(void *data) {
     JavaListener *listener = (JavaListener *) data;
     listener->callback(2, 2, "call java from c++ in child thread");
+    delete(listener);
     pthread_exit(&callJavaThread);
 }
 
@@ -124,6 +125,8 @@ JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_CppThreadDemo_callbackFromC(JNIEnv *env, jobject thiz) {
     // Fix: JNI ERROR (app bug): accessed stale local reference
     jobject globalObj = env->NewGlobalRef(thiz);
+    // TODO 需要找个时机回收这个 GlobalReference ：env->DeleteGlobalRef(globalObj)
+    // 目前是放在 JavaListener 的析构函数里释放
 
     // JavaListener 构造方法需要在 C++ 主线程中调用，即直接从 java 层调用下来的线程
     JavaListener *javaListener = new OnResultListener(jvm, env, globalObj);
@@ -132,4 +135,3 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_callbackFromC(JNIEnv *env, jobject thiz) {
 
     pthread_create(&callJavaThread, NULL, callJavaThreadCallback, javaListener);
 }
-

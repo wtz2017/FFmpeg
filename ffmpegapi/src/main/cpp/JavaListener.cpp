@@ -12,6 +12,12 @@ JavaListener::JavaListener(JavaVM *jvm, JNIEnv *mainEnv, jobject obj) {
     _obj = obj;
 }
 
+JavaListener::~JavaListener() {
+    JNIEnv *env = initCallbackEnv();
+    env->DeleteGlobalRef(_obj);
+    releaseCallbackEnv();
+}
+
 JNIEnv *JavaListener::initCallbackEnv() {
     pid_t currentTid = gettid();
     if (currentTid == _mainTid) {
@@ -19,7 +25,7 @@ JNIEnv *JavaListener::initCallbackEnv() {
         return _mainEnv;
     }
 
-    // 在 C++ 子线程中要使用子线程 env
+    // 在 C++ 子线程中要使用子线程 env，否则会报错 JNI ERROR: non-VM thread making JNI call
     JNIEnv *env;
     _jvm->AttachCurrentThread(&env, 0);
     return env;
@@ -39,6 +45,10 @@ void JavaListener::callback(int argCount, ...) {
 
     if (_methodID == NULL) {
         _methodID = env->GetMethodID(env->GetObjectClass(_obj), getMethodName(), getMethodSignature());
+        if (env->ExceptionCheck()) {
+            LOGE("GetMethodID exception! method: %s %s", getMethodName(), getMethodSignature());
+            env->Throw(env->ExceptionOccurred());
+        }
     }
 
     va_list args;
