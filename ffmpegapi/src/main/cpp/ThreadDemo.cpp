@@ -116,7 +116,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_stopProduceConsumeThread(JNIEnv *env, jobje
 void *callJavaThreadCallback(void *data) {
     JavaListener *listener = (JavaListener *) data;
     listener->callback(2, 2, "call java from c++ in child thread");
-    delete(listener);
+    delete listener;
     pthread_exit(&callJavaThread);
 }
 
@@ -134,4 +134,69 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_callbackFromC(JNIEnv *env, jobject thiz) {
     javaListener->callback(2, 1, "call java from c++ in main thread");
 
     pthread_create(&callJavaThread, NULL, callJavaThreadCallback, javaListener);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_CppThreadDemo_setByteArray(JNIEnv *env, jobject thiz, jbyteArray jarray) {
+    // 1. 获取 java 数组长度
+    int arrayLen = env->GetArrayLength(jarray);
+
+    // 2. 获取指向 java 数组或其副本的指针，这里是 JNI_FALSE，因此获取的是原始数组指针
+    jbyte *pArray = env->GetByteArrayElements(jarray, JNI_FALSE);
+
+    // 3. 处理数据，对于非 copy 模式，会直接修改原始 java 数组元素
+    for (int i = 0; i < arrayLen; i++) {
+        pArray[i] += 2;
+    }
+
+    // 4. 释放数组指针，对于 copy 模式，第 3 个参数决定如何管理 copy 内存和是否提交 copy 的值到原始 java 数组
+    env->ReleaseByteArrayElements(jarray, pArray, 0);
+
+//    // 2. 申请缓冲区
+////    jbyte *copyArray = (jbyte *) malloc(sizeof(jbyte) * arrayLen);
+//    jbyte *copyArray = new jbyte[arrayLen];
+//
+//
+//    // 3. 初始化缓冲区
+////    memset(copyArray, 0, sizeof(jbyte) * arrayLen);
+//    for (int i = 0; i < arrayLen; ++i) {
+//        copyArray[i] = 0;
+//    }
+//
+//    // 4. 拷贝 java 数组数据
+//    env->GetByteArrayRegion(jarray, 0, arrayLen, copyArray);
+//
+//    // 5. 处理数据
+//    for (int i = 0; i < arrayLen; i++) {
+//        copyArray[i] += 2;
+//        LOGI("after modify copyArray %d = %d", i, copyArray[i]);
+//    }
+//
+//    // 如果想把处理结果同步到原始 java 数组，可以这么做
+////    env->SetByteArrayRegion(jarray, 0, arrayLen, copyArray);
+//
+//    // 6. 释放缓冲区
+////    free(copyArray);
+//    delete copyArray;
+}
+
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_com_wtz_ffmpegapi_CppThreadDemo_getByteArray(JNIEnv *env, jobject thiz) {
+    int arrayLen = 10;
+
+//    jbyte *pbuf = (jbyte *) malloc(sizeof(jbyte) * arrayLen);
+    jbyte *pbuf = new jbyte[arrayLen];
+    for (int i = 0; i < arrayLen; i++) {
+        pbuf[i] = i + 2;
+    }
+
+    jbyteArray jarray = env->NewByteArray(arrayLen);
+    env->SetByteArrayRegion(jarray, 0, arrayLen, pbuf);
+
+//    free(pbuf);
+    delete pbuf;
+
+    return jarray;
 }

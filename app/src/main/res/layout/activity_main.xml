@@ -36,4 +36,16 @@
         android:layout_height="wrap_content"
         android:text="C++ 线程回调 java"/>
 
+    <Button
+        android:id="@+id/btn_java_set_byte_array_to_c"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="java 传递byte[] 到 C++"/>
+
+    <Button
+        android:id="@+id/btn_c_set_byte_array_to_java"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="C++ 传递byte[] 到 java"/>
+
 </LinearLayout>

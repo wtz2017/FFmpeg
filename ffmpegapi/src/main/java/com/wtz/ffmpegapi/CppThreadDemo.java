@@ -33,4 +33,8 @@ public class CppThreadDemo {
 
     public native void callbackFromC();
 
+    public native void setByteArray(byte[] data);
+
+    public native byte[] getByteArray();
+
 }

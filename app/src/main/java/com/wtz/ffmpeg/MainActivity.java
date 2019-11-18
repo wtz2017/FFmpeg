@@ -33,6 +33,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_start_product_consumer).setOnClickListener(this);
         findViewById(R.id.btn_stop_product_consumer).setOnClickListener(this);
         findViewById(R.id.btn_c_thread_call_java).setOnClickListener(this);
+        findViewById(R.id.btn_java_set_byte_array_to_c).setOnClickListener(this);
+        findViewById(R.id.btn_c_set_byte_array_to_java).setOnClickListener(this);
 
         api.testFFmpeg();
     }
@@ -64,6 +66,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 });
                 cppThreadDemo.callbackFromC();
+                break;
+            case R.id.btn_java_set_byte_array_to_c:
+                byte[] data = new byte[6];
+                for (int i = 0; i < data.length; i++) {
+                    data[i] = (byte) i;
+                    Log.d(TAG, "before setByteArray data " + i + " = " + data[i]);
+                }
+                cppThreadDemo.setByteArray(data);
+                for (int i = 0; i < data.length; i++) {
+                    Log.d(TAG, "after setByteArray data " + i + " = " + data[i]);
+                }
+                break;
+            case R.id.btn_c_set_byte_array_to_java:
+                byte[] array = cppThreadDemo.getByteArray();
+                for (int i = 0; i < array.length; i++) {
+                    Log.d(TAG, "getByteArray data " + i + " = " + array[i]);
+                }
                 break;
         }
     }
