@@ -7,13 +7,13 @@ import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
-import com.wtz.ffmpegapi.API;
+import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.CppThreadDemo;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "FFmpegActivity";
 
-    private API api;
+    private WePlayer wePlayer;
 
     private CppThreadDemo cppThreadDemo;
     private boolean isProducing;
@@ -23,20 +23,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        api = new API();
         cppThreadDemo = new CppThreadDemo();
+        cppThreadDemo.stringToJNI("hello! I'm java!");
 
-        TextView tv = findViewById(R.id.sample_text);
-        tv.setText(api.stringFromJNI());
-
+        ((TextView) findViewById(R.id.sample_text)).setText(cppThreadDemo.stringFromJNI());
         findViewById(R.id.btn_simple_pthread).setOnClickListener(this);
         findViewById(R.id.btn_start_product_consumer).setOnClickListener(this);
         findViewById(R.id.btn_stop_product_consumer).setOnClickListener(this);
         findViewById(R.id.btn_c_thread_call_java).setOnClickListener(this);
         findViewById(R.id.btn_java_set_byte_array_to_c).setOnClickListener(this);
         findViewById(R.id.btn_c_set_byte_array_to_java).setOnClickListener(this);
+        findViewById(R.id.btn_test_ffmpeg).setOnClickListener(this);
 
-        api.testFFmpeg();
+        wePlayer = new WePlayer();
     }
 
     @Override
@@ -83,6 +82,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 for (int i = 0; i < array.length; i++) {
                     Log.d(TAG, "getByteArray data " + i + " = " + array[i]);
                 }
+                break;
+            case R.id.btn_test_ffmpeg:
+                wePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
+                wePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
+                    @Override
+                    public void onPrepared() {
+                        Log.d(TAG, "WePlayer onPrepared");
+                        wePlayer.start();
+                    }
+                });
+                wePlayer.prepareAsync();
                 break;
         }
     }

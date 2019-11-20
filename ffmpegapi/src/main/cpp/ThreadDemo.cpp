@@ -1,10 +1,13 @@
 #include <jni.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <string>
 #include "AndroidLog.h"
 #include "JavaListener.h"
 #include "OnResultListener.h"
 #include "queue"
+
+#define LOG_TAG "ThreadDemo"
 
 JavaVM *jvm;
 
@@ -23,50 +26,72 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
     jvm = vm;
     if (vm->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK) {
+        LOGE(LOG_TAG, "JNI_OnLoad vm->GetEnv exception!");
         return -1;
     }
     return JNI_VERSION_1_6;
 }
 
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_wtz_ffmpegapi_CppThreadDemo_stringFromJNI(JNIEnv *env, jobject thiz) {
+    std::string hello = "Welcome to FFmpeg";
+    return env->NewStringUTF(hello.c_str());
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_CppThreadDemo_stringToJNI(JNIEnv *env, jobject thiz, jstring jstr) {
+    const char *chars = env->GetStringUTFChars(jstr, NULL);
+    LOGI(LOG_TAG, "stringToJNI GetStringUTFChars content: %s", chars);
+    env->ReleaseStringUTFChars(jstr, chars);
+
+    int strLen = env->GetStringLength(jstr);
+    char *buf = new char[strLen];
+    env->GetStringUTFRegion(jstr, 0, strLen, buf);
+    LOGI(LOG_TAG, "stringToJNI GetStringUTFRegion content: %s", buf);
+    delete[] buf;
+}
+
 void *simpleThreadCallback(void *data) {
-    LOGI("This is a simple thread!(pid=%d tid=%d)", getpid(), gettid());
+    LOGI(LOG_TAG, "This is a simple thread!(pid=%d tid=%d)", getpid(), gettid());
     pthread_exit(&simpleThread);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_CppThreadDemo_testSimpleThread(JNIEnv *env, jobject thiz) {
-    LOGI("Call testSimpleThread from java!(pid=%d tid=%d)", getpid(), gettid());
+    LOGI(LOG_TAG, "Call testSimpleThread from java!(pid=%d tid=%d)", getpid(), gettid());
     pthread_create(&simpleThread, NULL, simpleThreadCallback, NULL);
 }
 
 void *producerCallback(void *data) {
-    LOGI("This is producer thread!(pid=%d tid=%d)", getpid(), gettid());
+    LOGI(LOG_TAG, "This is producer thread!(pid=%d tid=%d)", getpid(), gettid());
     while (!stopProduce) {
         pthread_mutex_lock(&productMutex);
 
         productQueue.push(1);
-        LOGI("生产了一个产品，目前总量为%d，准备通知消费者", productQueue.size());
+        LOGI(LOG_TAG, "生产了一个产品，目前总量为%d，准备通知消费者", productQueue.size());
         pthread_cond_signal(&productCond);
 
         pthread_mutex_unlock(&productMutex);
 
         sleep(5);// 睡眠 5 秒
     }
-    LOGE("producer exiting...");
+    LOGE(LOG_TAG, "producer exiting...");
     pthread_exit(&producerThread);
 }
 
 void *consumerCallback(void *data) {
-    LOGI("This is consumer thread!(pid=%d tid=%d)", getpid(), gettid());
+    LOGI(LOG_TAG, "This is consumer thread!(pid=%d tid=%d)", getpid(), gettid());
     while (!stopProduce) {
         pthread_mutex_lock(&productMutex);
 
         if (productQueue.size() > 0) {
             productQueue.pop();
-            LOGI("消费了一个产品，还剩%d个产品", productQueue.size());
+            LOGI(LOG_TAG, "消费了一个产品，还剩%d个产品", productQueue.size());
         } else {
-            LOGD("没有产品可消费，等待中...");
+            LOGD(LOG_TAG, "没有产品可消费，等待中...");
             pthread_cond_wait(&productCond, &productMutex);
         }
 
@@ -74,14 +99,14 @@ void *consumerCallback(void *data) {
 
         usleep(500 * 1000);// 睡眠 500000 微秒，即 500 毫秒
     }
-    LOGE("consumer exiting...");
+    LOGE(LOG_TAG, "consumer exiting...");
     pthread_exit(&consumerThread);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_CppThreadDemo_startProduceConsumeThread(JNIEnv *env, jobject thiz) {
-    LOGI("Call startProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
+    LOGI(LOG_TAG, "Call startProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
     stopProduce = false;
 
     for (int i = 0; i < 10; ++i) {
@@ -103,7 +128,7 @@ void clearQueue(std::queue<int> &queue) {
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_CppThreadDemo_stopProduceConsumeThread(JNIEnv *env, jobject thiz) {
-    LOGI("Call stopProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
+    LOGI(LOG_TAG, "Call stopProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
     stopProduce = true;
 
     pthread_cond_signal(&productCond);// 唤醒还在等待的消费者
@@ -123,13 +148,8 @@ void *callJavaThreadCallback(void *data) {
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_CppThreadDemo_callbackFromC(JNIEnv *env, jobject thiz) {
-    // Fix: JNI ERROR (app bug): accessed stale local reference
-    jobject globalObj = env->NewGlobalRef(thiz);
-    // TODO 需要找个时机回收这个 GlobalReference ：env->DeleteGlobalRef(globalObj)
-    // 目前是放在 JavaListener 的析构函数里释放
-
     // JavaListener 构造方法需要在 C++ 主线程中调用，即直接从 java 层调用下来的线程
-    JavaListener *javaListener = new OnResultListener(jvm, env, globalObj);
+    JavaListener *javaListener = new OnResultListener(jvm, env, thiz);
 
     javaListener->callback(2, 1, "call java from c++ in main thread");
 
@@ -142,10 +162,10 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_setByteArray(JNIEnv *env, jobject thiz, jby
     // 1. 获取 java 数组长度
     int arrayLen = env->GetArrayLength(jarray);
 
-    // 2. 获取指向 java 数组或其副本的指针，这里是 JNI_FALSE，因此获取的是原始数组指针
-    jbyte *pArray = env->GetByteArrayElements(jarray, JNI_FALSE);
+    // 2. 获取指向 java 数组或其副本的指针，具体是哪个由底层实现，第二个参数若不空用来反馈实现者是否拷贝的结果
+    jbyte *pArray = env->GetByteArrayElements(jarray, NULL);
 
-    // 3. 处理数据，对于非 copy 模式，会直接修改原始 java 数组元素
+    // 3. 处理数据，如果底层实现是非拷贝方式，下述代码会直接修改原始 java 数组元素
     for (int i = 0; i < arrayLen; i++) {
         pArray[i] += 2;
     }
@@ -170,7 +190,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_setByteArray(JNIEnv *env, jobject thiz, jby
 //    // 5. 处理数据
 //    for (int i = 0; i < arrayLen; i++) {
 //        copyArray[i] += 2;
-//        LOGI("after modify copyArray %d = %d", i, copyArray[i]);
+//        LOGI(LOG_TAG, "after modify copyArray %d = %d", i, copyArray[i]);
 //    }
 //
 //    // 如果想把处理结果同步到原始 java 数组，可以这么做
@@ -178,7 +198,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_setByteArray(JNIEnv *env, jobject thiz, jby
 //
 //    // 6. 释放缓冲区
 ////    free(copyArray);
-//    delete copyArray;
+//    delete[] copyArray;
 }
 
 extern "C"
@@ -196,7 +216,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_getByteArray(JNIEnv *env, jobject thiz) {
     env->SetByteArrayRegion(jarray, 0, arrayLen, pbuf);
 
 //    free(pbuf);
-    delete pbuf;
+    delete[] pbuf;
 
     return jarray;
 }

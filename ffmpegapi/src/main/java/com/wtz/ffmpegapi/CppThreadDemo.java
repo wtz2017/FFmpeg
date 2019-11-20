@@ -6,6 +6,10 @@ public class CppThreadDemo {
         System.loadLibrary("thread_demo");
     }
 
+    public native String stringFromJNI();
+
+    public native void stringToJNI(String string);
+
     public native void testSimpleThread();
 
     public native void startProduceConsumeThread();

@@ -12,10 +12,11 @@
 class JavaListener {
 
 private:
+    const char *LOG_TAG = "JavaListener";
     pid_t _mainTid;
     JavaVM *_jvm;
     JNIEnv *_mainEnv;
-    jobject _obj;
+    jobject _globalObj;
     jmethodID _methodID = NULL;// 若不初始化，则值为非空；置空用于后边判断一次性懒加载
 
 public:
@@ -26,9 +27,9 @@ public:
      * @param mainEnv C++ 主线程 env
      * @param obj
      */
-    JavaListener(JavaVM *jvm, _JNIEnv *mainEnv, jobject obj);
+    JavaListener(JavaVM *jvm, JNIEnv *mainEnv, jobject obj);
 
-    ~JavaListener();
+    virtual ~JavaListener();
 
     void callback(int argCount, ...);
 

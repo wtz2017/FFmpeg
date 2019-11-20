@@ -9,12 +9,16 @@
 #include "AndroidLog.h"
 
 class OnResultListener : public JavaListener {
+private:
+    const char *LOG_TAG = "OnResultListener";
+
 public:
     OnResultListener(JavaVM *vm, JNIEnv *mainEnv, jobject obj)
             : JavaListener(vm, mainEnv, obj) {
     }
 
-    ~OnResultListener();
+    ~OnResultListener() {
+    }
 
     const char *getMethodName() {
         return "onResult";
@@ -27,7 +31,9 @@ public:
     void reallyCallback(JNIEnv *env, jobject obj, jmethodID methodId, va_list args) {
         int code = va_arg(args, int);
         char *msg = va_arg(args, char *);
-        LOGD("reallyCallback[%s] code=%d, msg=%s", getMethodName(), code, msg);
+        if (LOG_DEBUG) {
+            LOGD(LOG_TAG, "reallyCallback[%s] code=%d, msg=%s", getMethodName(), code, msg);
+        }
 
         jstring stringUtf = env->NewStringUTF(msg);
         env->CallVoidMethod(obj, methodId, code, stringUtf);

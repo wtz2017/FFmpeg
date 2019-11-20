@@ -1,15 +1,17 @@
 cmake_minimum_required(VERSION 3.4.1)
 
-include_directories( include/ )
+include_directories(include/)
 
 # Creates and names a library, sets it as either STATIC or SHARED,
 # and provides the relative paths to its source code.
 add_library(
-        ffmpeg_api
+        weplayer
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
-        FFmpegAPI.cpp)
+        WePlayerJNI.cpp
+        WeFFmpeg.cpp
+        JavaListener.cpp)
 
 add_library(
         thread_demo
@@ -17,45 +19,45 @@ add_library(
         ThreadDemo.cpp
         JavaListener.cpp)
 
-add_library( avcodec SHARED IMPORTED )
-set_target_properties( avcodec
+add_library(avcodec SHARED IMPORTED)
+set_target_properties(avcodec
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavcodec.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavcodec.so)
 
-add_library( avdevice SHARED IMPORTED )
-set_target_properties( avdevice
+add_library(avdevice SHARED IMPORTED)
+set_target_properties(avdevice
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavdevice.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavdevice.so)
 
-add_library( avfilter SHARED IMPORTED )
-set_target_properties( avfilter
+add_library(avfilter SHARED IMPORTED)
+set_target_properties(avfilter
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavfilter.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavfilter.so)
 
-add_library( avformat SHARED IMPORTED )
-set_target_properties( avformat
+add_library(avformat SHARED IMPORTED)
+set_target_properties(avformat
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavformat.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavformat.so)
 
-add_library( avutil SHARED IMPORTED )
-set_target_properties( avutil
+add_library(avutil SHARED IMPORTED)
+set_target_properties(avutil
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavutil.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavutil.so)
 
-add_library( postproc SHARED IMPORTED )
-set_target_properties( postproc
+add_library(postproc SHARED IMPORTED)
+set_target_properties(postproc
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libpostproc.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libpostproc.so)
 
-add_library( swresample SHARED IMPORTED )
-set_target_properties( swresample
+add_library(swresample SHARED IMPORTED)
+set_target_properties(swresample
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libswresample.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libswresample.so)
 
-add_library( swscale SHARED IMPORTED )
-set_target_properties( swscale
+add_library(swscale SHARED IMPORTED)
+set_target_properties(swscale
         PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libswscale.so )
+        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libswscale.so)
 
 # Searches for a specified prebuilt library and stores the path as a variable.
 # Because CMake includes system libraries in the search path by default,
@@ -68,7 +70,7 @@ find_library(
 
 # Specifies libraries CMake should link to your target library.
 target_link_libraries(
-        ffmpeg_api
+        weplayer
 
         avcodec
         avdevice
@@ -80,10 +82,10 @@ target_link_libraries(
         swscale
 
         # Links the target library to the log library included in the NDK.
-        ${log-lib} )
+        ${log-lib})
 
 target_link_libraries(
         thread_demo
 
-        ${log-lib} )
+        ${log-lib})
 
