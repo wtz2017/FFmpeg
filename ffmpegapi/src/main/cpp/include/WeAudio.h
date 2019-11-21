@@ -5,6 +5,8 @@
 #ifndef FFMPEG_WEAUDIO_H
 #define FFMPEG_WEAUDIO_H
 
+#include "AVPacketQueue.h"
+
 extern "C"
 {
 #include "libavcodec/avcodec.h"
@@ -17,10 +19,12 @@ public:
     AVCodecContext *codecContext = NULL;
     AVCodecParameters *codecParams = NULL;
 
-public:
-    WeAudio() {};
+    AVPacketQueue *queue = NULL;
 
-    ~WeAudio() {};
+public:
+    WeAudio(PlayStatus *status);
+
+    ~WeAudio();
 
 };
 

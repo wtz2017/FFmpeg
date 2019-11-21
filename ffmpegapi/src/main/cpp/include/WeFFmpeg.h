@@ -19,17 +19,19 @@ class WeFFmpeg {
 
 private:
     const char *LOG_TAG = "WeFFmpeg";
+
     char *dataSource = NULL;
     JavaListener *preparedListener = NULL;
     AVFormatContext *pFormatCtx = NULL;
     WeAudio *weAudio = NULL;
+    PlayStatus *status = NULL;
 
 public:
     pthread_t prepareThread;
     pthread_t decodeThread;
 
 public:
-    WeFFmpeg(JavaListener *javaListener);
+    WeFFmpeg(JavaListener *preparedListener);
 
     ~WeFFmpeg();
 

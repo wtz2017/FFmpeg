@@ -11,6 +11,9 @@ add_library(
         # Provides a relative path to your source file(s).
         WePlayerJNI.cpp
         WeFFmpeg.cpp
+        WeAudio.cpp
+        AVPacketQueue.cpp
+        PlayStatus.cpp
         JavaListener.cpp)
 
 add_library(
