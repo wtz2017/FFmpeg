@@ -30,6 +30,16 @@ WeFFmpeg::~WeFFmpeg() {
 }
 
 void WeFFmpeg::setDataSource(char *dataSource) {
+    if (dataSource == NULL || strlen(dataSource) == 0) {
+        LOGE(LOG_TAG, "SetDataSource can't be NULL");
+        return;
+    }
+    // strcmp() 函数不能接受为 NULL 的指针
+    if (this->dataSource != NULL && strcmp(dataSource, this->dataSource) == 0) {
+        LOGW(LOG_TAG, "SetDataSource is the same with old source");
+        return;
+    }
+    delete this->dataSource;
     this->dataSource = dataSource;
 }
 
@@ -67,10 +77,9 @@ void WeFFmpeg::_prepareAsync() {
     }
 
     // 清除音频旧数据
-    if (weAudio != NULL) {
-        weAudio->streamIndex = -1;
-        delete weAudio->codecParams;
-        weAudio->codecParams = NULL;
+    if (weAudio != NULL) {// TODO 是否有必要复用 weAudio ？在连续切换源地址时，应该先stop掉再从头再来
+        delete weAudio;
+        weAudio = NULL;
     }
     // 从流信息中遍历查找音频流
     for (int i = 0; i < pFormatCtx->nb_streams; i++) {
@@ -79,16 +88,18 @@ void WeFFmpeg::_prepareAsync() {
                 LOGD(LOG_TAG, "Find audio stream info index: %d", i);
             }
             // 保存音频流信息
-            if (weAudio == NULL) {
-                weAudio = new WeAudio(status);
-            }
+            // TODO 是否有必要复用 weAudio ？在连续切换源地址时，应该先stop掉再从头再来
+//            if (weAudio == NULL) {
+//                weAudio = new WeAudio(status);
+//            }
+            weAudio = new WeAudio(status);
             weAudio->streamIndex = i;
             weAudio->codecParams = pFormatCtx->streams[i]->codecpar;
             break;
         }
     }
 
-    if (weAudio == NULL || weAudio->streamIndex == -1) {
+    if (weAudio == NULL) {
         LOGE(LOG_TAG, "Can't find audio stream from: %s", dataSource);
         status->setStatus(PlayStatus::ERROR);
         return;
