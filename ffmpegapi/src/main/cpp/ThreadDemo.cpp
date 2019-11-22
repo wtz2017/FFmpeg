@@ -2,10 +2,17 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string>
+#include <assert.h>
 #include "AndroidLog.h"
 #include "JavaListener.h"
 #include "OnResultListener.h"
 #include "queue"
+
+extern "C"
+{
+#include <SLES/OpenSLES.h>
+#include <SLES/OpenSLES_Android.h>
+}
 
 #define LOG_TAG "ThreadDemo"
 
@@ -21,6 +28,27 @@ pthread_cond_t productCond;
 std::queue<int> productQueue;
 
 pthread_t callJavaThread;
+
+//------------ OpenSL ES Test Start------------
+// 引擎
+SLObjectItf engineObject = NULL;
+SLEngineItf engine = NULL;
+
+// 混音器
+SLObjectItf outputMixObject = NULL;
+SLEnvironmentalReverbItf outputMixEnvironmentalReverb = NULL;
+
+// 播放器
+SLObjectItf playerObject = NULL;
+SLPlayItf playController = NULL;
+SLVolumeItf volumeController = NULL;
+SLAndroidSimpleBufferQueueItf pcmBufferQueue = NULL;
+
+FILE *pcmFile;
+const int BYTES_SAMPLED_PER_SECOND = 44100 * 2 * 2;
+uint8_t *readBuffer;// 字节数组指针
+void *enqueueBuffer;// 播放数据入队 buffer
+//------------ OpenSL ES Test End------------
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
@@ -220,3 +248,300 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_getByteArray(JNIEnv *env, jobject thiz) {
 
     return jarray;
 }
+
+//------------ OpenSL ES Test Start------------
+/**
+ * destroy buffer queue audio player object, and invalidate all associated interfaces
+ */
+void destroyBufferQueueAudioPlayer() {
+    if (playerObject != NULL) {
+        (*playerObject)->Destroy(playerObject);
+        playerObject = NULL;
+        playController = NULL;
+        volumeController = NULL;
+        pcmBufferQueue = NULL;
+    }
+}
+
+/**
+ * destroy output mix object, and invalidate all associated interfaces
+ */
+void destroyOutputMixer() {
+    if (outputMixObject != NULL) {
+        (*outputMixObject)->Destroy(outputMixObject);
+        outputMixObject = NULL;
+        outputMixEnvironmentalReverb = NULL;
+    }
+}
+
+/**
+ * destroy engine object, and invalidate all associated interfaces
+ */
+void destroyEngine() {
+    if (engineObject != NULL) {
+        (*engineObject)->Destroy(engineObject);
+        engineObject = NULL;
+        engine = NULL;
+    }
+}
+
+/**
+ * 确保在退出应用时销毁所有对象。
+ * 对象应按照与创建时相反的顺序销毁，因为销毁具有依赖对象的对象并不安全。
+ * 例如，请按照以下顺序销毁：音频播放器和录制器、输出混合，最后是引擎。
+ */
+void shuttdownPlayer() {
+    destroyBufferQueueAudioPlayer();
+    destroyOutputMixer();
+    destroyEngine();
+}
+
+bool initEngine(SLObjectItf *engineObject, SLEngineItf *engine) {
+    // create engine object
+    SLresult result;
+    result = slCreateEngine(engineObject, 0, NULL, 0, NULL, NULL);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "slCreateEngine exception!");
+        return false;
+    }
+
+    // realize the engine object
+    (void) result;
+    result = (**engineObject)->Realize(*engineObject, SL_BOOLEAN_FALSE);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "engineObject Realize exception!");
+        destroyEngine();
+        return false;
+    }
+
+    // get the engine interface, which is needed in order to create other objects
+    (void) result;
+    result = (**engineObject)->GetInterface(*engineObject, SL_IID_ENGINE, engine);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "GetInterface SLEngineItf exception!");
+        destroyEngine();
+        return false;
+    }
+
+    return true;
+}
+
+bool initOutputMix(SLEngineItf *engine, SLObjectItf *outputMixObject) {
+    // create output mix, with environmental reverb specified as a non-required interface
+    const SLInterfaceID ids[1] = {SL_IID_ENVIRONMENTALREVERB};
+    const SLboolean reqs[1] = {SL_BOOLEAN_FALSE};
+    SLresult result;
+    result = (**engine)->CreateOutputMix(*engine, outputMixObject, 1, ids, reqs);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "CreateOutputMix exception!");
+        return false;
+    }
+
+    // realize the output mix
+    (void) result;
+    result = (**outputMixObject)->Realize(*outputMixObject, SL_BOOLEAN_FALSE);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "outputMixObject Realize exception!");
+        destroyOutputMixer();
+        return false;
+    }
+
+    return true;
+}
+
+bool setEnvironmentalReverb(SLObjectItf *outputMixObject,
+                            SLEnvironmentalReverbItf *outputMixEnvironmentalReverb) {
+    // get the environmental reverb interface
+    // this could fail if the environmental reverb effect is not available,
+    // either because the feature is not present, excessive CPU load, or
+    // the required MODIFY_AUDIO_SETTINGS permission was not requested and granted
+    SLresult result;
+    result = (**outputMixObject)->GetInterface(*outputMixObject, SL_IID_ENVIRONMENTALREVERB,
+                                               outputMixEnvironmentalReverb);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "GetInterface SLEnvironmentalReverbItf exception!");
+        return false;
+    }
+
+    // aux effect on the output mix, used by the buffer queue player
+    const SLEnvironmentalReverbSettings reverbSettings = SL_I3DL2_ENVIRONMENT_PRESET_STONECORRIDOR;
+    result = (**outputMixEnvironmentalReverb)->SetEnvironmentalReverbProperties(
+            *outputMixEnvironmentalReverb, &reverbSettings);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "SetEnvironmentalReverbProperties exception!");
+        return false;
+    }
+
+    return true;
+}
+
+bool createBufferQueueAudioPlayer(SLEngineItf *engine, SLObjectItf *playerObject,
+                                  SLPlayItf *playController, SLVolumeItf *volumeController) {
+    // configure audio source
+    SLDataLocator_AndroidSimpleBufferQueue bufferQueueLocator = {
+            SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 2
+    };
+    SLDataFormat_PCM pcmFormat = {
+            SL_DATAFORMAT_PCM,// 数据格式：pcm
+            2,// 声道数：2个（立体声）
+            SL_SAMPLINGRATE_44_1,// 采样率：44100hz
+            SL_PCMSAMPLEFORMAT_FIXED_16,// bitsPerSample：16位
+            SL_PCMSAMPLEFORMAT_FIXED_16,// containerSize：和采样位数一致就行
+            SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT,// 立体声（前左前右）
+            SL_BYTEORDER_LITTLEENDIAN// 字节排列顺序：小端 little-endian，将低序字节存储在起始地址
+    };
+    SLDataSource audioSrc = {&bufferQueueLocator, &pcmFormat};
+
+    // configure audio sink
+    SLDataLocator_OutputMix outputMixLocator = {SL_DATALOCATOR_OUTPUTMIX, outputMixObject};
+    SLDataSink audioSnk = {&outputMixLocator, NULL};
+
+    /*
+     * create audio player:
+     *     fast audio does not support when SL_IID_EFFECTSEND is required, skip it
+     *     for fast audio case
+     */
+    const SLInterfaceID ids[3] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_EFFECTSEND,
+            /*SL_IID_MUTESOLO,*/};
+    const SLboolean reqs[3] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE,
+            /*SL_BOOLEAN_TRUE,*/ };
+    SLresult result;
+    result = (**engine)->CreateAudioPlayer(
+            *engine, playerObject, &audioSrc, &audioSnk, 3, ids, reqs);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "CreateAudioPlayer exception!");
+        return false;
+    }
+
+    // realize the player
+    (void) result;
+    result = (**playerObject)->Realize(*playerObject, SL_BOOLEAN_FALSE);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "playerObject Realize exception!");
+        destroyBufferQueueAudioPlayer();
+        return false;
+    }
+
+    result = (**playerObject)->GetInterface(*playerObject, SL_IID_PLAY, playController);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "GetInterface SLPlayItf exception!");
+        destroyBufferQueueAudioPlayer();
+        return false;
+    }
+
+    result = (**playerObject)->GetInterface(*playerObject, SL_IID_VOLUME, volumeController);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "GetInterface SLVolumeItf exception!");
+        destroyBufferQueueAudioPlayer();
+        return false;
+    }
+
+    return true;
+}
+
+bool
+setBufferQueueCallback(SLObjectItf *playerObject, SLAndroidSimpleBufferQueueItf *pcmBufferQueue,
+                       slAndroidSimpleBufferQueueCallback callback) {
+    // get the buffer queue interface
+    SLresult result;
+    result = (**playerObject)->GetInterface(*playerObject, SL_IID_BUFFERQUEUE, pcmBufferQueue);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "GetInterface SLAndroidSimpleBufferQueueItf exception!");
+        destroyBufferQueueAudioPlayer();
+        return false;
+    }
+
+    // register callback on the buffer queue
+    (void) result;
+    result = (**pcmBufferQueue)->RegisterCallback(*pcmBufferQueue, callback, NULL);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "pcmBufferQueue RegisterCallback exception!");
+        destroyBufferQueueAudioPlayer();
+        return false;
+    }
+
+    return true;
+}
+
+bool setPlayState(SLPlayItf *playController, SLuint32 state) {
+    SLresult result;
+    result = (**playController)->SetPlayState(*playController, state);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "SetPlayState %d exception!", state);
+        return false;
+    }
+
+    return true;
+}
+
+int getPcmData(void **buf) {
+    int size = 0;
+    if (!feof(pcmFile)) {
+        size = fread(readBuffer, 1, BYTES_SAMPLED_PER_SECOND, pcmFile);
+        if (size < BYTES_SAMPLED_PER_SECOND) {
+            LOGI(LOG_TAG, "read last data!");
+        } else {
+            LOGI(LOG_TAG, "reading...");
+        }
+        *buf = readBuffer;
+    } else {
+        LOGI(LOG_TAG, "file end");
+        *buf = NULL;
+    }
+    return size;
+}
+
+void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
+    int size = getPcmData(&enqueueBuffer);
+    if (NULL != enqueueBuffer) {
+        SLresult result;
+        result = (*pcmBufferQueue)->Enqueue(pcmBufferQueue, enqueueBuffer, size);
+    }
+}
+
+// https://github.com/android/ndk-samples/blob/master/native-audio/app/src/main/cpp/native-audio-jni.c
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_CppThreadDemo_playPCM(JNIEnv *env, jobject thiz, jstring jpath) {
+    // 读取 pcm 文件
+    const char *path = env->GetStringUTFChars(jpath, 0);
+    pcmFile = fopen(path, "r");
+    env->ReleaseStringUTFChars(jpath, path);
+    if (pcmFile == NULL) {
+        LOGE(LOG_TAG, "fopen file error: %s", path);
+        return;
+    }
+
+    // 初始化引擎
+    if (!initEngine(&engineObject, &engine)) {
+        shuttdownPlayer();
+        return;
+    }
+
+    // 使用引擎创建混音器
+    if (!initOutputMix(&engine, &outputMixObject)) {
+        shuttdownPlayer();
+        return;
+    }
+    // 使用混音器设置混音效果
+    setEnvironmentalReverb(&outputMixObject, &outputMixEnvironmentalReverb);
+
+    // 使用引擎创建数据源为缓冲队列的播放器
+    if (!createBufferQueueAudioPlayer(&engine, &playerObject, &playController, &volumeController)) {
+        shuttdownPlayer();
+        return;
+    }
+    // 设置播放器缓冲队列回调函数
+    if (!setBufferQueueCallback(&playerObject, &pcmBufferQueue, pcmBufferCallback)) {
+        shuttdownPlayer();
+        return;
+    }
+    // 设置播放状态为正在播放
+    setPlayState(&playController, SL_PLAYSTATE_PLAYING);
+
+    // 初始化文件读缓冲器
+    readBuffer = (uint8_t *) malloc(BYTES_SAMPLED_PER_SECOND);
+    // 主动调用缓冲队列回调函数开始工作
+    pcmBufferCallback(pcmBufferQueue, NULL);
+}
+//------------ OpenSL ES Test End------------

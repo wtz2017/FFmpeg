@@ -84,11 +84,15 @@ target_link_libraries(
         swresample
         swscale
 
+        OpenSLES
+
         # Links the target library to the log library included in the NDK.
         ${log-lib})
 
 target_link_libraries(
         thread_demo
+
+        OpenSLES
 
         ${log-lib})
 

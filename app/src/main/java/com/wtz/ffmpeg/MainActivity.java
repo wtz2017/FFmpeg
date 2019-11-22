@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_c_thread_call_java).setOnClickListener(this);
         findViewById(R.id.btn_java_set_byte_array_to_c).setOnClickListener(this);
         findViewById(R.id.btn_c_set_byte_array_to_java).setOnClickListener(this);
+        findViewById(R.id.btn_test_opensl_es).setOnClickListener(this);
         findViewById(R.id.btn_test_ffmpeg).setOnClickListener(this);
 
         wePlayer = new WePlayer();
@@ -82,6 +83,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 for (int i = 0; i < array.length; i++) {
                     Log.d(TAG, "getByteArray data " + i + " = " + array[i]);
                 }
+                break;
+            case R.id.btn_test_opensl_es:
+                String path = "/sdcard/test.pcm";
+                cppThreadDemo.playPCM(path);
                 break;
             case R.id.btn_test_ffmpeg:
                 wePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");

@@ -16,6 +16,8 @@ public class CppThreadDemo {
 
     public native void stopProduceConsumeThread();
 
+    public native void playPCM(String path);
+
     public interface OnResultListener {
         void onResult(int code, String msg);
     }
