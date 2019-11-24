@@ -496,6 +496,9 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
     if (NULL != enqueueBuffer) {
         SLresult result;
         result = (*pcmBufferQueue)->Enqueue(pcmBufferQueue, enqueueBuffer, size);
+        if (SL_RESULT_SUCCESS != result) {
+            LOGE(LOG_TAG, "BufferQueue Enqueue exception!");
+        }
     }
 }
 

@@ -11,6 +11,7 @@ PlayStatus::PlayStatus() {
 PlayStatus::~PlayStatus() {
 }
 
+// TODO 是否加锁同步处理
 void PlayStatus::setStatus(PlayStatus::Status status) {
     this->status = status;
 }

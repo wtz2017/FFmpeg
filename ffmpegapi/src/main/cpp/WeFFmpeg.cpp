@@ -55,13 +55,20 @@ void WeFFmpeg::prepareAsync() {
     pthread_create(&prepareThread, NULL, prepareThreadCall, this);
 }
 
+// TODO 如何处理连续换歌调用和资源释放？
 void WeFFmpeg::_prepareAsync() {
     // 注册解码器并初始化网络
     av_register_all();
     avformat_network_init();
 
-    // 打开文件或网络流
-    pFormatCtx = avformat_alloc_context();// TODO pFormatCtx 是否可以复用？？？
+    if (pFormatCtx != NULL) {// TODO
+        avformat_free_context(pFormatCtx);
+//        av_free(pFormatCtx);// A/libc: invalid address or address of corrupt block 0x77c2b930 passed to dlfree
+//        delete pFormatCtx;
+        pFormatCtx = NULL;
+    }
+    pFormatCtx = avformat_alloc_context();
+    // 打开文件或网络流 TODO 何时关闭流
     if (avformat_open_input(&pFormatCtx, dataSource, NULL, NULL) != 0) {
         LOGE(LOG_TAG, "Can't open data source: %s", dataSource);
         // 报错的原因可能有：打开网络流时无网络权限，打开本地流时无外部存储访问权限
@@ -88,10 +95,6 @@ void WeFFmpeg::_prepareAsync() {
                 LOGD(LOG_TAG, "Find audio stream info index: %d", i);
             }
             // 保存音频流信息
-            // TODO 是否有必要复用 weAudio ？在连续切换源地址时，应该先stop掉再从头再来
-//            if (weAudio == NULL) {
-//                weAudio = new WeAudio(status);
-//            }
             weAudio = new WeAudio(status);
             weAudio->streamIndex = i;
             weAudio->codecParams = pFormatCtx->streams[i]->codecpar;
@@ -165,46 +168,55 @@ void WeFFmpeg::_start() {
 
     status->setStatus(PlayStatus::PLAYING);
 
-    int frameCount = 0;
+    // WeAudio 模块开启新的线程从 AVPacket 队列里取包、解码、重采样、播放，没有就阻塞等待
+    weAudio->play();
+
+    // 本线程开始读 AVPacket 包并缓存入队
+    int packetCount = 0;
     AVPacket *avPacket = NULL;
-    while (1) {
+    while (status != NULL && status->isPlaying()) {
         // Allocate an AVPacket
         avPacket = av_packet_alloc();
-        // 读取音频帧到 AVPacket
+        // 读取数据包到 AVPacket
         if (av_read_frame(pFormatCtx, avPacket) == 0) {
             if (avPacket->stream_index == weAudio->streamIndex) {
-                // 音频解码操作
-                frameCount++;
+                // 当前包为音频包
+                packetCount++;
                 if (LOG_DEBUG) {
-                    LOGD(LOG_TAG, "Audio decode frame %d", frameCount);
+                    LOGD(LOG_TAG, "Read Audio packet, current count is %d", packetCount);
                 }
+                // 缓存音频包到队列
                 weAudio->queue->putAVpacket(avPacket);
             } else {
                 // 不是音频就释放内存
                 av_packet_free(&avPacket);
                 av_free(avPacket);
+                avPacket = NULL;
             }
         } else {
+            // 文件读取出错或已经结束
             if (LOG_DEBUG) {
-                LOGD(LOG_TAG, "Audio decode finished");
+                LOGD(LOG_TAG, "AVPacket read finished");
             }
             // 减少 avPacket 对 packet 数据的引用计数
             av_packet_free(&avPacket);
             // 释放 avPacket 结构体本身
             av_free(avPacket);
             avPacket = NULL;
+
+            // 等待队列数据取完后退出，否则造成播放不完整
+            while (status != NULL && status->isPlaying()) {
+                if (weAudio->queue->getQueueSize() > 0) {
+                    continue;
+                }
+
+                status->setStatus(PlayStatus::STOPPED);
+                // 当队列中数据都取完后，再通知可能正在阻塞等待的消费者线程
+                weAudio->queue->informPutFinished();
+                // TODO ------回调应用层确认播放完成
+                break;
+            }
             break;
         }
-    }
-
-    // TODO ------回调确认播放完成 status->setStatus(PlayStatus::STOPPED);
-
-    //模拟出队
-    while (weAudio->queue->getQueueSize() > 0) {
-        AVPacket *packet = av_packet_alloc();
-        weAudio->queue->getAVpacket(packet);
-        av_packet_free(&packet);
-        av_free(packet);
-        packet = NULL;
     }
 }

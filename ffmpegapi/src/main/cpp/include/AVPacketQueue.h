@@ -20,7 +20,6 @@ class AVPacketQueue {
 private:
     const char *LOG_TAG = "AVPacketQueue";
 
-public:
     std::queue<AVPacket *> queue;
     pthread_mutex_t mutex;
     pthread_cond_t condition;
@@ -33,7 +32,12 @@ public:
 
     void putAVpacket(AVPacket *packet);
 
-    void getAVpacket(AVPacket *packet);
+    bool getAVpacket(AVPacket *packet);
+
+    /**
+     * 生产者线程通知已经没有数据可以入队了，防止最后消费者线程一直阻塞等待
+     */
+    void informPutFinished();
 
     int getQueueSize();
 

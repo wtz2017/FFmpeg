@@ -22,6 +22,7 @@ private:
 
     char *dataSource = NULL;
     JavaListener *preparedListener = NULL;
+
     AVFormatContext *pFormatCtx = NULL;
     WeAudio *weAudio = NULL;
     PlayStatus *status = NULL;
