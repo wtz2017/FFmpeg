@@ -4,13 +4,32 @@
 
 #include "WeAudio.h"
 
-WeAudio::WeAudio(PlayStatus *status) {
+WeAudio::WeAudio(PlayStatus *status, int sampleRate) {
     this->status = status;
-    queue = new AVPacketQueue(status);
-    sampledBuffer = static_cast<uint8_t *>(av_malloc(SAMPLE_BUFFER_SIZE_BYTES));
+
+    // 初始化采样参数
+    this->sampleRate = sampleRate;
+    this->channelNums = av_get_channel_layout_nb_channels(SAMPLE_OUT_CHANNEL_LAYOUT);
+    this->bytesPerSample = av_get_bytes_per_sample(SAMPLE_OUT_FORMAT);
+
+    this->queue = new AVPacketQueue(status);
 }
 
 WeAudio::~WeAudio() {
+    if (openSlPlayer != NULL) {
+        openSlPlayer->destroy();
+        delete openSlPlayer;
+        openSlPlayer = NULL;
+    }
+
+    if (sampledBuffer != NULL) {
+        av_free(sampledBuffer);
+        sampledBuffer = NULL;
+    }
+
+    releaseAvPacket();
+    releaseAvFrame();
+
     delete codecContext;
     codecContext = NULL;
 
@@ -20,24 +39,23 @@ WeAudio::~WeAudio() {
     delete queue;
     queue = NULL;
 
-    releaseAvPacket();
-    releaseAvFrame();
-
     delete testSaveFile;
     testSaveFile = NULL;
 }
 
 void *playThreadCall(void *data) {
     WeAudio *weAudio = static_cast<WeAudio *>(data);
+
     if (weAudio->TEST_SAMPLE) {
         weAudio->testSaveFile = fopen(weAudio->TEST_SAVE_FILE_PATH, "w");
     }
-    while (weAudio->status != NULL && weAudio->status->isPlaying()) {
-        weAudio->_play();
-    }
+
+    weAudio->_play();
+
     if (weAudio->TEST_SAMPLE) {
         fclose(weAudio->testSaveFile);
     }
+
     pthread_exit(&weAudio->playThread);
 }
 
@@ -45,7 +63,32 @@ void WeAudio::play() {
     pthread_create(&playThread, NULL, playThreadCall, this);
 }
 
-int WeAudio::_play() {
+void WeAudio::_play() {
+    if (sampledBuffer == NULL) {
+        // 使用 1 秒的采样字节数作为缓冲区大小
+        int bufferSize = sampleRate * channelNums * bytesPerSample;
+        sampledBuffer = static_cast<uint8_t *>(av_malloc(bufferSize));
+    }
+
+    if (openSlPlayer == NULL) {
+        openSlPlayer = new OpenSLPlayer(this);
+    }
+
+    if (!openSlPlayer->init()) {
+        LOGE(LOG_TAG, "OpenSLPlayer init failed!");
+        return;
+    }
+
+    openSlPlayer->start();
+}
+
+/**
+ * 实现 PcmGenerator 声明的虚函数，提供 PCM 数据
+ *
+ * @param buf 外部调用者用来接收数据的 buffer
+ * @return 实际返回的数据字节大小
+ */
+int WeAudio::getPcmData(void **buf) {
     int ret = 0;
     // 循环是为了本次操作如果失败就再从队列里取下一个操作，也就是理想情况只操作一次
     while (status != NULL && status->isPlaying()) {
@@ -61,6 +104,12 @@ int WeAudio::_play() {
         }
 
         break;
+    }
+
+    if (ret > 0) {
+        *buf = sampledBuffer;
+    } else {
+        *buf = NULL;
     }
 
     return ret;
@@ -150,9 +199,7 @@ int WeAudio::resample() {
         return -1;
     }
 
-    int outChannelsNums = av_get_channel_layout_nb_channels(SAMPLE_OUT_CHANNEL_LAYOUT);
-    int bytesPerSample = av_get_bytes_per_sample(SAMPLE_OUT_FORMAT);
-    int sampleDataBytes = outChannelsNums * sampleNumsPerChannel * bytesPerSample;
+    int sampleDataBytes = channelNums * sampleNumsPerChannel * bytesPerSample;
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
     }
@@ -183,4 +230,20 @@ void WeAudio::releaseAvFrame() {
     av_frame_free(&avFrame);
     av_free(avFrame);
     avFrame = NULL;
+}
+
+int WeAudio::getChannelNums() {
+    return channelNums;
+}
+
+SLuint32 WeAudio::getOpenSLSampleRate() {
+    return OpenSLPlayer::convertToOpenSLSampleRate(sampleRate);
+}
+
+int WeAudio::getBitsPerSample() {
+    return bytesPerSample * 8;
+}
+
+SLuint32 WeAudio::getOpenSLChannelLayout() {
+    return OpenSLPlayer::ffmpegToOpenSLChannelLayout(SAMPLE_OUT_CHANNEL_LAYOUT);
 }

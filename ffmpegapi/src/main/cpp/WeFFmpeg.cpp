@@ -95,7 +95,7 @@ void WeFFmpeg::_prepareAsync() {
                 LOGD(LOG_TAG, "Find audio stream info index: %d", i);
             }
             // 保存音频流信息
-            weAudio = new WeAudio(status);
+            weAudio = new WeAudio(status, pFormatCtx->streams[i]->codecpar->sample_rate);
             weAudio->streamIndex = i;
             weAudio->codecParams = pFormatCtx->streams[i]->codecpar;
             break;

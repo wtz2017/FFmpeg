@@ -13,6 +13,7 @@ add_library(
         WeFFmpeg.cpp
         WeAudio.cpp
         AVPacketQueue.cpp
+        OpenSLPlayer.cpp
         PlayStatus.cpp
         JavaListener.cpp)
 
