@@ -7,6 +7,8 @@
 
 #include "AVPacketQueue.h"
 #include "OpenSLPlayer.h"
+#include "OnPlayLoadingListener.h"
+#include "JavaListenerContainer.h"
 
 extern "C"
 {
@@ -33,6 +35,7 @@ private:
 
 public:
     PlayStatus *status = NULL;
+    JavaListenerContainer *javaListenerContainer = NULL;;
 
     int streamIndex = -1;
     AVCodecContext *codecContext = NULL;
@@ -46,13 +49,17 @@ public:
     FILE *testSaveFile = NULL;// 纯测试采样数据保存文件指针
 
 public:
-    WeAudio(PlayStatus *status, int sampleRate);
+    WeAudio(PlayStatus *status, int sampleRate, JavaListenerContainer *javaListenerContainer);
 
     ~WeAudio();
 
-    void play();
+    void startPlayer();
 
-    void _play();
+    void _startPlayer();
+
+    void pause();
+
+    void resumePlay();
 
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);

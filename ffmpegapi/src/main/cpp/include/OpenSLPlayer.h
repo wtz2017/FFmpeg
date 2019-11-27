@@ -60,6 +60,8 @@ public:
 private:
     const char *LOG_TAG = "OpenSLPlayer";
 
+    bool initSuccess = false;
+
     // 引擎
     SLObjectItf engineObject = NULL;
     SLEngineItf engine = NULL;
@@ -87,9 +89,11 @@ public:
 
     bool init();
 
-    void start();
+    void startPlay();
 
-    void stop();
+    void pause();
+
+    void resumePlay();
 
     /**
      * 确保在退出应用时销毁所有对象。
@@ -97,6 +101,8 @@ public:
      * 例如，请按照以下顺序销毁：音频播放器和录制器、输出混合，最后是引擎。
      */
     void destroy();
+
+    bool isInitSuccess();
 
     /**
      * 转换采样率（Hz）为 OpenSL ES 定义的采样率

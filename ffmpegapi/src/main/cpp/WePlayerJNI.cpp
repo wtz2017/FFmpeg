@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <JavaListenerContainer.h>
 #include "WeFFmpeg.h"
 #include "OnPreparedListener.h"
 #include "AndroidLog.h"
@@ -23,8 +24,10 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, jstring dataSource) {
     if (weFFmpeg == NULL) {
-        JavaListener *javaListener = new OnPreparedListener(jvm, env, thiz);
-        weFFmpeg = new WeFFmpeg(javaListener);
+        JavaListenerContainer *javaListenerContainer = new JavaListenerContainer();
+        javaListenerContainer->onPreparedListener = new OnPreparedListener(jvm, env, thiz);
+        javaListenerContainer->onPlayLoadingListener = new OnPlayLoadingListener(jvm, env, thiz);
+        weFFmpeg = new WeFFmpeg(javaListenerContainer);
     }
 
     int strLen = env->GetStringLength(dataSource);
@@ -70,4 +73,38 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
     }
 
     weFFmpeg->start();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativePause(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass, "Have you called start before calling the pause function?");
+        env->DeleteLocalRef(exceptionClass);
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativePause...");
+    }
+
+    weFFmpeg->pause();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeResumePlay(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass, "Have you called start before calling the resumePlay function?");
+        env->DeleteLocalRef(exceptionClass);
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeResumePlay...");
+    }
+
+    weFFmpeg->resumePlay();
 }

@@ -20,7 +20,7 @@ void AVPacketQueue::putAVpacket(AVPacket *packet) {
     pthread_mutex_lock(&mutex);
 
     queue.push(packet);
-    if (LOG_DEBUG) {
+    if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "putAVpacket current size：%d", queue.size());
     }
     pthread_cond_signal(&condition);
@@ -42,7 +42,7 @@ bool AVPacketQueue::getAVpacket(AVPacket *packet) {
                 ret = true;
                 // 弹出队首 AVPacket
                 queue.pop();
-                if (LOG_DEBUG) {
+                if (LOG_REPEAT_DEBUG) {
                     LOGD(LOG_TAG, "Pop an avpacket from the queue, %d remaining.", queue.size());
                 }
             }

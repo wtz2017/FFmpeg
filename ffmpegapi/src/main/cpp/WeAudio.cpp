@@ -4,8 +4,9 @@
 
 #include "WeAudio.h"
 
-WeAudio::WeAudio(PlayStatus *status, int sampleRate) {
+WeAudio::WeAudio(PlayStatus *status, int sampleRate, JavaListenerContainer *javaListenerContainer) {
     this->status = status;
+    this->javaListenerContainer = javaListenerContainer;
 
     // 初始化采样参数
     this->sampleRate = sampleRate;
@@ -16,6 +17,9 @@ WeAudio::WeAudio(PlayStatus *status, int sampleRate) {
 }
 
 WeAudio::~WeAudio() {
+    // 最顶层 WeFFmpeg 负责回收 javaListenerContainer，这里只把本指针置空
+    javaListenerContainer = NULL;
+
     if (openSlPlayer != NULL) {
         openSlPlayer->destroy();
         delete openSlPlayer;
@@ -50,7 +54,7 @@ void *playThreadCall(void *data) {
         weAudio->testSaveFile = fopen(weAudio->TEST_SAVE_FILE_PATH, "w");
     }
 
-    weAudio->_play();
+    weAudio->_startPlayer();
 
     if (weAudio->TEST_SAMPLE) {
         fclose(weAudio->testSaveFile);
@@ -59,11 +63,14 @@ void *playThreadCall(void *data) {
     pthread_exit(&weAudio->playThread);
 }
 
-void WeAudio::play() {
+void WeAudio::startPlayer() {
     pthread_create(&playThread, NULL, playThreadCall, this);
 }
 
-void WeAudio::_play() {
+void WeAudio::_startPlayer() {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "_startPlayer");
+    }
     if (sampledBuffer == NULL) {
         // 使用 1 秒的采样字节数作为缓冲区大小
         int bufferSize = sampleRate * channelNums * bytesPerSample;
@@ -79,7 +86,35 @@ void WeAudio::_play() {
         return;
     }
 
-    openSlPlayer->start();
+    openSlPlayer->startPlay();
+}
+
+void WeAudio::pause() {
+    if (openSlPlayer == NULL) {
+        LOGE(LOG_TAG, "Invoke pause but openSlPlayer is NULL!");
+        return;
+    }
+
+    if (!openSlPlayer->isInitSuccess()) {
+        LOGE(LOG_TAG, "Invoke pause but openSlPlayer did not initialize successfully!");
+        return;
+    }
+
+    openSlPlayer->pause();
+}
+
+void WeAudio::resumePlay() {
+    if (openSlPlayer == NULL) {
+        LOGE(LOG_TAG, "Invoke resumePlay but openSlPlayer is NULL!");
+        return;
+    }
+
+    if (!openSlPlayer->isInitSuccess()) {
+        LOGE(LOG_TAG, "Invoke resumePlay but openSlPlayer did not initialize successfully!");
+        return;
+    }
+
+    openSlPlayer->resumePlay();
 }
 
 /**
@@ -92,6 +127,22 @@ int WeAudio::getPcmData(void **buf) {
     int ret = 0;
     // 循环是为了本次操作如果失败就再从队列里取下一个操作，也就是理想情况只操作一次
     while (status != NULL && status->isPlaying()) {
+        if (queue->getQueueSize() == 0) {
+            // 队列中无数据，表示正在加载中
+            // TODO 需要排除播放完成的场景
+            if (!status->isPlayLoading) {
+                status->isPlayLoading = true;
+                javaListenerContainer->onPlayLoadingListener->callback(1, true);
+            }
+            continue;
+        }
+
+        // 队列中有数据
+        if (status->isPlayLoading) {
+            status->isPlayLoading = false;
+            javaListenerContainer->onPlayLoadingListener->callback(1, false);
+        }
+
         // 解 AVPacket 包
         if (!decodeQueuePacket()) {
             continue;
@@ -200,7 +251,7 @@ int WeAudio::resample() {
     }
 
     int sampleDataBytes = channelNums * sampleNumsPerChannel * bytesPerSample;
-    if (LOG_DEBUG) {
+    if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
     }
     if (TEST_SAMPLE) {

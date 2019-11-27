@@ -22,10 +22,29 @@ public class WePlayer {
     private native void nativeSetDataSource(String dataSource);
     private native void nativePrepareAsync();
     private native void nativeStart();
+    private native void nativePause();
+    private native void nativeResumePlay();
 
-    private String mDataSource;
     private OnPreparedListener mOnPreparedListener;
+    private OnPlayLoadingListener mOnPlayLoadingListener;
+    private String mDataSource;
     private boolean isPrepared;
+
+    public interface OnPreparedListener {
+        void onPrepared();
+    }
+
+    public interface OnPlayLoadingListener {
+        void onPlayLoading(boolean isLoading);
+    }
+
+    public void setOnPreparedListener(OnPreparedListener onPreparedListener) {
+        this.mOnPreparedListener = onPreparedListener;
+    }
+
+    public void setOnPlayLoadingListener(OnPlayLoadingListener onPlayLoadingListener) {
+        this.mOnPlayLoadingListener = onPlayLoadingListener;
+    }
 
     public void setDataSource(String dataSource) {
         if (TextUtils.equals(dataSource, mDataSource)) {
@@ -34,14 +53,6 @@ public class WePlayer {
         isPrepared = false;
         this.mDataSource = dataSource;
         nativeSetDataSource(mDataSource);
-    }
-
-    public interface OnPreparedListener {
-        void onPrepared();
-    }
-
-    public void setOnPreparedListener(OnPreparedListener onPreparedListener) {
-        this.mOnPreparedListener = onPreparedListener;
     }
 
     public void prepareAsync() {
@@ -73,6 +84,32 @@ public class WePlayer {
         }
 
         nativeStart();
+    }
+
+    /**
+     * called from native
+     */
+    public void onNativePlayLoading(boolean isLoading) {
+        LogUtils.d(TAG, "onNativePlayLoading isLoading: " + isLoading);
+        if (mOnPlayLoadingListener != null) {
+            mOnPlayLoadingListener.onPlayLoading(isLoading);
+        }
+    }
+
+    public void pause() {
+        if (!isPrepared) {
+            throw new IllegalStateException("Can't call pause method before prepare finished");
+        }
+
+        nativePause();
+    }
+
+    public void resumePlay() {
+        if (!isPrepared) {
+            throw new IllegalStateException("Can't call resumePlay method before prepare finished");
+        }
+
+        nativeResumePlay();
     }
 
 }

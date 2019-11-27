@@ -14,7 +14,7 @@ OpenSLPlayer::~OpenSLPlayer() {
 }
 
 void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
-    if (LOG_DEBUG) {
+    if (LOG_REPEAT_DEBUG) {
         LOGD("OpenSLPlayer", "call pcmBufferCallback context=%p", context);
     }
     OpenSLPlayer *player = (OpenSLPlayer *) context;
@@ -67,31 +67,45 @@ bool OpenSLPlayer::init() {
         return false;
     }
 
-    return true;
-}
-
-void OpenSLPlayer::start() {
-    if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "start");
-    }
-    // 设置播放状态为正在播放
     setPlayState(SL_PLAYSTATE_PLAYING);
 
     // 主动调用缓冲队列回调函数开始工作
     pcmBufferCallback(pcmBufferQueue, this);
+
+    initSuccess = true;
+    return true;
 }
 
-void OpenSLPlayer::stop() {
+void OpenSLPlayer::startPlay() {
     if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "stop");
+        LOGD(LOG_TAG, "startPlay");
     }
-    // TODO
+    // 设置播放状态为正在播放
+    setPlayState(SL_PLAYSTATE_PLAYING);
+
+    // 首次启动时需要主动调用缓冲队列回调函数开始播放
+    pcmBufferCallback(pcmBufferQueue, this);
+}
+
+void OpenSLPlayer::pause() {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "pause");
+    }
+    setPlayState(SL_PLAYSTATE_PAUSED);
+}
+
+void OpenSLPlayer::resumePlay() {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "resumePlay");
+    }
+    setPlayState(SL_PLAYSTATE_PLAYING);
 }
 
 void OpenSLPlayer::destroy() {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "destroy");
     }
+    initSuccess = false;
     destroyBufferQueueAudioPlayer();
     destroyOutputMixer();
     destroyEngine();
@@ -301,6 +315,10 @@ void OpenSLPlayer::destroyEngine() {
     }
 }
 
+bool OpenSLPlayer::isInitSuccess() {
+    return initSuccess;
+}
+
 SLuint32 OpenSLPlayer::convertToOpenSLSampleRate(int sampleRate) {
     SLuint32 rate = 0;
     switch (sampleRate) {
@@ -435,4 +453,3 @@ SLuint32 OpenSLPlayer::ffmpegToOpenSLChannelLayout(int64_t ffmpegChannelLayout) 
     }
     return ret;
 }
-

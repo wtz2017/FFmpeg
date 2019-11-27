@@ -14,6 +14,7 @@ extern "C"
 };
 
 #include "WeAudio.h"
+#include "JavaListenerContainer.h"
 
 class WeFFmpeg {
 
@@ -21,7 +22,7 @@ private:
     const char *LOG_TAG = "WeFFmpeg";
 
     char *dataSource = NULL;
-    JavaListener *preparedListener = NULL;
+    JavaListenerContainer *javaListenerContainer = NULL;
 
     AVFormatContext *pFormatCtx = NULL;
     WeAudio *weAudio = NULL;
@@ -32,7 +33,7 @@ public:
     pthread_t decodeThread;
 
 public:
-    WeFFmpeg(JavaListener *preparedListener);
+    WeFFmpeg(JavaListenerContainer *javaListenerContainer);
 
     ~WeFFmpeg();
 
@@ -45,6 +46,11 @@ public:
     void start();
 
     void _start();
+
+    void pause();
+
+    void resumePlay();
+
 };
 
 

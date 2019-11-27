@@ -6,8 +6,8 @@
 #include "WeFFmpeg.h"
 #include "WeAudio.h"
 
-WeFFmpeg::WeFFmpeg(JavaListener *preparedListener) {
-    this->preparedListener = preparedListener;
+WeFFmpeg::WeFFmpeg(JavaListenerContainer *javaListenerContainer) {
+    this->javaListenerContainer = javaListenerContainer;
     status = new PlayStatus();
 }
 
@@ -15,8 +15,9 @@ WeFFmpeg::~WeFFmpeg() {
     delete dataSource;
     dataSource = NULL;
 
-    delete preparedListener;
-    preparedListener = NULL;
+    // 最顶层负责回收 javaListenerContainer
+    delete javaListenerContainer;
+    javaListenerContainer = NULL;
 
     delete pFormatCtx;
     pFormatCtx = NULL;
@@ -25,6 +26,7 @@ WeFFmpeg::~WeFFmpeg() {
     weAudio = NULL;
 
     status->setStatus(PlayStatus::STOPPED);
+    // 最顶层负责回收 status
     delete status;
     status == NULL;
 }
@@ -95,7 +97,8 @@ void WeFFmpeg::_prepareAsync() {
                 LOGD(LOG_TAG, "Find audio stream info index: %d", i);
             }
             // 保存音频流信息
-            weAudio = new WeAudio(status, pFormatCtx->streams[i]->codecpar->sample_rate);
+            weAudio = new WeAudio(status, pFormatCtx->streams[i]->codecpar->sample_rate,
+                                  javaListenerContainer);
             weAudio->streamIndex = i;
             weAudio->codecParams = pFormatCtx->streams[i]->codecpar;
             break;
@@ -145,7 +148,7 @@ void WeFFmpeg::_prepareAsync() {
     status->setStatus(PlayStatus::PREPARED);
 
     // 回调初始化准备完成
-    preparedListener->callback(1, dataSource);
+    javaListenerContainer->onPreparedListener->callback(1, dataSource);
 }
 
 void *decodeThreadCall(void *data) {
@@ -155,6 +158,10 @@ void *decodeThreadCall(void *data) {
 }
 
 void WeFFmpeg::start() {
+    if (status != NULL && !status->isPrepared()) {
+        LOGE(LOG_TAG, "Invoke start but status is not prepared");
+        return;
+    }
     // 线程创建时入口函数必须是全局函数或者某个类的静态成员函数
     pthread_create(&decodeThread, NULL, decodeThreadCall, this);
 }
@@ -169,12 +176,12 @@ void WeFFmpeg::_start() {
     status->setStatus(PlayStatus::PLAYING);
 
     // WeAudio 模块开启新的线程从 AVPacket 队列里取包、解码、重采样、播放，没有就阻塞等待
-    weAudio->play();
+    weAudio->startPlayer();
 
     // 本线程开始读 AVPacket 包并缓存入队
     int packetCount = 0;
     AVPacket *avPacket = NULL;
-    while (status != NULL && status->isPlaying()) {
+    while (status != NULL && !status->isStoped()) {
         // Allocate an AVPacket
         avPacket = av_packet_alloc();
         // 读取数据包到 AVPacket
@@ -182,7 +189,7 @@ void WeFFmpeg::_start() {
             if (avPacket->stream_index == weAudio->streamIndex) {
                 // 当前包为音频包
                 packetCount++;
-                if (LOG_DEBUG) {
+                if (LOG_REPEAT_DEBUG) {
                     LOGD(LOG_TAG, "Read Audio packet, current count is %d", packetCount);
                 }
                 // 缓存音频包到队列
@@ -205,7 +212,7 @@ void WeFFmpeg::_start() {
             avPacket = NULL;
 
             // 等待队列数据取完后退出，否则造成播放不完整
-            while (status != NULL && status->isPlaying()) {
+            while (status != NULL && !status->isStoped()) {
                 if (weAudio->queue->getQueueSize() > 0) {
                     continue;
                 }
@@ -219,4 +226,24 @@ void WeFFmpeg::_start() {
             break;
         }
     }
+}
+
+void WeFFmpeg::pause() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "pause but weAudio is NULL");
+        status->setStatus(PlayStatus::ERROR);
+        return;
+    }
+
+    weAudio->pause();
+}
+
+void WeFFmpeg::resumePlay() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "resumePlay but weAudio is NULL");
+        status->setStatus(PlayStatus::ERROR);
+        return;
+    }
+
+    weAudio->resumePlay();
 }

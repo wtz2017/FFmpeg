@@ -34,7 +34,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_java_set_byte_array_to_c).setOnClickListener(this);
         findViewById(R.id.btn_c_set_byte_array_to_java).setOnClickListener(this);
         findViewById(R.id.btn_test_opensl_es).setOnClickListener(this);
-        findViewById(R.id.btn_test_ffmpeg).setOnClickListener(this);
+        findViewById(R.id.btn_open_audio_play).setOnClickListener(this);
+        findViewById(R.id.btn_pause_audio).setOnClickListener(this);
+        findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
 
         wePlayer = new WePlayer();
     }
@@ -88,8 +90,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 String path = "/sdcard/test.pcm";
                 cppThreadDemo.playPCM(path);
                 break;
-            case R.id.btn_test_ffmpeg:
+            case R.id.btn_open_audio_play:
                 wePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
+//                wePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
                 wePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                     @Override
                     public void onPrepared() {
@@ -97,7 +100,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         wePlayer.start();
                     }
                 });
+                wePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
+                    @Override
+                    public void onPlayLoading(boolean isLoading) {
+                        Log.d(TAG, "WePlayer onPlayLoading: " + isLoading);
+                    }
+                });
                 wePlayer.prepareAsync();
+                break;
+            case R.id.btn_pause_audio:
+                wePlayer.pause();
+                break;
+            case R.id.btn_resume_play_audio:
+                wePlayer.resumePlay();
                 break;
         }
     }

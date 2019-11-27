@@ -55,9 +55,21 @@
         android:text="测试 OpenSL ES"/>
 
     <Button
-        android:id="@+id/btn_test_ffmpeg"
+        android:id="@+id/btn_open_audio_play"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="测试 FFmpeg"/>
+        android:text="打开音频文件开始播放"/>
+
+    <Button
+        android:id="@+id/btn_pause_audio"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="暂停音频播放"/>
+
+    <Button
+        android:id="@+id/btn_resume_play_audio"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="恢复音频播放"/>
 
 </LinearLayout>
