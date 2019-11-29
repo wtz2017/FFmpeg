@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include "JavaListener.h"
 #include "AndroidLog.h"
+#include "WeUtils.h"
 
 extern "C"
 {
@@ -51,6 +52,20 @@ public:
     void pause();
 
     void resumePlay();
+
+    /**
+     * Gets the duration of the file.
+     *
+     * @return the duration in milliseconds
+     */
+    int getDuration();
+
+    /**
+     * Gets the current playback position.
+     *
+     * @return the current position in milliseconds
+     */
+    int getCurrentPosition();
 
 };
 

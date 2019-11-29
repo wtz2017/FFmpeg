@@ -73,8 +73,8 @@ void WeAudio::_startPlayer() {
     }
     if (sampledBuffer == NULL) {
         // 使用 1 秒的采样字节数作为缓冲区大小
-        int bufferSize = sampleRate * channelNums * bytesPerSample;
-        sampledBuffer = static_cast<uint8_t *>(av_malloc(bufferSize));
+        sampledSizePerSecond = sampleRate * channelNums * bytesPerSample;
+        sampledBuffer = static_cast<uint8_t *>(av_malloc(sampledSizePerSecond));
     }
 
     if (openSlPlayer == NULL) {
@@ -251,6 +251,13 @@ int WeAudio::resample() {
     }
 
     int sampleDataBytes = channelNums * sampleNumsPerChannel * bytesPerSample;
+    currentFrameTime = avFrame->pts * av_q2d(streamTimeBase);
+    if (currentFrameTime < currentPlayTime) {
+        // avFrame->pts maybe 0
+        currentFrameTime = currentPlayTime;
+    }
+    // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
+    currentPlayTime = currentFrameTime + (sampleDataBytes / (double) sampledSizePerSecond);
     if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
     }

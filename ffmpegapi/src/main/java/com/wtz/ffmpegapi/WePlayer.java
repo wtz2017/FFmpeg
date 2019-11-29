@@ -24,6 +24,8 @@ public class WePlayer {
     private native void nativeStart();
     private native void nativePause();
     private native void nativeResumePlay();
+    private native int nativeGetDuration();
+    private native int nativeGetCurrentPosition();
 
     private OnPreparedListener mOnPreparedListener;
     private OnPlayLoadingListener mOnPlayLoadingListener;
@@ -110,6 +112,24 @@ public class WePlayer {
         }
 
         nativeResumePlay();
+    }
+
+    /**
+     * Gets the duration of the file.
+     *
+     * @return the duration in milliseconds
+     */
+    public int getDuration() {
+        return nativeGetDuration();
+    }
+
+    /**
+     * Gets the current playback position.
+     *
+     * @return the current position in milliseconds
+     */
+    public int getCurrentPosition() {
+        return nativeGetCurrentPosition();
     }
 
 }

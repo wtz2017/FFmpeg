@@ -3,7 +3,6 @@
 //
 
 #include "WeFFmpeg.h"
-#include "WeUtils.h"
 
 WeFFmpeg::WeFFmpeg(JavaListenerContainer *javaListenerContainer) {
     this->javaListenerContainer = javaListenerContainer;
@@ -103,6 +102,8 @@ void WeFFmpeg::_prepareAsync() {
                                   javaListenerContainer);
             weAudio->streamIndex = i;
             weAudio->codecParams = pFormatCtx->streams[i]->codecpar;
+            weAudio->streamTimeBase = pFormatCtx->streams[i]->time_base;
+            weAudio->duration = pFormatCtx->duration * av_q2d(AV_TIME_BASE_Q);
             break;
         }
     }
@@ -248,4 +249,36 @@ void WeFFmpeg::resumePlay() {
     }
 
     weAudio->resumePlay();
+}
+
+/**
+ * Gets the duration of the file.
+ *
+ * @return the duration in milliseconds
+ */
+int WeFFmpeg::getDuration() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "getDuration but weAudio is NULL");
+        // 不涉及到控制，不设置错误状态
+        return 0;
+    }
+    return weAudio->duration * 1000;
+}
+
+/**
+ * Gets the current playback position.
+ *
+ * @return the current position in milliseconds
+ */
+int WeFFmpeg::getCurrentPosition() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "getCurrentPosition but weAudio is NULL");
+        // 不涉及到控制，不设置错误状态
+        return 0;
+    }
+    int ret = weAudio->currentPlayTime * 1000;
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "getCurrentPosition: %d", ret);
+    }
+    return ret;
 }

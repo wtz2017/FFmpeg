@@ -108,3 +108,25 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeResumePlay(JNIEnv *env, jobject thiz) {
 
     weFFmpeg->resumePlay();
 }
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetDuration(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        // 不涉及到控制状态，不抛异常
+        return 0;
+    }
+
+    return weFFmpeg->getDuration();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetCurrentPosition(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        // 不涉及到控制状态，不抛异常
+        return 0;
+    }
+
+    return weFFmpeg->getCurrentPosition();
+}

@@ -25,6 +25,7 @@ private:
     AVFrame *avFrame = NULL;
 
     uint8_t *sampledBuffer = NULL;
+    int sampledSizePerSecond;
     int sampleRate;// 采样率（Hz）与原数据保持一致，从外部传参
     const int64_t SAMPLE_OUT_CHANNEL_LAYOUT = AV_CH_LAYOUT_STEREO;// 声道布局：立体声
     int channelNums;// 由声道布局计算得出声道数
@@ -40,6 +41,11 @@ public:
     int streamIndex = -1;
     AVCodecContext *codecContext = NULL;
     AVCodecParameters *codecParams = NULL;
+
+    int duration = 0;
+    AVRational streamTimeBase;
+    double currentFrameTime = 0;
+    double currentPlayTime = 0;
 
     AVPacketQueue *queue = NULL;
     pthread_t playThread;

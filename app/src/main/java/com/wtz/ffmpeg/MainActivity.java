@@ -1,32 +1,55 @@
 package com.wtz.ffmpeg;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
+import com.wtz.ffmpeg.utils.DateTimeUtil;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.CppThreadDemo;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "FFmpegActivity";
 
-    private WePlayer wePlayer;
-
-    private CppThreadDemo cppThreadDemo;
+    private CppThreadDemo mCppThreadDemo;
     private boolean isProducing;
+
+    private WePlayer mWePlayer;
+
+    private TextView mPlayTimeView;
+    private String mDurationText;
+
+    private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
+    private static final int MSG_UPDATE_PLAY_TIME = 1;
+    private Handler mHandler = new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            switch (msg.what) {
+                case MSG_UPDATE_PLAY_TIME:
+                    updatePlayTime();
+                    removeMessages(MSG_UPDATE_PLAY_TIME);
+                    sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME, UPDATE_PLAY_TIME_INTERVAL);
+                    break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        cppThreadDemo = new CppThreadDemo();
-        cppThreadDemo.stringToJNI("hello! I'm java!");
+        mCppThreadDemo = new CppThreadDemo();
+        mCppThreadDemo.stringToJNI("hello! I'm java!");
 
-        ((TextView) findViewById(R.id.sample_text)).setText(cppThreadDemo.stringFromJNI());
+        ((TextView) findViewById(R.id.sample_text)).setText(mCppThreadDemo.stringFromJNI());
         findViewById(R.id.btn_simple_pthread).setOnClickListener(this);
         findViewById(R.id.btn_start_product_consumer).setOnClickListener(this);
         findViewById(R.id.btn_stop_product_consumer).setOnClickListener(this);
@@ -38,7 +61,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_pause_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
 
-        wePlayer = new WePlayer();
+        mPlayTimeView = findViewById(R.id.tv_play_time);
+
+        mWePlayer = new WePlayer();
     }
 
     @Override
@@ -46,28 +71,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Log.d(TAG, "onClick " + view);
         switch (view.getId()) {
             case R.id.btn_simple_pthread:
-                cppThreadDemo.testSimpleThread();
+                mCppThreadDemo.testSimpleThread();
                 break;
             case R.id.btn_start_product_consumer:
                 if (!isProducing) {
                     isProducing = true;
-                    cppThreadDemo.startProduceConsumeThread();
+                    mCppThreadDemo.startProduceConsumeThread();
                 }
                 break;
             case R.id.btn_stop_product_consumer:
                 if (isProducing) {
-                    cppThreadDemo.stopProduceConsumeThread();
+                    mCppThreadDemo.stopProduceConsumeThread();
                     isProducing = false;
                 }
                 break;
             case R.id.btn_c_thread_call_java:
-                cppThreadDemo.setOnResultListener(new CppThreadDemo.OnResultListener() {
+                mCppThreadDemo.setOnResultListener(new CppThreadDemo.OnResultListener() {
                     @Override
                     public void onResult(int code, String msg) {
                         Log.d(TAG, "OnResultListener code: " + code + "; msg: " + msg);
                     }
                 });
-                cppThreadDemo.callbackFromC();
+                mCppThreadDemo.callbackFromC();
                 break;
             case R.id.btn_java_set_byte_array_to_c:
                 byte[] data = new byte[6];
@@ -75,46 +100,61 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     data[i] = (byte) i;
                     Log.d(TAG, "before setByteArray data " + i + " = " + data[i]);
                 }
-                cppThreadDemo.setByteArray(data);
+                mCppThreadDemo.setByteArray(data);
                 for (int i = 0; i < data.length; i++) {
                     Log.d(TAG, "after setByteArray data " + i + " = " + data[i]);
                 }
                 break;
             case R.id.btn_c_set_byte_array_to_java:
-                byte[] array = cppThreadDemo.getByteArray();
+                byte[] array = mCppThreadDemo.getByteArray();
                 for (int i = 0; i < array.length; i++) {
                     Log.d(TAG, "getByteArray data " + i + " = " + array[i]);
                 }
                 break;
             case R.id.btn_test_opensl_es:
                 String path = "/sdcard/test.pcm";
-                cppThreadDemo.playPCM(path);
+                mCppThreadDemo.playPCM(path);
                 break;
             case R.id.btn_open_audio_play:
-                wePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
-//                wePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
-                wePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
+                mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
+//                mWePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
+                mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                     @Override
                     public void onPrepared() {
                         Log.d(TAG, "WePlayer onPrepared");
-                        wePlayer.start();
+                        mWePlayer.start();
+                        mDurationText = DateTimeUtil.changeRemainTimeToHms(mWePlayer.getDuration());
+                        mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
                     }
                 });
-                wePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
+                mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
                     @Override
                     public void onPlayLoading(boolean isLoading) {
                         Log.d(TAG, "WePlayer onPlayLoading: " + isLoading);
                     }
                 });
-                wePlayer.prepareAsync();
+                mWePlayer.prepareAsync();
                 break;
             case R.id.btn_pause_audio:
-                wePlayer.pause();
+                mWePlayer.pause();
+                mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
                 break;
             case R.id.btn_resume_play_audio:
-                wePlayer.resumePlay();
+                mWePlayer.resumePlay();
+                mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
                 break;
         }
+    }
+
+    private void updatePlayTime() {
+        String currentPosition = DateTimeUtil.changeRemainTimeToHms(mWePlayer.getCurrentPosition());
+        mPlayTimeView.setText(currentPosition + "/" + mDurationText);
+    }
+
+    @Override
+    protected void onDestroy() {
+        mHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
 }
