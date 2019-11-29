@@ -2,9 +2,8 @@
 // Created by WTZ on 2019/11/19.
 //
 
-#include "AndroidLog.h"
 #include "WeFFmpeg.h"
-#include "WeAudio.h"
+#include "WeUtils.h"
 
 WeFFmpeg::WeFFmpeg(JavaListenerContainer *javaListenerContainer) {
     this->javaListenerContainer = javaListenerContainer;
@@ -92,6 +91,9 @@ void WeFFmpeg::_prepareAsync() {
     }
     // 从流信息中遍历查找音频流
     for (int i = 0; i < pFormatCtx->nb_streams; i++) {
+        if (LOG_DEBUG) {
+            WeUtils::av_dump_format_for_android(pFormatCtx, i, NULL, 0);
+        }
         if (pFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
             if (LOG_DEBUG) {
                 LOGD(LOG_TAG, "Find audio stream info index: %d", i);

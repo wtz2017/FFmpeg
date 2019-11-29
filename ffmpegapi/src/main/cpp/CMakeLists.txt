@@ -15,7 +15,8 @@ add_library(
         AVPacketQueue.cpp
         OpenSLPlayer.cpp
         PlayStatus.cpp
-        JavaListener.cpp)
+        JavaListener.cpp
+        WeUtils.cpp)
 
 add_library(
         thread_demo

@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 #include "JavaListener.h"
+#include "AndroidLog.h"
 
 extern "C"
 {
