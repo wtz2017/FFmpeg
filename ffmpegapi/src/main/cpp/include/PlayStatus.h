@@ -10,7 +10,7 @@ class PlayStatus {
 
 public:
     enum Status {
-        PREPARING, PREPARED, PLAYING, PAUSED, STOPPED, ERROR
+        PREPARING, PREPARED, PLAYING, PAUSED, COMPLETED, STOPPED, ERROR
     };
 
     /**
@@ -37,7 +37,11 @@ public:
 
     bool isPaused();
 
+    bool isCompleted();
+
     bool isStoped();
+
+    bool isError();
 
 };
 

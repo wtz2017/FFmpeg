@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_open_audio_play).setOnClickListener(this);
         findViewById(R.id.btn_pause_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
+        findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
 
         mPlayTimeView = findViewById(R.id.tv_play_time);
 
@@ -118,6 +119,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.btn_open_audio_play:
                 mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
 //                mWePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
+//                mWePlayer.setDataSource("http://ngcdn004.cnr.cn/live/dszs/index.m3u8");
                 mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                     @Override
                     public void onPrepared() {
@@ -142,6 +144,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.btn_resume_play_audio:
                 mWePlayer.resumePlay();
                 mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
+                break;
+            case R.id.btn_stop_play_audio:
+                mWePlayer.stop();
+                mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
                 break;
         }
     }

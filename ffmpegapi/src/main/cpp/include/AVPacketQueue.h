@@ -20,10 +20,11 @@ class AVPacketQueue {
 private:
     const char *LOG_TAG = "AVPacketQueue";
 
+    PlayStatus *status = NULL;
+
     std::queue<AVPacket *> queue;
     pthread_mutex_t mutex;
     pthread_cond_t condition;
-    PlayStatus *status = NULL;
 
 public:
     AVPacketQueue(PlayStatus *status);
@@ -41,7 +42,7 @@ public:
 
     int getQueueSize();
 
-    void clearQueue(std::queue<AVPacket *> &queue);
+    void clearQueue();
 
 };
 

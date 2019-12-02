@@ -102,4 +102,11 @@
             android:layout_height="wrap_content"
             android:text="恢复音频播放" />
     </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_stop_play_audio"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="停止音频播放" />
+
 </LinearLayout>

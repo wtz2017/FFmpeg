@@ -19,8 +19,6 @@ extern "C"
 class WeAudio : public PcmGenerator {
 
 private:
-    const char *LOG_TAG = "WeAudio";
-
     AVPacket *avPacket = NULL;
     AVFrame *avFrame = NULL;
 
@@ -35,6 +33,8 @@ private:
     OpenSLPlayer *openSlPlayer = NULL;
 
 public:
+    const char *LOG_TAG = "WeAudio";
+
     PlayStatus *status = NULL;
     JavaListenerContainer *javaListenerContainer = NULL;;
 
@@ -48,7 +48,7 @@ public:
     double currentPlayTime = 0;
 
     AVPacketQueue *queue = NULL;
-    pthread_t playThread;
+    pthread_t startPlayThread;
 
     const bool TEST_SAMPLE = false;// TODO 纯测试采样开关
     const char *TEST_SAVE_FILE_PATH = "/sdcard/test_sample_data.pcm";
@@ -66,6 +66,8 @@ public:
     void pause();
 
     void resumePlay();
+
+    void stopPlay();
 
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);
@@ -88,6 +90,8 @@ private:
      * @return -1 if failed, or sampled bytes
      */
     int resample();
+
+    void release();
 
     void releaseAvPacket();
 

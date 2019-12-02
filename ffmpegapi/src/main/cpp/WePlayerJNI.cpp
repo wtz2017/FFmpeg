@@ -46,7 +46,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativePrepareAsync(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {
         jclass exceptionClass = env->FindClass("java/lang/Exception");
         env->ThrowNew(exceptionClass,
-                      "Have you called setDataSource before calling the prepareAsync function?");
+                      "Have you called setDataSource before calling the prepare function?");
         env->DeleteLocalRef(exceptionClass);
         return;
     }
@@ -72,7 +72,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
         LOGD(LOG_TAG, "nativeStart...");
     }
 
-    weFFmpeg->start();
+    weFFmpeg->startDemuxThread();
 }
 
 extern "C"
@@ -114,6 +114,7 @@ JNIEXPORT jint JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeGetDuration(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {
         // 不涉及到控制状态，不抛异常
+        LOGE(LOG_TAG, "nativeGetDuration...but weFFmpeg is NULL");
         return 0;
     }
 
@@ -125,8 +126,42 @@ JNIEXPORT jint JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeGetCurrentPosition(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {
         // 不涉及到控制状态，不抛异常
+        LOGE(LOG_TAG, "nativeGetCurrentPosition...but weFFmpeg is NULL");
         return 0;
     }
 
     return weFFmpeg->getCurrentPosition();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetStopFlag(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        // 允许直接停止，不抛异常
+        LOGE(LOG_TAG, "nativeSetStopFlag...but weFFmpeg is NULL");
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeSetStopFlag...");
+    }
+
+    weFFmpeg->setStopFlag();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeRelease(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        // 允许直接释放，不抛异常
+        LOGE(LOG_TAG, "nativeRelease...but weFFmpeg is NULL");
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeRelease...");
+    }
+
+    delete weFFmpeg;
+    weFFmpeg = NULL;
 }

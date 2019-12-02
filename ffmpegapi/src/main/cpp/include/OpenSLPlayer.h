@@ -95,12 +95,7 @@ public:
 
     void resumePlay();
 
-    /**
-     * 确保在退出应用时销毁所有对象。
-     * 对象应按照与创建时相反的顺序销毁，因为销毁具有依赖对象的对象并不安全。
-     * 例如，请按照以下顺序销毁：音频播放器和录制器、输出混合，最后是引擎。
-     */
-    void destroy();
+    void stopPlay();
 
     bool isInitSuccess();
 
@@ -127,9 +122,16 @@ private:
 
     bool createBufferQueueAudioPlayer();
 
-    bool setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback, void* pContext);
+    bool setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback, void *pContext);
 
     bool setPlayState(SLuint32 state);
+
+    /**
+     * 确保在退出应用时销毁所有对象。
+     * 对象应按照与创建时相反的顺序销毁，因为销毁具有依赖对象的对象并不安全。
+     * 例如，请按照以下顺序销毁：音频播放器和录制器、输出混合，最后是引擎。
+     */
+    void destroy();
 
     /**
      * destroy buffer queue audio player object, and invalidate all associated interfaces

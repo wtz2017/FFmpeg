@@ -28,13 +28,11 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
         LOGE("OpenSLPlayer", "pcmBufferCallback getPcmData failed");
         return;
     }
-    if (NULL != player->enqueueBuffer) {
-        SLresult result;
-        result = (*player->pcmBufferQueue)->Enqueue(
-                player->pcmBufferQueue, player->enqueueBuffer, size);
-        if (SL_RESULT_SUCCESS != result) {
-            LOGE("OpenSLPlayer", "pcmBufferCallback BufferQueue Enqueue exception!");
-        }
+    SLresult result;
+    result = (*player->pcmBufferQueue)->Enqueue(
+            player->pcmBufferQueue, player->enqueueBuffer, size);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE("OpenSLPlayer", "pcmBufferCallback BufferQueue Enqueue exception!");
     }
 }
 
@@ -42,6 +40,7 @@ bool OpenSLPlayer::init() {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "init");
     }
+
     // 初始化引擎
     if (!initEngine()) {
         destroy();
@@ -99,6 +98,13 @@ void OpenSLPlayer::resumePlay() {
         LOGD(LOG_TAG, "resumePlay");
     }
     setPlayState(SL_PLAYSTATE_PLAYING);
+}
+
+void OpenSLPlayer::stopPlay() {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "stopPlay");
+    }
+    setPlayState(SL_PLAYSTATE_STOPPED);
 }
 
 void OpenSLPlayer::destroy() {
@@ -279,6 +285,11 @@ OpenSLPlayer::setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback
 }
 
 bool OpenSLPlayer::setPlayState(SLuint32 state) {
+    if (playController == NULL) {
+        LOGE(LOG_TAG, "SetPlayState %d failed because playController is NULL !", state);
+        return false;
+    }
+
     SLresult result;
     result = (*playController)->SetPlayState(playController, state);
     if (SL_RESULT_SUCCESS != result) {

@@ -11,7 +11,6 @@ PlayStatus::PlayStatus() {
 PlayStatus::~PlayStatus() {
 }
 
-// TODO 是否加锁同步处理
 void PlayStatus::setStatus(PlayStatus::Status status) {
     this->status = status;
 }
@@ -32,6 +31,15 @@ bool PlayStatus::isPaused() {
     return status == PAUSED;
 }
 
+bool PlayStatus::isCompleted() {
+    return status == COMPLETED;
+}
+
 bool PlayStatus::isStoped() {
     return status == STOPPED;
 }
+
+bool PlayStatus::isError() {
+    return status == ERROR;
+}
+

@@ -1,11 +1,14 @@
 package com.wtz.ffmpegapi;
 
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Message;
 import android.text.TextUtils;
 
 import com.wtz.ffmpegapi.utils.LogUtils;
 
 public class WePlayer {
-    private static final String TAG = "WePlayer";
+    private static final String TAG = "WePlayer-Java";
 
     static {
         System.loadLibrary("weplayer");
@@ -20,11 +23,21 @@ public class WePlayer {
     }
 
     private native void nativeSetDataSource(String dataSource);
+
     private native void nativePrepareAsync();
+
     private native void nativeStart();
+
     private native void nativePause();
+
     private native void nativeResumePlay();
+
+    private native void nativeSetStopFlag();
+
+    private native void nativeRelease();
+
     private native int nativeGetDuration();
+
     private native int nativeGetCurrentPosition();
 
     private OnPreparedListener mOnPreparedListener;
@@ -32,12 +45,58 @@ public class WePlayer {
     private String mDataSource;
     private boolean isPrepared;
 
+    private HandlerThread mWorkThread;
+    private Handler mWorkHandler;
+    private static final int HANDLE_SET_DATA_SOURCE = 1;
+    private static final int HANDLE_PREPARE_ASYNC = 2;
+    private static final int HANDLE_START = 3;
+    private static final int HANDLE_PAUSE = 4;
+    private static final int HANDLE_RESUME_PLAY = 5;
+    private static final int HANDLE_RELEASE = 6;
+
     public interface OnPreparedListener {
         void onPrepared();
     }
 
     public interface OnPlayLoadingListener {
         void onPlayLoading(boolean isLoading);
+    }
+
+    public WePlayer() {
+        mWorkThread = new HandlerThread("WePlayer-dispatcher");
+        mWorkThread.start();
+        mWorkHandler = new Handler(mWorkThread.getLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                int msgType = msg.what;
+                LogUtils.d(TAG, "mWorkHandler handleMessage: " + msgType);
+                switch (msgType) {
+                    case HANDLE_SET_DATA_SOURCE:
+                        handleSetDataSource(msg);
+                        break;
+
+                    case HANDLE_PREPARE_ASYNC:
+                        handlePrepareAsync();
+                        break;
+
+                    case HANDLE_START:
+                        handleStart();
+                        break;
+
+                    case HANDLE_PAUSE:
+                        handlePause();
+                        break;
+
+                    case HANDLE_RESUME_PLAY:
+                        handleResumePlay();
+                        break;
+
+                    case HANDLE_RELEASE:
+                        handleRelease();
+                        break;
+                }
+            }
+        };
     }
 
     public void setOnPreparedListener(OnPreparedListener onPreparedListener) {
@@ -49,19 +108,31 @@ public class WePlayer {
     }
 
     public void setDataSource(String dataSource) {
-        if (TextUtils.equals(dataSource, mDataSource)) {
-            return;
-        }
-        isPrepared = false;
+        mWorkHandler.removeMessages(HANDLE_SET_DATA_SOURCE);// 以最新设置的源为准
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_DATA_SOURCE);
+        msg.obj = dataSource;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleSetDataSource(Message msg) {
+        String dataSource = (String) msg.obj;
         this.mDataSource = dataSource;
         nativeSetDataSource(mDataSource);
     }
 
     public void prepareAsync() {
+        mWorkHandler.removeMessages(HANDLE_PREPARE_ASYNC);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_PREPARE_ASYNC);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handlePrepareAsync() {
         if (TextUtils.isEmpty(mDataSource)) {
-            throw new IllegalStateException("Can't call prepareAsync method before set valid data source");
+            LogUtils.e(TAG, "Can't call prepareAsync method before set valid data source");
+            return;
         }
 
+        isPrepared = false;
         nativePrepareAsync();
     }
 
@@ -81,8 +152,14 @@ public class WePlayer {
     }
 
     public void start() {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_START);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleStart() {
         if (!isPrepared) {
-            throw new IllegalStateException("Can't call start method before prepare finished");
+            LogUtils.e(TAG, "Can't call start method before prepare finished");
+            return;
         }
 
         nativeStart();
@@ -99,19 +176,45 @@ public class WePlayer {
     }
 
     public void pause() {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_PAUSE);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handlePause() {
         if (!isPrepared) {
-            throw new IllegalStateException("Can't call pause method before prepare finished");
+            LogUtils.e(TAG, "Can't call pause method before prepare finished");
+            return;
         }
 
         nativePause();
     }
 
     public void resumePlay() {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_RESUME_PLAY);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleResumePlay() {
         if (!isPrepared) {
-            throw new IllegalStateException("Can't call resumePlay method before prepare finished");
+            LogUtils.e(TAG, "Can't call resumePlay method before prepare finished");
+            return;
         }
 
         nativeResumePlay();
+    }
+
+    public void stop() {
+        isPrepared = false;
+        nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
+
+        // 先清除其它所有未执行消息，再执行具体释放动作
+        mWorkHandler.removeCallbacksAndMessages(null);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_RELEASE);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleRelease() {
+        nativeRelease();
     }
 
     /**
@@ -120,6 +223,10 @@ public class WePlayer {
      * @return the duration in milliseconds
      */
     public int getDuration() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getDuration method before prepare finished");
+            return 0;
+        }
         return nativeGetDuration();
     }
 
@@ -129,6 +236,10 @@ public class WePlayer {
      * @return the current position in milliseconds
      */
     public int getCurrentPosition() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getCurrentPosition method before prepare finished");
+            return 0;
+        }
         return nativeGetCurrentPosition();
     }
 

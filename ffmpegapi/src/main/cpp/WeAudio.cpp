@@ -17,37 +17,10 @@ WeAudio::WeAudio(PlayStatus *status, int sampleRate, JavaListenerContainer *java
 }
 
 WeAudio::~WeAudio() {
-    // 最顶层 WeFFmpeg 负责回收 javaListenerContainer，这里只把本指针置空
-    javaListenerContainer = NULL;
-
-    if (openSlPlayer != NULL) {
-        openSlPlayer->destroy();
-        delete openSlPlayer;
-        openSlPlayer = NULL;
-    }
-
-    if (sampledBuffer != NULL) {
-        av_free(sampledBuffer);
-        sampledBuffer = NULL;
-    }
-
-    releaseAvPacket();
-    releaseAvFrame();
-
-    delete codecContext;
-    codecContext = NULL;
-
-    delete codecParams;
-    codecParams = NULL;
-
-    delete queue;
-    queue = NULL;
-
-    delete testSaveFile;
-    testSaveFile = NULL;
+    release();
 }
 
-void *playThreadCall(void *data) {
+void *startPlayThreadCall(void *data) {
     WeAudio *weAudio = static_cast<WeAudio *>(data);
 
     if (weAudio->TEST_SAMPLE) {
@@ -60,11 +33,14 @@ void *playThreadCall(void *data) {
         fclose(weAudio->testSaveFile);
     }
 
-    pthread_exit(&weAudio->playThread);
+    if (LOG_DEBUG) {
+        LOGD(weAudio->LOG_TAG, "startPlayThread exit");
+    }
+    pthread_exit(&weAudio->startPlayThread);
 }
 
 void WeAudio::startPlayer() {
-    pthread_create(&playThread, NULL, playThreadCall, this);
+    pthread_create(&startPlayThread, NULL, startPlayThreadCall, this);
 }
 
 void WeAudio::_startPlayer() {
@@ -228,7 +204,7 @@ int WeAudio::resample() {
 
     // 重采样参数设置或修改参数之后必须调用 swr_init() 对 SwrContext 进行初始化
     if (swr_init(swrContext) < 0) {
-        LOGE(LOG_TAG, "swr_alloc_set_opts occurred exception");
+        LOGE(LOG_TAG, "swr_init occurred exception");
         releaseAvFrame();
         swr_free(&swrContext);
         swrContext = NULL;
@@ -304,4 +280,64 @@ int WeAudio::getBitsPerSample() {
 
 SLuint32 WeAudio::getOpenSLChannelLayout() {
     return OpenSLPlayer::ffmpegToOpenSLChannelLayout(SAMPLE_OUT_CHANNEL_LAYOUT);
+}
+
+void WeAudio::stopPlay() {
+    if (openSlPlayer == NULL) {
+        LOGE(LOG_TAG, "Invoke stopPlay but openSlPlayer is NULL!");
+        return;
+    }
+
+    if (!openSlPlayer->isInitSuccess()) {
+        LOGE(LOG_TAG, "Invoke stopPlay but openSlPlayer did not initialize successfully!");
+        return;
+    }
+
+    openSlPlayer->stopPlay();
+}
+
+void WeAudio::release() {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "release...");
+    }
+    stopPlay();// 首先停止播放，也就停止了消费者从队列里取数据
+
+    if (openSlPlayer != NULL) {
+        delete openSlPlayer;// 启动其析构函数回收内部资源
+        openSlPlayer = NULL;
+    }
+
+    if (queue != NULL) {
+        delete queue;// 启动其析构函数回收内部资源
+        queue = NULL;
+    }
+
+    if (sampledBuffer != NULL) {
+//        av_freep(sampledBuffer);// 小米手机测试：报错 SIGBUS
+        av_free(sampledBuffer);// 小米手机测试：OK
+        sampledBuffer = NULL;
+    }
+
+    releaseAvPacket();
+    releaseAvFrame();
+
+    // codecContext 是调用 avcodec_alloc_context3 创建的，需要使用对应函数关闭释放
+    if (codecContext != NULL) {
+        avcodec_close(codecContext);
+        avcodec_free_context(&codecContext);
+        codecContext = NULL;
+    }
+
+    // 是直接通过 pFormatCtx->streams[i]->codecpar 赋值的，只需把本指针清空即可
+    if (codecParams != NULL) {
+        codecParams = NULL;
+    }
+
+    testSaveFile = NULL;
+
+    // 最顶层 WeFFmpeg 负责回收 javaListenerContainer，这里只把本指针置空
+    javaListenerContainer = NULL;
+
+    // 最顶层 WeFFmpeg 负责回收 status，这里只把本指针置空
+    status == NULL;
 }
