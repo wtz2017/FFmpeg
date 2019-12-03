@@ -19,6 +19,8 @@ extern "C"
 class WeAudio : public PcmGenerator {
 
 private:
+    bool startFinished = false;// 启动播放器线程工作是否完成
+
     AVPacket *avPacket = NULL;
     AVFrame *avFrame = NULL;
 
@@ -36,7 +38,7 @@ public:
     const char *LOG_TAG = "WeAudio";
 
     PlayStatus *status = NULL;
-    JavaListenerContainer *javaListenerContainer = NULL;;
+    JavaListenerContainer *javaListenerContainer = NULL;
 
     int streamIndex = -1;
     AVCodecContext *codecContext = NULL;
@@ -63,6 +65,8 @@ public:
     void startPlayer();
 
     void _startPlayer();
+
+    bool startThreadFinished();
 
     void pause();
 

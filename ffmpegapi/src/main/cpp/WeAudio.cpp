@@ -66,6 +66,11 @@ void WeAudio::_startPlayer() {
     }
 
     openSlPlayer->startPlay();
+    startFinished = true;
+}
+
+bool WeAudio::startThreadFinished() {
+    return startFinished;
 }
 
 void WeAudio::pause() {

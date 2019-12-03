@@ -7,6 +7,7 @@
 WeFFmpeg::WeFFmpeg(JavaListenerContainer *javaListenerContainer) {
     this->javaListenerContainer = javaListenerContainer;
     status = new PlayStatus();
+    pthread_mutex_init(&statusMutex, NULL);
 }
 
 WeFFmpeg::~WeFFmpeg() {
@@ -44,14 +45,16 @@ int formatCtxInterruptCallback(void *context) {
 
 void WeFFmpeg::prepareAsync() {
     // 判断只有 stoped 状态才可以往下走，避免之前启动未回收内存
+    pthread_mutex_lock(&statusMutex);
     if (status == NULL || !status->isStoped()) {
         LOGE(LOG_TAG, "Can't call prepare before stop!");
+        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
-
     status->setStatus(PlayStatus::PREPARING, LOG_TAG);
+    pthread_mutex_unlock(&statusMutex);
 
     // 注册解码器并初始化网络
     av_register_all();
@@ -66,7 +69,7 @@ void WeFFmpeg::prepareAsync() {
         LOGE(LOG_TAG, "Can't open data source: %s", dataSource);
         // 报错的原因可能有：打开网络流时无网络权限，打开本地流时无外部存储访问权限
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
@@ -74,7 +77,7 @@ void WeFFmpeg::prepareAsync() {
     if (avformat_find_stream_info(pFormatCtx, NULL) < 0) {
         LOGE(LOG_TAG, "Can't find stream info from: %s", dataSource);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
@@ -100,7 +103,7 @@ void WeFFmpeg::prepareAsync() {
     if (weAudio == NULL) {
         LOGE(LOG_TAG, "Can't find audio stream from: %s", dataSource);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
@@ -110,7 +113,7 @@ void WeFFmpeg::prepareAsync() {
     if (!decoder) {
         LOGE(LOG_TAG, "Can't find decoder for codec id %d", codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
@@ -119,7 +122,7 @@ void WeFFmpeg::prepareAsync() {
     if (!weAudio->codecContext) {
         LOGE(LOG_TAG, "Can't allocate an AVCodecContext for codec id %d", codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
@@ -128,7 +131,7 @@ void WeFFmpeg::prepareAsync() {
         LOGE(LOG_TAG, "Can't fill the AVCodecContext by AVCodecParameters for codec id %d",
              codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
@@ -138,12 +141,16 @@ void WeFFmpeg::prepareAsync() {
              "Can't initialize the AVCodecContext to use the given AVCodec for codec id %d",
              codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+        setErrorOnPreparing();
         return;
     }
 
+    // 状态确认需要加锁同步，判断在准备期间是否已经被停止
+    pthread_mutex_lock(&statusMutex);
     if (status == NULL || !status->isPreparing()) {
         LOGE(LOG_TAG, "prepare finished but status isn't PREPARING");
+        workFinished = true;
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
     status->setStatus(PlayStatus::PREPARED, LOG_TAG);
@@ -153,6 +160,15 @@ void WeFFmpeg::prepareAsync() {
     }
     // 回调初始化准备完成，注意要在 java API 层把回调切换到主线程
     javaListenerContainer->onPreparedListener->callback(1, dataSource);
+    pthread_mutex_unlock(&statusMutex);
+}
+
+void WeFFmpeg::setErrorOnPreparing() {
+    pthread_mutex_lock(&statusMutex);
+    if (status != NULL && status->isPreparing()) {
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+    }
+    pthread_mutex_unlock(&statusMutex);
 }
 
 void *demuxThreadCall(void *data) {
@@ -168,23 +184,20 @@ void *demuxThreadCall(void *data) {
 }
 
 void WeFFmpeg::startDemuxThread() {
+    pthread_mutex_lock(&statusMutex);
     if (status == NULL || !status->isPrepared()) {
         LOGE(LOG_TAG, "Invoke startDemuxThread but status is not prepared");
+        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
     status->setStatus(PlayStatus::PLAYING, LOG_TAG);
     // 线程创建时入口函数必须是全局函数或者某个类的静态成员函数
     pthread_create(&demuxThread, NULL, demuxThreadCall, this);
+    pthread_mutex_unlock(&statusMutex);
 }
 
 void WeFFmpeg::_demux() {
-    if (weAudio == NULL) {
-        LOGE(LOG_TAG, "_demux but weAudio is NULL");
-        workFinished = true;
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
-        return;
-    }
-
     // WeAudio 模块开启新的线程从 AVPacket 队列里取包、解码、重采样、播放，没有就阻塞等待
     weAudio->startPlayer();
 
@@ -247,25 +260,32 @@ void WeFFmpeg::_demux() {
 }
 
 void WeFFmpeg::pause() {
-    if (weAudio == NULL) {
-        LOGE(LOG_TAG, "pause but weAudio is NULL");
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+    pthread_mutex_lock(&statusMutex);
+    if (status == NULL || !status->isPlaying()) {
+        LOGE(LOG_TAG, "pause but status is not PLAYING");
+        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
 
     status->setStatus(PlayStatus::PAUSED, LOG_TAG);
-    weAudio->pause();
+    weAudio->pause();// 非耗时操作可以加锁
+    pthread_mutex_unlock(&statusMutex);
 }
 
 void WeFFmpeg::resumePlay() {
-    if (weAudio == NULL) {
-        LOGE(LOG_TAG, "resumePlay but weAudio is NULL");
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+    pthread_mutex_lock(&statusMutex);
+    if (status == NULL || !status->isPaused()) {
+        LOGE(LOG_TAG, "resumePlay but status is not PAUSED");
+        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
 
     status->setStatus(PlayStatus::PLAYING, LOG_TAG);
     weAudio->resumePlay();// 要先设置播放状态，才能恢复播放
+    // 非耗时操作可以加锁
+    pthread_mutex_unlock(&statusMutex);
 }
 
 /**
@@ -302,13 +322,17 @@ int WeFFmpeg::getCurrentPosition() {
 
 /**
  * setStopFlag 不走 java 调度线程消息队列，直接执行，避免无法立即通知结束工作
+ * 这样就会与使用调度线程的方法并发，所以要对部分函数步骤做锁同步
  */
 void WeFFmpeg::setStopFlag() {
+    pthread_mutex_lock(&statusMutex);
     if (status == NULL || status->isStoped()) {
         LOGE(LOG_TAG, "Call setStopFlag but status is already NULL or stopped: %d", status);
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
     status->setStatus(PlayStatus::STOPPED, LOG_TAG);
+    pthread_mutex_unlock(&statusMutex);
 }
 
 /**
@@ -316,18 +340,21 @@ void WeFFmpeg::setStopFlag() {
  * 因为 release 要与 prepare 保持串行，而 prepare 可能会一直阻塞，先异步调用 setStopFlag 结束 prepare
  */
 void WeFFmpeg::release() {
+    pthread_mutex_lock(&statusMutex);
     if (status == NULL) {
         LOGE(LOG_TAG, "to release but status is already NULL");
+        pthread_mutex_unlock(&statusMutex);
         return;
     }
     // 进一步检查外界是否已经调用了 setStopFlag，否则这里直接设置停止标志
     if (!status->isStoped()) {
         status->setStatus(PlayStatus::STOPPED, LOG_TAG);
     }
+    pthread_mutex_unlock(&statusMutex);
 
     // 等待工作线程结束
     int sleepCount = 0;
-    while (!workFinished) {
+    while (!workFinished || (weAudio != NULL && !weAudio->startThreadFinished())) {
         if (sleepCount > 300) {
             break;
         }
@@ -356,16 +383,17 @@ void WeFFmpeg::release() {
     delete dataSource;
     dataSource = NULL;
 
+    // 最顶层负责回收 javaListenerContainer
+    delete javaListenerContainer;
+    javaListenerContainer = NULL;
+
     // 最顶层负责回收 status
     delete status;
     status = NULL;
 
-    // 最顶层负责回收 javaListenerContainer
-    delete javaListenerContainer;
-    javaListenerContainer = NULL;
+    pthread_mutex_destroy(&statusMutex);
 
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "release finished");
     }
 }
-
