@@ -21,6 +21,9 @@ WeAudio::~WeAudio() {
 }
 
 void *startPlayThreadCall(void *data) {
+    if (LOG_DEBUG) {
+        LOGD("WeAudio", "startPlayThread run");
+    }
     WeAudio *weAudio = static_cast<WeAudio *>(data);
 
     if (weAudio->TEST_SAMPLE) {
@@ -253,7 +256,8 @@ void WeAudio::releaseAvPacket() {
         return;
     }
     av_packet_free(&avPacket);
-    av_free(avPacket);
+//    av_free(avPacket);
+    av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
     avPacket = NULL;
 }
 
@@ -262,7 +266,8 @@ void WeAudio::releaseAvFrame() {
         return;
     }
     av_frame_free(&avFrame);
-    av_free(avFrame);
+//    av_free(avFrame);
+    av_freep(&avFrame);// 使用 av_freep(&buf) 代替 av_free(buf)
     avFrame = NULL;
 }
 
@@ -313,8 +318,8 @@ void WeAudio::release() {
     }
 
     if (sampledBuffer != NULL) {
-//        av_freep(sampledBuffer);// 小米手机测试：报错 SIGBUS
-        av_free(sampledBuffer);// 小米手机测试：OK
+//        av_free(sampledBuffer);
+        av_freep(&sampledBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
         sampledBuffer = NULL;
     }
 

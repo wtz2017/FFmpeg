@@ -49,7 +49,8 @@ bool AVPacketQueue::getAVpacket(AVPacket *packet) {
             }
             // 释放已经出队的 AVPacket
             av_packet_free(&avPacket);
-            av_free(avPacket);
+//            av_free(avPacket);
+            av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
             avPacket = NULL;
             break;
         } else {
@@ -92,7 +93,8 @@ void AVPacketQueue::clearQueue() {
         packet = queue.front();
         queue.pop();
         av_packet_free(&packet);
-        av_free(packet);
+//        av_free(packet);
+        av_freep(&packet);// 使用 av_freep(&buf) 代替 av_free(buf)
     }
     packet = NULL;
 

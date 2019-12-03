@@ -66,11 +66,6 @@ bool OpenSLPlayer::init() {
         return false;
     }
 
-    setPlayState(SL_PLAYSTATE_PLAYING);
-
-    // 主动调用缓冲队列回调函数开始工作
-    pcmBufferCallback(pcmBufferQueue, this);
-
     initSuccess = true;
     return true;
 }

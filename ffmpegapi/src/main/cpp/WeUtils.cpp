@@ -88,7 +88,8 @@ void WeUtils::av_dump_format_for_android(AVFormatContext *ic, int index, const c
         if (!printed[i])
             dump_stream_format(ic, i, index, is_output);
 
-    av_free(printed);
+//    av_free(printed);
+    av_freep(&printed);// 使用 av_freep(&buf) 代替 av_free(buf)
     LOGI(WE_UTILS_LOG_TAG, "**************** AV_DUMP_FORMAT: END ****************")
 }
 

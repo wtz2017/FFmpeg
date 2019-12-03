@@ -45,11 +45,12 @@ public:
     int duration = 0;
     AVRational streamTimeBase;
     double currentFrameTime = 0;
-    double currentPlayTime = 0;
+    double currentPlayTime = 0;// 当前播放时间，单位：秒
 
     AVPacketQueue *queue = NULL;
     pthread_t startPlayThread;
 
+    // 测试用
     const bool TEST_SAMPLE = false;// TODO 纯测试采样开关
     const char *TEST_SAVE_FILE_PATH = "/sdcard/test_sample_data.pcm";
     FILE *testSaveFile = NULL;// 纯测试采样数据保存文件指针

@@ -144,11 +144,17 @@ void WeFFmpeg::prepareAsync() {
 
     status->setStatus(PlayStatus::PREPARED);
 
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "prepare finished");
+    }
     // 回调初始化准备完成
     javaListenerContainer->onPreparedListener->callback(1, dataSource);
 }
 
 void *demuxThreadCall(void *data) {
+    if (LOG_DEBUG) {
+        LOGD("WeFFmpeg", "demuxThread run");
+    }
     WeFFmpeg *weFFmpeg = (WeFFmpeg *) data;
     weFFmpeg->_demux();
     if (LOG_DEBUG) {
@@ -178,6 +184,9 @@ void WeFFmpeg::_demux() {
     // WeAudio 模块开启新的线程从 AVPacket 队列里取包、解码、重采样、播放，没有就阻塞等待
     weAudio->startPlayer();
 
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "Start read AVPacket...");
+    }
     // 本线程开始读 AVPacket 包并缓存入队
     int packetCount = 0;
     AVPacket *avPacket = NULL;
@@ -197,7 +206,8 @@ void WeFFmpeg::_demux() {
             } else {
                 // 不是音频就释放内存
                 av_packet_free(&avPacket);
-                av_free(avPacket);
+//                av_free(avPacket);
+                av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
                 avPacket = NULL;
             }
         } else {
@@ -208,7 +218,8 @@ void WeFFmpeg::_demux() {
             // 减少 avPacket 对 packet 数据的引用计数
             av_packet_free(&avPacket);
             // 释放 avPacket 结构体本身
-            av_free(avPacket);
+//            av_free(avPacket);
+            av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
             avPacket = NULL;
 
             // 等待队列数据取完后退出，否则造成播放不完整
