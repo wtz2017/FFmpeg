@@ -10,11 +10,9 @@ public class DateTimeUtil {
      */
     public static String changeRemainTimeToHms(long timeMilli) {
         if (timeMilli == 0) {
-            return "00:00:00";// 避免 Math.round 参数遇到 0f 崩溃问题
+            return "00:00:00";
         }
-//        int totalSeconds = Math.round((float) timeMilli / 1000);// 毫秒数转秒数，毫秒部分四舍五入
-//        int totalSeconds = (int) ((float) timeMilli / 1000);// 毫秒数转秒数，毫秒部分四舍五入
-        int totalSeconds = (int) (timeMilli / 1000);// 毫秒数转秒数
+        int totalSeconds = Math.round((float) timeMilli / 1000);// 毫秒数转秒数，毫秒部分四舍五入
         int second = totalSeconds % 60;// 秒数除60得分钟数再取余得秒数
         int minute = totalSeconds / 60 % 60;// 秒数除两个60得小时再取余得分钟数
         int hour = totalSeconds / 60 / 60;// 秒数除两个60得小时数

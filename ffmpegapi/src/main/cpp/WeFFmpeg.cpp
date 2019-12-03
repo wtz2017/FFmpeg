@@ -35,8 +35,8 @@ int formatCtxInterruptCallback(void *context) {
         LOGD("WeFFmpeg", "formatCtxInterruptCallback...");
     }
     WeFFmpeg *weFFmpeg = (WeFFmpeg *)context;
-    if (weFFmpeg->status == NULL || weFFmpeg->status->isStoped()) {
-        LOGD("WeFFmpeg", "formatCtxInterruptCallback return AVERROR_EOF");
+    if (weFFmpeg->status == NULL || weFFmpeg->status->isStoped() || weFFmpeg->status->isError()) {
+        LOGW("WeFFmpeg", "formatCtxInterruptCallback return AVERROR_EOF");
         return AVERROR_EOF;
     }
     return 0;
@@ -47,11 +47,11 @@ void WeFFmpeg::prepareAsync() {
     if (status == NULL || !status->isStoped()) {
         LOGE(LOG_TAG, "Can't call prepare before stop!");
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
-    status->setStatus(PlayStatus::PREPARING);
+    status->setStatus(PlayStatus::PREPARING, LOG_TAG);
 
     // 注册解码器并初始化网络
     av_register_all();
@@ -66,7 +66,7 @@ void WeFFmpeg::prepareAsync() {
         LOGE(LOG_TAG, "Can't open data source: %s", dataSource);
         // 报错的原因可能有：打开网络流时无网络权限，打开本地流时无外部存储访问权限
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -74,7 +74,7 @@ void WeFFmpeg::prepareAsync() {
     if (avformat_find_stream_info(pFormatCtx, NULL) < 0) {
         LOGE(LOG_TAG, "Can't find stream info from: %s", dataSource);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -100,7 +100,7 @@ void WeFFmpeg::prepareAsync() {
     if (weAudio == NULL) {
         LOGE(LOG_TAG, "Can't find audio stream from: %s", dataSource);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -110,7 +110,7 @@ void WeFFmpeg::prepareAsync() {
     if (!decoder) {
         LOGE(LOG_TAG, "Can't find decoder for codec id %d", codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -119,7 +119,7 @@ void WeFFmpeg::prepareAsync() {
     if (!weAudio->codecContext) {
         LOGE(LOG_TAG, "Can't allocate an AVCodecContext for codec id %d", codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -128,7 +128,7 @@ void WeFFmpeg::prepareAsync() {
         LOGE(LOG_TAG, "Can't fill the AVCodecContext by AVCodecParameters for codec id %d",
              codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -138,16 +138,20 @@ void WeFFmpeg::prepareAsync() {
              "Can't initialize the AVCodecContext to use the given AVCodec for codec id %d",
              codecId);
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
-    status->setStatus(PlayStatus::PREPARED);
+    if (status == NULL || !status->isPreparing()) {
+        LOGE(LOG_TAG, "prepare finished but status isn't PREPARING");
+        return;
+    }
+    status->setStatus(PlayStatus::PREPARED, LOG_TAG);
 
     if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "prepare finished");
+        LOGD(LOG_TAG, "prepare finished to callback java...");
     }
-    // 回调初始化准备完成
+    // 回调初始化准备完成，注意要在 java API 层把回调切换到主线程
     javaListenerContainer->onPreparedListener->callback(1, dataSource);
 }
 
@@ -168,7 +172,7 @@ void WeFFmpeg::startDemuxThread() {
         LOGE(LOG_TAG, "Invoke startDemuxThread but status is not prepared");
         return;
     }
-    status->setStatus(PlayStatus::PLAYING);
+    status->setStatus(PlayStatus::PLAYING, LOG_TAG);
     // 线程创建时入口函数必须是全局函数或者某个类的静态成员函数
     pthread_create(&demuxThread, NULL, demuxThreadCall, this);
 }
@@ -177,7 +181,7 @@ void WeFFmpeg::_demux() {
     if (weAudio == NULL) {
         LOGE(LOG_TAG, "_demux but weAudio is NULL");
         workFinished = true;
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
@@ -229,7 +233,7 @@ void WeFFmpeg::_demux() {
                     continue;
                 }
 
-                status->setStatus(PlayStatus::COMPLETED);
+                status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
                 // 当队列中数据都取完后，再通知可能正在阻塞等待的消费者线程
                 weAudio->queue->informPutFinished();
                 // TODO ------回调应用层确认播放完成
@@ -245,21 +249,23 @@ void WeFFmpeg::_demux() {
 void WeFFmpeg::pause() {
     if (weAudio == NULL) {
         LOGE(LOG_TAG, "pause but weAudio is NULL");
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
+    status->setStatus(PlayStatus::PAUSED, LOG_TAG);
     weAudio->pause();
 }
 
 void WeFFmpeg::resumePlay() {
     if (weAudio == NULL) {
         LOGE(LOG_TAG, "resumePlay but weAudio is NULL");
-        status->setStatus(PlayStatus::ERROR);
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
         return;
     }
 
-    weAudio->resumePlay();
+    status->setStatus(PlayStatus::PLAYING, LOG_TAG);
+    weAudio->resumePlay();// 要先设置播放状态，才能恢复播放
 }
 
 /**
@@ -302,7 +308,7 @@ void WeFFmpeg::setStopFlag() {
         LOGE(LOG_TAG, "Call setStopFlag but status is already NULL or stopped: %d", status);
         return;
     }
-    status->setStatus(PlayStatus::STOPPED);
+    status->setStatus(PlayStatus::STOPPED, LOG_TAG);
 }
 
 /**
@@ -316,7 +322,7 @@ void WeFFmpeg::release() {
     }
     // 进一步检查外界是否已经调用了 setStopFlag，否则这里直接设置停止标志
     if (!status->isStoped()) {
-        status->setStatus(PlayStatus::STOPPED);
+        status->setStatus(PlayStatus::STOPPED, LOG_TAG);
     }
 
     // 等待工作线程结束

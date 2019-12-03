@@ -61,10 +61,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_pause_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
+        findViewById(R.id.btn_destroy_audio_player).setOnClickListener(this);
 
         mPlayTimeView = findViewById(R.id.tv_play_time);
-
-        mWePlayer = new WePlayer();
     }
 
     @Override
@@ -117,6 +116,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mCppThreadDemo.playPCM(path);
                 break;
             case R.id.btn_open_audio_play:
+                if (mWePlayer == null) {
+                    mWePlayer = new WePlayer();
+                }
                 mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
 //                mWePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
 //                mWePlayer.setDataSource("http://ngcdn004.cnr.cn/live/dszs/index.m3u8");
@@ -138,15 +140,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mWePlayer.prepareAsync();
                 break;
             case R.id.btn_pause_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
                 mWePlayer.pause();
                 mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
                 break;
             case R.id.btn_resume_play_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
                 mWePlayer.resumePlay();
                 mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
                 break;
             case R.id.btn_stop_play_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
                 mWePlayer.stop();
+                mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
+                break;
+            case R.id.btn_destroy_audio_player:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.destroyPlayer();
+                mWePlayer = null;
                 mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
                 break;
         }

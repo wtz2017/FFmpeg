@@ -11,7 +11,10 @@ PlayStatus::PlayStatus() {
 PlayStatus::~PlayStatus() {
 }
 
-void PlayStatus::setStatus(PlayStatus::Status status) {
+void PlayStatus::setStatus(PlayStatus::Status status, const char *setterName) {
+    if (LOG_DEBUG) {
+        LOGW(LOG_TAG, "%s to set status: %s", setterName, getStatusName(status));
+    }
     this->status = status;
 }
 
@@ -41,5 +44,36 @@ bool PlayStatus::isStoped() {
 
 bool PlayStatus::isError() {
     return status == ERROR;
+}
+
+const char *PlayStatus::getStatusName(PlayStatus::Status status) {
+    const char *name = NULL;
+    switch (status) {
+        case PREPARING:
+            name = "PREPARING";
+            break;
+        case PREPARED:
+            name = "PREPARED";
+            break;
+        case PLAYING:
+            name = "PLAYING";
+            break;
+        case PAUSED:
+            name = "PAUSED";
+            break;
+        case COMPLETED:
+            name = "COMPLETED";
+            break;
+        case STOPPED:
+            name = "STOPPED";
+            break;
+        case ERROR:
+            name = "ERROR";
+            break;
+        default:
+            name = "unknown";
+            break;
+    }
+    return name;
 }
 

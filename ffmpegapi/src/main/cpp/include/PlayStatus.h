@@ -5,6 +5,8 @@
 #ifndef FFMPEG_PLAYSTATUS_H
 #define FFMPEG_PLAYSTATUS_H
 
+#include <stddef.h>
+#include "AndroidLog.h"
 
 class PlayStatus {
 
@@ -20,6 +22,8 @@ public:
     bool isPlayLoading;
 
 private:
+    const char *LOG_TAG = "PlayStatus";
+
     Status status;
 
 public:
@@ -27,7 +31,7 @@ public:
 
     ~PlayStatus();
 
-    void setStatus(Status status);
+    void setStatus(Status status, const char *setterName);
 
     bool isPreparing();
 
@@ -42,6 +46,9 @@ public:
     bool isStoped();
 
     bool isError();
+
+private:
+    const char *getStatusName(Status status);
 
 };
 

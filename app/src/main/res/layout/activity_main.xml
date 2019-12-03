@@ -103,10 +103,22 @@
             android:text="恢复音频播放" />
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btn_stop_play_audio"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="停止音频播放" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_stop_play_audio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="停止音频播放" />
+
+        <Button
+            android:id="@+id/btn_destroy_audio_player"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="销毁音频播放器" />
+    </LinearLayout>
 
 </LinearLayout>

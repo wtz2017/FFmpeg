@@ -2,8 +2,10 @@ package com.wtz.ffmpegapi;
 
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.wtz.ffmpegapi.utils.LogUtils;
 
@@ -45,14 +47,18 @@ public class WePlayer {
     private String mDataSource;
     private boolean isPrepared;
 
-    private HandlerThread mWorkThread;
+    private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
+    private HandlerThread mWorkThread;
     private static final int HANDLE_SET_DATA_SOURCE = 1;
     private static final int HANDLE_PREPARE_ASYNC = 2;
     private static final int HANDLE_START = 3;
     private static final int HANDLE_PAUSE = 4;
     private static final int HANDLE_RESUME_PLAY = 5;
     private static final int HANDLE_RELEASE = 6;
+    private static final int HANDLE_DESTROY = 7;
+
+    private boolean isDestroyed;
 
     public interface OnPreparedListener {
         void onPrepared();
@@ -63,6 +69,7 @@ public class WePlayer {
     }
 
     public WePlayer() {
+        mUIHandler = new Handler(Looper.getMainLooper());
         mWorkThread = new HandlerThread("WePlayer-dispatcher");
         mWorkThread.start();
         mWorkHandler = new Handler(mWorkThread.getLooper()) {
@@ -70,6 +77,10 @@ public class WePlayer {
             public void handleMessage(Message msg) {
                 int msgType = msg.what;
                 LogUtils.d(TAG, "mWorkHandler handleMessage: " + msgType);
+                if (isDestroyed && msgType != HANDLE_DESTROY) {
+                    Log.e(TAG, "mWorkHandler handleMessage but Player is already destroyed!");
+                    return;
+                }
                 switch (msgType) {
                     case HANDLE_SET_DATA_SOURCE:
                         handleSetDataSource(msg);
@@ -94,9 +105,43 @@ public class WePlayer {
                     case HANDLE_RELEASE:
                         handleRelease();
                         break;
+
+                    case HANDLE_DESTROY:
+                        handleDestroy();
+                        break;
                 }
             }
         };
+    }
+
+    public void destroyPlayer() {
+        if (isDestroyed) {
+            return;
+        }
+        // 首先置总的标志位，阻止消息队列的正常消费
+        isDestroyed = true;
+
+        // 然后停止前驱：工作线程
+        mWorkHandler.removeCallbacksAndMessages(null);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_DESTROY);
+        mWorkHandler.sendMessage(msg);
+
+        // 最后停止回调：工作结果
+        mUIHandler.removeCallbacksAndMessages(null);
+    }
+
+    private void handleDestroy() {
+        nativeSetStopFlag();
+        nativeRelease();
+
+        mWorkHandler.removeCallbacksAndMessages(null);
+        try {
+            mWorkThread.quit();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        mUIHandler.removeCallbacksAndMessages(null);
     }
 
     public void setOnPreparedListener(OnPreparedListener onPreparedListener) {
@@ -140,14 +185,19 @@ public class WePlayer {
      * called from native
      */
     public void onNativePrepared(String dataSource) {
-        LogUtils.d(TAG, "onNativePrepared dataSource: " + dataSource);
+        LogUtils.d(TAG, "onNativePrepared isDestroyed: " + isDestroyed + ", dataSource: " + dataSource);
         if (!TextUtils.equals(dataSource, mDataSource)) {
             LogUtils.w(TAG, "onNativePrepared data source changed! So the preparation is invalid!");
             return;
         }
         isPrepared = true;
-        if (mOnPreparedListener != null) {
-            mOnPreparedListener.onPrepared();
+        if (mOnPreparedListener != null && !isDestroyed) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnPreparedListener.onPrepared();
+                }
+            });
         }
     }
 
@@ -168,10 +218,15 @@ public class WePlayer {
     /**
      * called from native
      */
-    public void onNativePlayLoading(boolean isLoading) {
-        LogUtils.d(TAG, "onNativePlayLoading isLoading: " + isLoading);
-        if (mOnPlayLoadingListener != null) {
-            mOnPlayLoadingListener.onPlayLoading(isLoading);
+    public void onNativePlayLoading(final boolean isLoading) {
+        LogUtils.d(TAG, "onNativePlayLoading isLoading: " + isLoading + ", isDestroyed:" + isDestroyed);
+        if (mOnPlayLoadingListener != null && !isDestroyed) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnPlayLoadingListener.onPlayLoading(isLoading);
+                }
+            });
         }
     }
 
