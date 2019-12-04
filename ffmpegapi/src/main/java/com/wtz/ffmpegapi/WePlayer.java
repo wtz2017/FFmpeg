@@ -10,7 +10,7 @@ import android.util.Log;
 import com.wtz.ffmpegapi.utils.LogUtils;
 
 public class WePlayer {
-    private static final String TAG = "WePlayer-Java";
+    private static final String TAG = "WePlayerJava";
 
     static {
         System.loadLibrary("weplayer");

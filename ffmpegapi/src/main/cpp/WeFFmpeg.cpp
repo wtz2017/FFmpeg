@@ -199,6 +199,7 @@ void WeFFmpeg::startDemuxThread() {
 
 void WeFFmpeg::_demux() {
     // WeAudio 模块开启新的线程从 AVPacket 队列里取包、解码、重采样、播放，没有就阻塞等待
+    weAudio->queue->setProductDataComplete(false);
     weAudio->startPlayer();
 
     if (LOG_DEBUG) {
@@ -232,6 +233,8 @@ void WeFFmpeg::_demux() {
             if (LOG_DEBUG) {
                 LOGD(LOG_TAG, "AVPacket read finished");
             }
+            weAudio->queue->setProductDataComplete(true);
+
             // 减少 avPacket 对 packet 数据的引用计数
             av_packet_free(&avPacket);
             // 释放 avPacket 结构体本身
@@ -246,10 +249,12 @@ void WeFFmpeg::_demux() {
                     continue;
                 }
 
-                status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
-                // 当队列中数据都取完后，再通知可能正在阻塞等待的消费者线程
-                weAudio->queue->informPutFinished();
-                // TODO ------回调应用层确认播放完成
+                pthread_mutex_lock(&statusMutex);
+                if (status != NULL && !status->isStoped() && !status->isError()) {
+                    status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
+                    // TODO ------回调应用层确认播放完成
+                }
+                pthread_mutex_unlock(&statusMutex);
                 break;
             }
             break;

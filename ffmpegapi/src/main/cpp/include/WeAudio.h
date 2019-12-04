@@ -44,7 +44,7 @@ public:
     AVCodecContext *codecContext = NULL;
     AVCodecParameters *codecParams = NULL;
 
-    int duration = 0;
+    double duration = 0;
     AVRational streamTimeBase;
     double currentFrameTime = 0;
     double currentPlayTime = 0;// 当前播放时间，单位：秒

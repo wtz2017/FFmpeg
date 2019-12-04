@@ -119,7 +119,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (mWePlayer == null) {
                     mWePlayer = new WePlayer();
                 }
-                mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
+//                mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
+                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=29750099.mp3");
+//                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=566435178.mp3");
 //                mWePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
 //                mWePlayer.setDataSource("http://ngcdn004.cnr.cn/live/dszs/index.m3u8");
                 mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {

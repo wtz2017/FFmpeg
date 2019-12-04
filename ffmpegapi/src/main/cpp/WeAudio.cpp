@@ -112,8 +112,11 @@ int WeAudio::getPcmData(void **buf) {
     // 循环是为了本次操作如果失败就再从队列里取下一个操作，也就是理想情况只操作一次
     while (status != NULL && status->isPlaying()) {
         if (queue->getQueueSize() == 0) {
-            // 队列中无数据，表示正在加载中
-            // TODO 需要排除播放完成的场景
+            if (queue->isProductDataComplete()) {
+                break;
+            }
+
+            // 队列中无数据且生产数据未完成，表示正在加载中
             if (!status->isPlayLoading) {
                 status->isPlayLoading = true;
                 javaListenerContainer->onPlayLoadingListener->callback(1, true);

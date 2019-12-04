@@ -13,7 +13,7 @@ PlayStatus::~PlayStatus() {
 
 void PlayStatus::setStatus(PlayStatus::Status status, const char *setterName) {
     if (LOG_DEBUG) {
-        LOGW(LOG_TAG, "%s to set status: %s", setterName, getStatusName(status));
+        LOGW(LOG_TAG, "%s set status: %s", setterName, getStatusName(status));
     }
     this->status = status;
 }

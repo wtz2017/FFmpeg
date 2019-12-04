@@ -17,6 +17,28 @@ AVPacketQueue::~AVPacketQueue() {
     status = NULL;// 最顶层 WeFFmpeg 负责回收 status，这里只把本指针置空
 }
 
+void AVPacketQueue::setProductDataComplete(bool complete) {
+    pthread_mutex_lock(&mutex);
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "setProductDataComplete: %d", complete);
+    }
+    productDataComplete = complete;
+    if (complete) {
+        pthread_cond_signal(&condition);
+    }
+
+    pthread_mutex_unlock(&mutex);
+}
+
+bool AVPacketQueue::isProductDataComplete() {
+    bool ret;
+    pthread_mutex_lock(&mutex);
+    ret = productDataComplete;
+    pthread_mutex_unlock(&mutex);
+    return ret;
+}
+
 void AVPacketQueue::putAVpacket(AVPacket *packet) {
     pthread_mutex_lock(&mutex);
 
@@ -53,24 +75,13 @@ bool AVPacketQueue::getAVpacket(AVPacket *packet) {
             av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
             avPacket = NULL;
             break;
-        } else {
+        } else if (!productDataComplete) {
             pthread_cond_wait(&condition, &mutex);
         }
     }
 
     pthread_mutex_unlock(&mutex);
     return ret;
-}
-
-void AVPacketQueue::informPutFinished() {
-    pthread_mutex_lock(&mutex);
-
-    if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "informPutFinished");
-    }
-    pthread_cond_signal(&condition);
-
-    pthread_mutex_unlock(&mutex);
 }
 
 int AVPacketQueue::getQueueSize() {

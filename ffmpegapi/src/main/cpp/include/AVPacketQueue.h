@@ -21,6 +21,7 @@ private:
     const char *LOG_TAG = "AVPacketQueue";
 
     PlayStatus *status = NULL;
+    bool productDataComplete = false;
 
     std::queue<AVPacket *> queue;
     pthread_mutex_t mutex;
@@ -31,14 +32,16 @@ public:
 
     ~AVPacketQueue();
 
+    /**
+     * 生产者线程通知是否还有数据可以入队，防止最后消费者线程一直阻塞等待
+     */
+    void setProductDataComplete(bool complete);
+
+    bool isProductDataComplete();
+
     void putAVpacket(AVPacket *packet);
 
     bool getAVpacket(AVPacket *packet);
-
-    /**
-     * 生产者线程通知已经没有数据可以入队了，防止最后消费者线程一直阻塞等待
-     */
-    void informPutFinished();
 
     int getQueueSize();
 
