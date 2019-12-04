@@ -6,6 +6,7 @@
 #define FFMPEG_PLAYSTATUS_H
 
 #include <stddef.h>
+#include <pthread.h>
 #include "AndroidLog.h"
 
 class PlayStatus {
@@ -20,6 +21,8 @@ public:
      * 此变量作为大的播放状态的一个补充子状态，只有在 OpenSL 播放中才会回调取数据，从而判断是否在加载中。
      */
     bool isPlayLoading;
+
+    pthread_mutex_t mutex;
 
 private:
     const char *LOG_TAG = "PlayStatus";

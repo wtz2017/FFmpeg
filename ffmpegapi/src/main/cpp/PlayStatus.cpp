@@ -6,9 +6,11 @@
 
 PlayStatus::PlayStatus() {
     status = STOPPED;
+    pthread_mutex_init(&mutex, NULL);
 }
 
 PlayStatus::~PlayStatus() {
+    pthread_mutex_destroy(&mutex);
 }
 
 void PlayStatus::setStatus(PlayStatus::Status status, const char *setterName) {

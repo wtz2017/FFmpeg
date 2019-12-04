@@ -139,6 +139,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         Log.d(TAG, "WePlayer onPlayLoading: " + isLoading);
                     }
                 });
+                mWePlayer.setOnErrorListener(new WePlayer.OnErrorListener() {
+                    @Override
+                    public void onError(int code, String msg) {
+                        Log.e(TAG, "WePlayer onError: " + code + "; " + msg);
+                    }
+                });
+                mWePlayer.setOnCompletionListener(new WePlayer.OnCompletionListener() {
+                    @Override
+                    public void onCompletion() {
+                        Log.d(TAG, "WePlayer onCompletion");
+                    }
+                });
                 mWePlayer.prepareAsync();
                 break;
             case R.id.btn_pause_audio:

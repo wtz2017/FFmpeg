@@ -60,8 +60,28 @@ void WeAudio::_startPlayer() {
         openSlPlayer = new OpenSLPlayer(this);
     }
 
-    if (!openSlPlayer->init()) {
+    int ret;
+    if ((ret = openSlPlayer->init()) != NO_ERROR) {
         LOGE(LOG_TAG, "OpenSLPlayer init failed!");
+        // 出错首先释放资源
+        delete openSlPlayer;
+        openSlPlayer = NULL;
+
+        // 然后设置错误状态
+        pthread_mutex_lock(&status->mutex);
+        if (status == NULL || status->isStoped()) {
+            // 只要不是“停止”状态，其它状态都可以切换到“错误”状态
+            pthread_mutex_unlock(&status->mutex);
+            startFinished = true;
+            return;
+        }
+        status->setStatus(PlayStatus::ERROR, LOG_TAG);
+
+        // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+        javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
+
+        pthread_mutex_unlock(&status->mutex);
+        startFinished = true;
         return;
     }
 
@@ -238,13 +258,7 @@ int WeAudio::resample() {
     }
 
     int sampleDataBytes = channelNums * sampleNumsPerChannel * bytesPerSample;
-    currentFrameTime = avFrame->pts * av_q2d(streamTimeBase);
-    if (currentFrameTime < currentPlayTime) {
-        // avFrame->pts maybe 0
-        currentFrameTime = currentPlayTime;
-    }
-    // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
-    currentPlayTime = currentFrameTime + (sampleDataBytes / (double) sampledSizePerSecond);
+    updateCurrentPlayTime(avFrame->pts, sampleDataBytes);
     if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
     }
@@ -257,6 +271,16 @@ int WeAudio::resample() {
     swrContext = NULL;
 
     return sampleDataBytes;
+}
+
+void WeAudio::updateCurrentPlayTime(int64_t pts, int sampleDataBytes) {
+    currentFrameTime = pts * av_q2d(streamTimeBase);
+    if (currentFrameTime < currentPlayTime) {
+        // avFrame->pts maybe 0
+        currentFrameTime = currentPlayTime;
+    }
+    // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
+    currentPlayTime = currentFrameTime + (sampleDataBytes / (double) sampledSizePerSecond);
 }
 
 void WeAudio::releaseAvPacket() {

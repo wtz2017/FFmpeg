@@ -37,8 +37,6 @@ private:
     AVFormatContext *pFormatCtx = NULL;
     WeAudio *weAudio = NULL;
 
-    pthread_mutex_t statusMutex;
-
 public:
     const char *LOG_TAG = "WeFFmpeg";
 
@@ -91,7 +89,7 @@ public:
     void release();
 
 private:
-    void setErrorOnPreparing();
+    void handleErrorOnPreparing(int errorCode);
 
 };
 

@@ -8,12 +8,16 @@
 
 #include "OnPreparedListener.h"
 #include "OnPlayLoadingListener.h"
+#include "OnErrorListener.h"
+#include "OnCompletionListener.h"
 
 class JavaListenerContainer {
 
 public:
     OnPreparedListener *onPreparedListener;
     OnPlayLoadingListener *onPlayLoadingListener;
+    OnErrorListener *onErrorListener;
+    OnCompletionListener *onCompletionListener;
 
 public:
     JavaListenerContainer() {

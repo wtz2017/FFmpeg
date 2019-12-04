@@ -36,38 +36,39 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
     }
 }
 
-bool OpenSLPlayer::init() {
+int OpenSLPlayer::init() {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "init");
     }
+    int ret;
 
     // 初始化引擎
-    if (!initEngine()) {
+    if ((ret = initEngine()) != NO_ERROR) {
         destroy();
-        return false;
+        return ret;
     }
 
     // 使用引擎创建混音器
-    if (!initOutputMix()) {
+    if ((ret = initOutputMix()) != NO_ERROR) {
         destroy();
-        return false;
+        return ret;
     }
     // 使用混音器设置混音效果
     setEnvironmentalReverb();
 
     // 使用引擎创建数据源为缓冲队列的播放器
-    if (!createBufferQueueAudioPlayer()) {
+    if ((ret = createBufferQueueAudioPlayer()) != NO_ERROR) {
         destroy();
-        return false;
+        return ret;
     }
     // 设置播放器缓冲队列回调函数
-    if (!setBufferQueueCallback(pcmBufferCallback, this)) {
+    if ((ret = setBufferQueueCallback(pcmBufferCallback, this)) != NO_ERROR) {
         destroy();
-        return false;
+        return ret;
     }
 
     initSuccess = true;
-    return true;
+    return NO_ERROR;
 }
 
 void OpenSLPlayer::startPlay() {
@@ -112,13 +113,13 @@ void OpenSLPlayer::destroy() {
     destroyEngine();
 }
 
-bool OpenSLPlayer::initEngine() {
+int OpenSLPlayer::initEngine() {
     // create engine object
     SLresult result;
     result = slCreateEngine(&engineObject, 0, NULL, 0, NULL, NULL);
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "slCreateEngine exception!");
-        return false;
+        return E_CODE_AUD_CREATE_ENGINE;
     }
 
     // realize the engine object
@@ -127,7 +128,7 @@ bool OpenSLPlayer::initEngine() {
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "engineObject Realize exception!");
         destroyEngine();
-        return false;
+        return E_CODE_AUD_REALIZE_ENGINE;
     }
 
     // get the engine interface, which is needed in order to create other objects
@@ -136,13 +137,13 @@ bool OpenSLPlayer::initEngine() {
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "GetInterface SLEngineItf exception!");
         destroyEngine();
-        return false;
+        return E_CODE_AUD_GETITF_ENGINE;
     }
 
-    return true;
+    return NO_ERROR;
 }
 
-bool OpenSLPlayer::initOutputMix() {
+int OpenSLPlayer::initOutputMix() {
     // create output mix, with environmental reverb specified as a non-required interface
     const SLInterfaceID ids[1] = {SL_IID_ENVIRONMENTALREVERB};
     const SLboolean reqs[1] = {SL_BOOLEAN_FALSE};
@@ -150,7 +151,7 @@ bool OpenSLPlayer::initOutputMix() {
     result = (*engine)->CreateOutputMix(engine, &outputMixObject, 1, ids, reqs);
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "CreateOutputMix exception!");
-        return false;
+        return E_CODE_AUD_CREATE_OUTMIX;
     }
 
     // realize the output mix
@@ -159,13 +160,13 @@ bool OpenSLPlayer::initOutputMix() {
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "outputMixObject Realize exception!");
         destroyOutputMixer();
-        return false;
+        return E_CODE_AUD_REALIZE_OUTMIX;
     }
 
-    return true;
+    return NO_ERROR;
 }
 
-bool OpenSLPlayer::setEnvironmentalReverb() {
+int OpenSLPlayer::setEnvironmentalReverb() {
     // get the environmental reverb interface
     // this could fail if the environmental reverb effect is not available,
     // either because the feature is not present, excessive CPU load, or
@@ -175,7 +176,7 @@ bool OpenSLPlayer::setEnvironmentalReverb() {
                                               &outputMixEnvironmentalReverb);
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "GetInterface SLEnvironmentalReverbItf exception!");
-        return false;
+        return E_CODE_AUD_GETITF_ENVRVB;
     }
 
     // aux effect on the output mix, used by the buffer queue player
@@ -184,13 +185,13 @@ bool OpenSLPlayer::setEnvironmentalReverb() {
             outputMixEnvironmentalReverb, &reverbSettings);
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "SetEnvironmentalReverbProperties exception!");
-        return false;
+        return E_CODE_AUD_SETPROP_ENVRVB;
     }
 
-    return true;
+    return NO_ERROR;
 }
 
-bool OpenSLPlayer::createBufferQueueAudioPlayer() {
+int OpenSLPlayer::createBufferQueueAudioPlayer() {
     // configure audio source
     SLDataLocator_AndroidSimpleBufferQueue bufferQueueLocator = {
             SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 2
@@ -225,7 +226,7 @@ bool OpenSLPlayer::createBufferQueueAudioPlayer() {
             engine, &playerObject, &audioSrc, &audioSnk, ID_COUNT, ids, reqs);
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "CreateAudioPlayer exception!");
-        return false;
+        return E_CODE_AUD_CREATE_AUDIOPL;
     }
 
     // realize the player
@@ -234,7 +235,7 @@ bool OpenSLPlayer::createBufferQueueAudioPlayer() {
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "playerObject Realize exception!");
         destroyBufferQueueAudioPlayer();
-        return false;
+        return E_CODE_AUD_REALIZ_AUDIOPL;
     }
 
     // get play controller
@@ -242,7 +243,7 @@ bool OpenSLPlayer::createBufferQueueAudioPlayer() {
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "GetInterface SLPlayItf exception!");
         destroyBufferQueueAudioPlayer();
-        return false;
+        return E_CODE_AUD_GETITF_PLAY;
     }
 
     // get volume controller
@@ -250,13 +251,13 @@ bool OpenSLPlayer::createBufferQueueAudioPlayer() {
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "GetInterface SLVolumeItf exception!");
         destroyBufferQueueAudioPlayer();
-        return false;
+        return E_CODE_AUD_GETITF_VOLUME;
     }
 
-    return true;
+    return NO_ERROR;
 }
 
-bool
+int
 OpenSLPlayer::setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback, void *pContext) {
     // get the buffer queue interface
     SLresult result;
@@ -264,7 +265,7 @@ OpenSLPlayer::setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "GetInterface SLAndroidSimpleBufferQueueItf exception!");
         destroyBufferQueueAudioPlayer();
-        return false;
+        return E_CODE_AUD_GETITF_BUFQUE;
     }
 
     // register callback on the buffer queue
@@ -273,26 +274,26 @@ OpenSLPlayer::setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "pcmBufferQueue RegisterCallback exception!");
         destroyBufferQueueAudioPlayer();
-        return false;
+        return E_CODE_AUD_REGCALL_BUFQUE;
     }
 
-    return true;
+    return NO_ERROR;
 }
 
-bool OpenSLPlayer::setPlayState(SLuint32 state) {
+int OpenSLPlayer::setPlayState(SLuint32 state) {
     if (playController == NULL) {
         LOGE(LOG_TAG, "SetPlayState %d failed because playController is NULL !", state);
-        return false;
+        return E_CODE_AUD_SET_PLAYSTATE;
     }
 
     SLresult result;
     result = (*playController)->SetPlayState(playController, state);
     if (SL_RESULT_SUCCESS != result) {
         LOGE(LOG_TAG, "SetPlayState %d exception!", state);
-        return false;
+        return E_CODE_AUD_SET_PLAYSTATE;
     }
 
-    return true;
+    return NO_ERROR;
 }
 
 void OpenSLPlayer::destroyBufferQueueAudioPlayer() {

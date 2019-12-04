@@ -9,6 +9,7 @@
 #include "OpenSLPlayer.h"
 #include "OnPlayLoadingListener.h"
 #include "JavaListenerContainer.h"
+#include "WeError.h"
 
 extern "C"
 {
@@ -95,6 +96,8 @@ private:
      * @return -1 if failed, or sampled bytes
      */
     int resample();
+
+    void updateCurrentPlayTime(int64_t pts, int sampleDataBytes);
 
     void release();
 

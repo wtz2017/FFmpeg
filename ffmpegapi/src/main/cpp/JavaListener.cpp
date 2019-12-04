@@ -63,6 +63,7 @@ void JavaListener::callback(int argCount, ...) {
         if (env->ExceptionCheck()) {
             LOGE(LOG_TAG, "GetMethodID exception! method: %s %s", getMethodName(), getMethodSignature());
             env->Throw(env->ExceptionOccurred());
+            return;
         }
     }
 

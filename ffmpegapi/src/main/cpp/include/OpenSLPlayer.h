@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "AndroidLog.h"
 #include "PcmGenerator.h"
+#include "WeError.h"
 
 extern "C"
 {
@@ -87,7 +88,7 @@ public:
 
     ~OpenSLPlayer();
 
-    bool init();
+    int init();
 
     void startPlay();
 
@@ -114,17 +115,17 @@ public:
     static SLuint32 ffmpegToOpenSLChannelLayout(int64_t ffmpegChannelLayout);
 
 private:
-    bool initEngine();
+    int initEngine();
 
-    bool initOutputMix();
+    int initOutputMix();
 
-    bool setEnvironmentalReverb();
+    int setEnvironmentalReverb();
 
-    bool createBufferQueueAudioPlayer();
+    int createBufferQueueAudioPlayer();
 
-    bool setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback, void *pContext);
+    int setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback, void *pContext);
 
-    bool setPlayState(SLuint32 state);
+    int setPlayState(SLuint32 state);
 
     /**
      * 确保在退出应用时销毁所有对象。

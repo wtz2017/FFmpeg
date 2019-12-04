@@ -44,6 +44,8 @@ public class WePlayer {
 
     private OnPreparedListener mOnPreparedListener;
     private OnPlayLoadingListener mOnPlayLoadingListener;
+    private OnErrorListener mOnErrorListener;
+    private OnCompletionListener mOnCompletionListener;
     private String mDataSource;
     private boolean isPrepared;
 
@@ -66,6 +68,14 @@ public class WePlayer {
 
     public interface OnPlayLoadingListener {
         void onPlayLoading(boolean isLoading);
+    }
+
+    public interface OnErrorListener {
+        void onError(int code, String msg);
+    }
+
+    public interface OnCompletionListener {
+        void onCompletion();
     }
 
     public WePlayer() {
@@ -144,12 +154,20 @@ public class WePlayer {
         mUIHandler.removeCallbacksAndMessages(null);
     }
 
-    public void setOnPreparedListener(OnPreparedListener onPreparedListener) {
-        this.mOnPreparedListener = onPreparedListener;
+    public void setOnPreparedListener(OnPreparedListener listener) {
+        this.mOnPreparedListener = listener;
     }
 
-    public void setOnPlayLoadingListener(OnPlayLoadingListener onPlayLoadingListener) {
-        this.mOnPlayLoadingListener = onPlayLoadingListener;
+    public void setOnPlayLoadingListener(OnPlayLoadingListener listener) {
+        this.mOnPlayLoadingListener = listener;
+    }
+
+    public void setOnErrorListener(OnErrorListener listener) {
+        this.mOnErrorListener = listener;
+    }
+
+    public void setOnCompletionListener(OnCompletionListener listener) {
+        this.mOnCompletionListener = listener;
     }
 
     public void setDataSource(String dataSource) {
@@ -183,6 +201,7 @@ public class WePlayer {
 
     /**
      * called from native
+     * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
     public void onNativePrepared(String dataSource) {
         LogUtils.d(TAG, "onNativePrepared isDestroyed: " + isDestroyed + ", dataSource: " + dataSource);
@@ -296,6 +315,38 @@ public class WePlayer {
             return 0;
         }
         return nativeGetCurrentPosition();
+    }
+
+    /**
+     * called from native
+     * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
+     */
+    public void onNativeError(final int code, final String msg) {
+        LogUtils.e(TAG, "onNativeError code=" + code + "; msg=" + msg);
+        if (mOnErrorListener != null && !isDestroyed) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnErrorListener.onError(code, msg);
+                }
+            });
+        }
+    }
+
+    /**
+     * called from native
+     * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
+     */
+    public void onNativeCompletion() {
+        LogUtils.d(TAG, "onNativeCompletion");
+        if (mOnCompletionListener != null && !isDestroyed) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnCompletionListener.onCompletion();
+                }
+            });
+        }
     }
 
 }
