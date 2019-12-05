@@ -112,6 +112,23 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeResumePlay(JNIEnv *env, jobject thiz) {
 }
 
 extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSeekTo(JNIEnv *env, jobject thiz, jint msec) {
+    if (weFFmpeg == NULL) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass, "Have you called prepare before calling the seekTo function?");
+        env->DeleteLocalRef(exceptionClass);
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeSeekTo %d ms...", msec);
+    }
+
+    weFFmpeg->seekTo(msec);
+}
+
+extern "C"
 JNIEXPORT jint JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeGetDuration(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {

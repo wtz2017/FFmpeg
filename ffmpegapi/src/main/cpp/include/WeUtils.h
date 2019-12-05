@@ -6,6 +6,7 @@
 #define FFMPEG_WEUTILS_H
 
 #include <stddef.h>
+#include <sys/time.h>
 #include "AndroidLog.h"
 
 extern "C"
@@ -31,6 +32,7 @@ class WeUtils {
 public:
     static void
     av_dump_format_for_android(AVFormatContext *ic, int index, const char *url, int is_output);
+    static long long getCurrentTimeMill();
 
 private:
     static void dump_metadata(void *ctx, AVDictionary *m, const char *indent);

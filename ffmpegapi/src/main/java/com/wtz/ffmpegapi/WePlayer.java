@@ -34,6 +34,8 @@ public class WePlayer {
 
     private native void nativeResumePlay();
 
+    private native void nativeSeekTo(int msec);
+
     private native void nativeSetStopFlag();
 
     private native void nativeRelease();
@@ -57,8 +59,9 @@ public class WePlayer {
     private static final int HANDLE_START = 3;
     private static final int HANDLE_PAUSE = 4;
     private static final int HANDLE_RESUME_PLAY = 5;
-    private static final int HANDLE_RELEASE = 6;
-    private static final int HANDLE_DESTROY = 7;
+    private static final int HANDLE_SEEK = 6;
+    private static final int HANDLE_RELEASE = 7;
+    private static final int HANDLE_DESTROY = 8;
 
     private boolean isDestroyed;
 
@@ -110,6 +113,10 @@ public class WePlayer {
 
                     case HANDLE_RESUME_PLAY:
                         handleResumePlay();
+                        break;
+
+                    case HANDLE_SEEK:
+                        handleSeek(msg);
                         break;
 
                     case HANDLE_RELEASE:
@@ -275,6 +282,22 @@ public class WePlayer {
         }
 
         nativeResumePlay();
+    }
+
+    /**
+     * Seeks to specified time position
+     *
+     * @param msec the offset in milliseconds from the start to seek to
+     */
+    public void seekTo(int msec) {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SEEK);
+        msg.arg1 = msec;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleSeek(Message msg) {
+        int msec = msg.arg1;
+        nativeSeekTo(msec);
     }
 
     public void stop() {

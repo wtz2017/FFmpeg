@@ -258,7 +258,7 @@ int WeAudio::resample() {
     }
 
     int sampleDataBytes = channelNums * sampleNumsPerChannel * bytesPerSample;
-    updateCurrentPlayTime(avFrame->pts, sampleDataBytes);
+    updatePlayTime(avFrame->pts, sampleDataBytes);
     if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
     }
@@ -273,14 +273,14 @@ int WeAudio::resample() {
     return sampleDataBytes;
 }
 
-void WeAudio::updateCurrentPlayTime(int64_t pts, int sampleDataBytes) {
+void WeAudio::updatePlayTime(int64_t pts, int sampleDataBytes) {
     currentFrameTime = pts * av_q2d(streamTimeBase);
-    if (currentFrameTime < currentPlayTime) {
+    if (currentFrameTime < playTimeSecs) {
         // avFrame->pts maybe 0
-        currentFrameTime = currentPlayTime;
+        currentFrameTime = playTimeSecs;
     }
     // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
-    currentPlayTime = currentFrameTime + (sampleDataBytes / (double) sampledSizePerSecond);
+    playTimeSecs = currentFrameTime + (sampleDataBytes / (double) sampledSizePerSecond);
 }
 
 void WeAudio::releaseAvPacket() {
@@ -331,6 +331,15 @@ void WeAudio::stopPlay() {
     }
 
     openSlPlayer->stopPlay();
+}
+
+double WeAudio::getPlayTimeSecs() {
+    return playTimeSecs;
+}
+
+void WeAudio::resetPlayTime() {
+    currentFrameTime = 0;
+    playTimeSecs = 0;
 }
 
 void WeAudio::release() {

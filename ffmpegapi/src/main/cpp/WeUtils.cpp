@@ -515,3 +515,9 @@ void WeUtils::print_peak(void *ctx, const char *str, uint32_t peak) {
     LOGI(WE_UTILS_LOG_TAG, ", ");
 }
 
+long long WeUtils::getCurrentTimeMill() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+

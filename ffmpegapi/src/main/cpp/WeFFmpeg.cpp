@@ -7,6 +7,7 @@
 WeFFmpeg::WeFFmpeg(JavaListenerContainer *javaListenerContainer) {
     this->javaListenerContainer = javaListenerContainer;
     status = new PlayStatus();
+    pthread_mutex_init(&demuxMutex, NULL);
 }
 
 WeFFmpeg::~WeFFmpeg() {
@@ -34,7 +35,7 @@ int formatCtxInterruptCallback(void *context) {
     if (LOG_REPEAT_DEBUG) {
         LOGD("WeFFmpeg", "formatCtxInterruptCallback...");
     }
-    WeFFmpeg *weFFmpeg = (WeFFmpeg *)context;
+    WeFFmpeg *weFFmpeg = (WeFFmpeg *) context;
     if (weFFmpeg->status == NULL || weFFmpeg->status->isStoped() || weFFmpeg->status->isError()) {
         LOGW("WeFFmpeg", "formatCtxInterruptCallback return AVERROR_EOF");
         return AVERROR_EOF;
@@ -95,7 +96,7 @@ void WeFFmpeg::prepareAsync() {
             weAudio->streamIndex = i;
             weAudio->codecParams = pFormatCtx->streams[i]->codecpar;
             weAudio->streamTimeBase = pFormatCtx->streams[i]->time_base;
-            weAudio->duration = pFormatCtx->duration * av_q2d(AV_TIME_BASE_Q);
+            duration = pFormatCtx->duration * av_q2d(AV_TIME_BASE_Q);
             break;
         }
     }
@@ -224,12 +225,26 @@ void WeFFmpeg::_demux() {
     }
     // 本线程开始读 AVPacket 包并缓存入队
     int packetCount = 0;
+    int readRet = -1;
     AVPacket *avPacket = NULL;
     while (status != NULL && !status->isStoped() && !status->isError()) {
+        if (status->isSeeking) {
+            continue;
+        }
+        if (weAudio->queue->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
+            continue;
+        }
+
         // Allocate an AVPacket
         avPacket = av_packet_alloc();
+
         // 读取数据包到 AVPacket
-        if (av_read_frame(pFormatCtx, avPacket) == 0) {
+        pthread_mutex_lock(&demuxMutex);// seek 会操作 AVFormatContext 修改解封装起始位置，所以要加锁
+        readRet = av_read_frame(pFormatCtx, avPacket);
+        pthread_mutex_unlock(&demuxMutex);
+
+        if (readRet == 0) {
+            // 读包成功
             if (avPacket->stream_index == weAudio->streamIndex) {
                 // 当前包为音频包
                 packetCount++;
@@ -247,6 +262,7 @@ void WeFFmpeg::_demux() {
             }
         } else {
             // 文件读取出错或已经结束
+            // TODO 如何区分是文件读取出错还是已经结束？播放中网络断开也会走到这里
             if (LOG_DEBUG) {
                 LOGD(LOG_TAG, "AVPacket read finished");
             }
@@ -266,24 +282,32 @@ void WeFFmpeg::_demux() {
                     continue;
                 }
 
-                pthread_mutex_lock(&status->mutex);
-                if (status == NULL || !status->isPlaying()) {
-                    // 只有“播放中”状态才可以切换到“播放完成”状态
+                // 到这里说明队列已经没有数据了，原因有两个：1.播放完成；2. seek 主动清空了数据
+                if (!weAudio->queue->isProductDataComplete()) {
+                    // seek 主动清空了数据
+                    break;// 跳出本循环，回到大循环继续读数据
+                } else {
+                    // 播放完成
+                    pthread_mutex_lock(&status->mutex);
+                    if (status == NULL || !status->isPlaying()) {
+                        // 只有“播放中”状态才可以切换到“播放完成”状态
+                        pthread_mutex_unlock(&status->mutex);
+                        workFinished = true;
+                        return;// 结束 demux 线程
+                    }
+                    status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
+
+                    // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+                    javaListenerContainer->onCompletionListener->callback(0);
+
                     pthread_mutex_unlock(&status->mutex);
-                    break;
+                    workFinished = true;
+                    return;// 结束 demux 线程
                 }
-                status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
-
-                // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-                javaListenerContainer->onCompletionListener->callback(0);
-                pthread_mutex_unlock(&status->mutex);
-                break;
-            }
-            break;
-        }
-    }
-
-    workFinished = true;
+            } // 读完等待循环
+        } // 读完分支
+    } // 读包大循环
+    workFinished = true;// 提前中断退出
 }
 
 void WeFFmpeg::pause() {
@@ -315,17 +339,72 @@ void WeFFmpeg::resumePlay() {
 }
 
 /**
+ * seek 会操作 AVFormatContext 修改解封装起始位置，
+ * 所以与同时解封装动作的 int av_read_frame(AVFormatContext *s, AVPacket *pkt) 冲突，
+ * 多线程之间要加锁同步操作！
+ *
+ * @param msec the offset in milliseconds from the start to seek to
+ */
+void WeFFmpeg::seekTo(int msec) {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "seekTo %d ms", msec);
+    }
+
+    if (status == NULL || (!status->isPrepared() && !status->isPlaying() && !status->isPaused())) {
+        LOGE(LOG_TAG, "Can't seek because status is %s", status->getCurrentStatusName());
+        return;
+    }
+
+    if (duration <= 0) {
+        LOGE(LOG_TAG, "Can't seek because duration <= 0");
+        return;
+    }
+    int targetSeconds = roundf(((float) msec) / 1000);
+    if (targetSeconds < 0) {
+        targetSeconds = 0;
+    } else if (targetSeconds > duration) {
+        targetSeconds = duration;
+    }
+
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "Can't seek because weAudio == NULL");
+        return;
+    }
+
+    status->isSeeking = true;
+
+    // reset
+    weAudio->queue->setProductDataComplete(false);// 通知解包者和播放者还有数据，尤其对于解包线已经解完进入等待状态有用
+    weAudio->queue->clearQueue();
+    weAudio->resetPlayTime();
+
+    long long seekStart, seekEnd;
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "seek --> start...");
+        seekStart = WeUtils::getCurrentTimeMill();
+    }
+    // seek
+    pthread_mutex_lock(&demuxMutex);
+    // 由于这里 seek 设置流索引为 -1，所以 seek 会以 AV_TIME_BASE 为单位，而 AV_TIME_BASE 定义为 1000000，
+    // 因此把秒数转换成 AV_TIME_BASE 所代表的时间刻度数后使用 int 就不够了，需要用 int64_t 代替。
+    int64_t seekPosition = targetSeconds * AV_TIME_BASE;
+    avformat_seek_file(pFormatCtx, -1, INT64_MIN, seekPosition, INT64_MAX, 0);
+    pthread_mutex_unlock(&demuxMutex);
+    if (LOG_DEBUG) {
+        seekEnd = WeUtils::getCurrentTimeMill();
+        LOGD(LOG_TAG, "seek --> end. use %lld ms!", seekEnd - seekStart);
+    }
+
+    status->isSeeking = false;
+}
+
+/**
  * Gets the duration of the file.
  *
  * @return the duration in milliseconds
  */
 int WeFFmpeg::getDuration() {
-    if (weAudio == NULL) {
-        LOGE(LOG_TAG, "getDuration but weAudio is NULL");
-        // 不涉及到控制，不设置错误状态
-        return 0;
-    }
-    return weAudio->duration * 1000;
+    return duration * 1000;
 }
 
 /**
@@ -339,7 +418,7 @@ int WeFFmpeg::getCurrentPosition() {
         // 不涉及到控制，不设置错误状态
         return 0;
     }
-    int ret = weAudio->currentPlayTime * 1000;
+    int ret = weAudio->getPlayTimeSecs() * 1000;
     if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "getCurrentPosition: %d", ret);
     }
@@ -416,6 +495,8 @@ void WeFFmpeg::release() {
     // 最顶层负责回收 status
     delete status;
     status = NULL;
+
+    pthread_mutex_destroy(&demuxMutex);
 
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "release finished");

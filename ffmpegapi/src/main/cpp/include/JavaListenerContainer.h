@@ -28,6 +28,10 @@ public:
         onPreparedListener = NULL;
         delete onPlayLoadingListener;
         onPlayLoadingListener = NULL;
+        delete onErrorListener;
+        onErrorListener = NULL;
+        delete onCompletionListener;
+        onCompletionListener = NULL;
     }
 
 };

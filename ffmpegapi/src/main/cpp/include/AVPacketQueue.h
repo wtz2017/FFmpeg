@@ -28,6 +28,9 @@ private:
     pthread_cond_t condition;
 
 public:
+    static const int MAX_CACHE_NUM = 40;
+
+public:
     AVPacketQueue(PlayStatus *status);
 
     ~AVPacketQueue();
@@ -46,6 +49,9 @@ public:
     int getQueueSize();
 
     void clearQueue();
+
+private:
+    void releaseQueue();
 
 };
 

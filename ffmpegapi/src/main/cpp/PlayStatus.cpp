@@ -79,3 +79,7 @@ const char *PlayStatus::getStatusName(PlayStatus::Status status) {
     return name;
 }
 
+const char *PlayStatus::getCurrentStatusName() {
+    return getStatusName(status);
+}
+

@@ -36,6 +36,9 @@ private:
     char *dataSource = NULL;
     AVFormatContext *pFormatCtx = NULL;
     WeAudio *weAudio = NULL;
+    double duration = 0;// Duration of the stream in seconds
+
+    pthread_mutex_t demuxMutex;
 
 public:
     const char *LOG_TAG = "WeFFmpeg";
@@ -66,6 +69,13 @@ public:
     void pause();
 
     void resumePlay();
+
+    /**
+     * Seeks to specified time position
+     *
+     * @param msec the offset in milliseconds from the start to seek to
+     */
+    void seekTo(int msec);
 
     /**
      * Gets the duration of the file.

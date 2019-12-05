@@ -11,7 +11,7 @@ AVPacketQueue::AVPacketQueue(PlayStatus *status) {
 }
 
 AVPacketQueue::~AVPacketQueue() {
-    clearQueue();
+    releaseQueue();
     pthread_cond_destroy(&condition);
     pthread_mutex_destroy(&mutex);
     status = NULL;// 最顶层 WeFFmpeg 负责回收 status，这里只把本指针置空
@@ -109,11 +109,14 @@ void AVPacketQueue::clearQueue() {
     }
     packet = NULL;
 
-    std::queue<AVPacket *> empty;
-    swap(empty, queue);
-
     pthread_mutex_unlock(&mutex);
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "clearQueue finished");
     }
+}
+
+void AVPacketQueue::releaseQueue() {
+    clearQueue();
+    std::queue<AVPacket *> empty;
+    swap(empty, queue);
 }

@@ -3,6 +3,8 @@ package com.wtz.ffmpeg;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,6 +27,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private TextView mPlayTimeView;
     private String mDurationText;
+    private ProgressDialog mProgressDialog;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
@@ -119,6 +122,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (mWePlayer == null) {
                     mWePlayer = new WePlayer();
                 }
+//                mWePlayer.setDataSource("file:///sdcard/test.mp3");
+//                mWePlayer.setDataSource("file:///sdcard/test.ac3");
+//                mWePlayer.setDataSource("file:///sdcard/test.mp4");
 //                mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
                 mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=29750099.mp3");
 //                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=566435178.mp3");
@@ -131,12 +137,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         mWePlayer.start();
                         mDurationText = DateTimeUtil.changeRemainTimeToHms(mWePlayer.getDuration());
                         mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
+
+                        // TODO ---seek TEST---
+                        int seek = (int) (0.5 * mWePlayer.getDuration());
+                        mWePlayer.seekTo(seek);
                     }
                 });
                 mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
                     @Override
                     public void onPlayLoading(boolean isLoading) {
                         Log.d(TAG, "WePlayer onPlayLoading: " + isLoading);
+                        if (isLoading) {
+                            showProgressDialog(MainActivity.this);
+                        } else {
+                            hideProgressDialog();
+                        }
                     }
                 });
                 mWePlayer.setOnErrorListener(new WePlayer.OnErrorListener() {
@@ -188,6 +203,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void updatePlayTime() {
         String currentPosition = DateTimeUtil.changeRemainTimeToHms(mWePlayer.getCurrentPosition());
         mPlayTimeView.setText(currentPosition + "/" + mDurationText);
+    }
+
+    private void showProgressDialog(Context context) {
+        if (mProgressDialog == null) {
+            mProgressDialog = new ProgressDialog(context);
+            mProgressDialog.setMessage("正在加载中");
+        }
+        mProgressDialog.show();
+    }
+
+    private void hideProgressDialog() {
+        if (mProgressDialog == null) {
+            return;
+        }
+        mProgressDialog.dismiss();
     }
 
     @Override

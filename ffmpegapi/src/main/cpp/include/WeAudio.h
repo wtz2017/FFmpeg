@@ -20,6 +20,8 @@ extern "C"
 class WeAudio : public PcmGenerator {
 
 private:
+    PlayStatus *status = NULL;
+    JavaListenerContainer *javaListenerContainer = NULL;
     bool startFinished = false;// 启动播放器线程工作是否完成
 
     AVPacket *avPacket = NULL;
@@ -35,20 +37,16 @@ private:
 
     OpenSLPlayer *openSlPlayer = NULL;
 
+    double currentFrameTime = 0;// 当前帧时间，单位：秒
+    double playTimeSecs = 0;// 当前播放时间，单位：秒
+
 public:
     const char *LOG_TAG = "WeAudio";
 
-    PlayStatus *status = NULL;
-    JavaListenerContainer *javaListenerContainer = NULL;
-
     int streamIndex = -1;
-    AVCodecContext *codecContext = NULL;
     AVCodecParameters *codecParams = NULL;
-
-    double duration = 0;
+    AVCodecContext *codecContext = NULL;
     AVRational streamTimeBase;
-    double currentFrameTime = 0;
-    double currentPlayTime = 0;// 当前播放时间，单位：秒
 
     AVPacketQueue *queue = NULL;
     pthread_t startPlayThread;
@@ -75,6 +73,13 @@ public:
 
     void stopPlay();
 
+    /**
+     * @return 当前播放时间，单位：秒
+     */
+    double getPlayTimeSecs();
+
+    void resetPlayTime();
+
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);
 
@@ -97,7 +102,7 @@ private:
      */
     int resample();
 
-    void updateCurrentPlayTime(int64_t pts, int sampleDataBytes);
+    void updatePlayTime(int64_t pts, int sampleDataBytes);
 
     void release();
 
