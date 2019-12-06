@@ -11,9 +11,12 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import com.wtz.ffmpeg.utils.DateTimeUtil;
+import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.CppThreadDemo;
 
@@ -24,10 +27,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private boolean isProducing;
 
     private WePlayer mWePlayer;
+    private int mDuration;
+    private boolean isSeeking;
+    private boolean isLoading;
 
     private TextView mPlayTimeView;
     private String mDurationText;
     private ProgressDialog mProgressDialog;
+    private SeekBar mSeekBar;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
@@ -67,6 +74,39 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_destroy_audio_player).setOnClickListener(this);
 
         mPlayTimeView = findViewById(R.id.tv_play_time);
+
+        mSeekBar = findViewById(R.id.seek_bar);
+        mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                if (isSeeking) {
+                    // 因为主动 seek 导致的 seekbar 变化，此时只需要更新时间
+                    updatePlayTime();
+                } else {
+                    // 因为实际播放时间变化而设置 seekbar 导致变化，什么都不用做
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "onStartTrackingTouch");
+                isSeeking = true;
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "onStopTrackingTouch");
+                if (mWePlayer != null){
+                    mWePlayer.seekTo(seekBar.getProgress());
+                }
+                isSeeking = false;
+            }
+        });
+        int[] wh = ScreenUtils.getScreenPixels(this);
+        int seekWith = (int) Math.round(0.75 * wh[0]);
+        ViewGroup.LayoutParams lp = mSeekBar.getLayoutParams();
+        lp.width = seekWith;
+        mSeekBar.setLayoutParams(lp);
     }
 
     @Override
@@ -135,21 +175,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     public void onPrepared() {
                         Log.d(TAG, "WePlayer onPrepared");
                         mWePlayer.start();
-                        mDurationText = DateTimeUtil.changeRemainTimeToHms(mWePlayer.getDuration());
-                        mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
 
-                        // TODO ---seek TEST---
-                        int seek = (int) (0.5 * mWePlayer.getDuration());
-                        mWePlayer.seekTo(seek);
+                        mDuration = mWePlayer.getDuration();
+                        mSeekBar.setMax(mDuration);
+                        mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
+                        startUpdateTime();
                     }
                 });
                 mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
                     @Override
                     public void onPlayLoading(boolean isLoading) {
                         Log.d(TAG, "WePlayer onPlayLoading: " + isLoading);
+                        MainActivity.this.isLoading = isLoading;
                         if (isLoading) {
+                            stopUpdateTime();
                             showProgressDialog(MainActivity.this);
                         } else {
+                            startUpdateTime();
                             hideProgressDialog();
                         }
                     }
@@ -173,36 +215,66 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     return;
                 }
                 mWePlayer.pause();
-                mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
+                stopUpdateTime();
                 break;
             case R.id.btn_resume_play_audio:
                 if (mWePlayer == null) {
                     return;
                 }
-                mWePlayer.resumePlay();
-                mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
+                mWePlayer.start();
+                startUpdateTime();
                 break;
             case R.id.btn_stop_play_audio:
                 if (mWePlayer == null) {
                     return;
                 }
                 mWePlayer.stop();
-                mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
+                stopUpdateTime();
+                resetSeekbarAndTime();
                 break;
             case R.id.btn_destroy_audio_player:
                 if (mWePlayer == null) {
                     return;
                 }
                 mWePlayer.destroyPlayer();
+                stopUpdateTime();
+                resetSeekbarAndTime();
                 mWePlayer = null;
-                mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
                 break;
         }
     }
 
+    private void startUpdateTime() {
+        // 延迟一定时间，是为了解决播放完成后再seek某位置后恢复播放时取的时间为0的问题
+        // 因卤播放完成后解码线程已经退出，再恢复播放时重新启动线程取数据需要一定时间
+        mHandler.sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME,200);
+    }
+
+    private void stopUpdateTime() {
+        mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
+    }
+
+    private void resetSeekbarAndTime() {
+        mPlayTimeView.setText("00:00:00/" + mDurationText);
+        mSeekBar.setProgress(0);
+    }
+
     private void updatePlayTime() {
-        String currentPosition = DateTimeUtil.changeRemainTimeToHms(mWePlayer.getCurrentPosition());
-        mPlayTimeView.setText(currentPosition + "/" + mDurationText);
+        if (mWePlayer == null || isLoading) return;
+
+        if (isSeeking) {
+            // seek 时 seekbar 会自动更新位置，只需要根据 seek 位置更新时间
+            String currentPosition = DateTimeUtil.changeRemainTimeToHms(mSeekBar.getProgress());
+            mPlayTimeView.setText(currentPosition + "/" + mDurationText);
+        } else if (mWePlayer.isPlaying()){
+            // 没有 seek 时，如果还在播放中，就正常按实际播放时间更新时间和 seekbar
+            int position = mWePlayer.getCurrentPosition();
+            String currentPosition = DateTimeUtil.changeRemainTimeToHms(position);
+            mPlayTimeView.setText(currentPosition + "/" + mDurationText);
+            mSeekBar.setProgress(position);
+        } else {
+            // 既没有 seek，也没有播放，那就不更新
+        }
     }
 
     private void showProgressDialog(Context context) {

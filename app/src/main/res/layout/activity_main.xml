@@ -85,6 +85,21 @@
             android:text="00:00:00/00:00:00" />
     </LinearLayout>
 
+    <SeekBar
+        android:id="@+id/seek_bar"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxWidth="150dp"
+        android:minWidth="150dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/seekbar_style"
+        android:secondaryProgress="0"
+        android:thumb="@drawable/seekbar_thumb"
+        android:thumbOffset="0dp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

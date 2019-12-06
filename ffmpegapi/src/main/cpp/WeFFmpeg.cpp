@@ -44,6 +44,8 @@ int formatCtxInterruptCallback(void *context) {
 }
 
 void WeFFmpeg::prepareAsync() {
+    workFinished = false;
+
     // 判断只有 stoped 状态才可以往下走，避免之前启动未回收内存
     pthread_mutex_lock(&status->mutex);
     if (status == NULL || !status->isStoped()) {
@@ -189,6 +191,25 @@ void WeFFmpeg::handleErrorOnPreparing(int errorCode) {
     pthread_mutex_unlock(&status->mutex);
 }
 
+void WeFFmpeg::start() {
+    pthread_mutex_lock(&status->mutex);
+    if (status == NULL ||
+        (!status->isPrepared() && !status->isPaused() && !status->isCompleted())) {
+        LOGE(LOG_TAG, "Invoke start but status is %s", status->getCurrentStatusName());
+        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
+        pthread_mutex_unlock(&status->mutex);
+        return;
+    }
+    if (status->isPrepared() || status->isCompleted()) {
+        status->setStatus(PlayStatus::PLAYING, LOG_TAG);
+        startDemuxThread();
+    } else {
+        status->setStatus(PlayStatus::PLAYING, LOG_TAG);
+        weAudio->resumePlay();// 要先设置播放状态，才能恢复播放
+    }
+    pthread_mutex_unlock(&status->mutex);
+}
+
 void *demuxThreadCall(void *data) {
     if (LOG_DEBUG) {
         LOGD("WeFFmpeg", "demuxThread run");
@@ -202,17 +223,9 @@ void *demuxThreadCall(void *data) {
 }
 
 void WeFFmpeg::startDemuxThread() {
-    pthread_mutex_lock(&status->mutex);
-    if (status == NULL || !status->isPrepared()) {
-        LOGE(LOG_TAG, "Invoke startDemuxThread but status is not prepared");
-        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
-        pthread_mutex_unlock(&status->mutex);
-        return;
-    }
-    status->setStatus(PlayStatus::PLAYING, LOG_TAG);
+    workFinished = false;
     // 线程创建时入口函数必须是全局函数或者某个类的静态成员函数
     pthread_create(&demuxThread, NULL, demuxThreadCall, this);
-    pthread_mutex_unlock(&status->mutex);
 }
 
 void WeFFmpeg::_demux() {
@@ -264,7 +277,7 @@ void WeFFmpeg::_demux() {
             // 文件读取出错或已经结束
             // TODO 如何区分是文件读取出错还是已经结束？播放中网络断开也会走到这里
             if (LOG_DEBUG) {
-                LOGD(LOG_TAG, "AVPacket read finished");
+                LOGW(LOG_TAG, "AVPacket read finished");
             }
             weAudio->queue->setProductDataComplete(true);
 
@@ -288,6 +301,7 @@ void WeFFmpeg::_demux() {
                     break;// 跳出本循环，回到大循环继续读数据
                 } else {
                     // 播放完成
+                    av_usleep(200 * 1000);// 再睡眠一定时间等待真正播放完成，解决上层依据状态更新时间时不能更新最后一秒的问题
                     pthread_mutex_lock(&status->mutex);
                     if (status == NULL || !status->isPlaying()) {
                         // 只有“播放中”状态才可以切换到“播放完成”状态
@@ -324,20 +338,6 @@ void WeFFmpeg::pause() {
     weAudio->pause();
 }
 
-void WeFFmpeg::resumePlay() {
-    pthread_mutex_lock(&status->mutex);
-    if (status == NULL || !status->isPaused()) {
-        LOGE(LOG_TAG, "resumePlay but status is not PAUSED");
-        // 调用非法，不是不可恢复的内部工作错误，所以不用设置错误状态
-        pthread_mutex_unlock(&status->mutex);
-        return;
-    }
-    status->setStatus(PlayStatus::PLAYING, LOG_TAG);
-    pthread_mutex_unlock(&status->mutex);
-
-    weAudio->resumePlay();// 要先设置播放状态，才能恢复播放
-}
-
 /**
  * seek 会操作 AVFormatContext 修改解封装起始位置，
  * 所以与同时解封装动作的 int av_read_frame(AVFormatContext *s, AVPacket *pkt) 冲突，
@@ -350,7 +350,8 @@ void WeFFmpeg::seekTo(int msec) {
         LOGD(LOG_TAG, "seekTo %d ms", msec);
     }
 
-    if (status == NULL || (!status->isPrepared() && !status->isPlaying() && !status->isPaused())) {
+    if (status == NULL || (!status->isPrepared() && !status->isPlaying()
+                           && !status->isPaused() && !status->isCompleted())) {
         LOGE(LOG_TAG, "Can't seek because status is %s", status->getCurrentStatusName());
         return;
     }
@@ -423,6 +424,10 @@ int WeFFmpeg::getCurrentPosition() {
         LOGD(LOG_TAG, "getCurrentPosition: %d", ret);
     }
     return ret;
+}
+
+bool WeFFmpeg::isPlaying() {
+    return status != NULL && status->isPlaying();
 }
 
 /**

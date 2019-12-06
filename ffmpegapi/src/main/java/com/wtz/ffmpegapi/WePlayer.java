@@ -32,9 +32,9 @@ public class WePlayer {
 
     private native void nativePause();
 
-    private native void nativeResumePlay();
-
     private native void nativeSeekTo(int msec);
+
+    private native boolean nativeIsPlaying();
 
     private native void nativeSetStopFlag();
 
@@ -58,10 +58,9 @@ public class WePlayer {
     private static final int HANDLE_PREPARE_ASYNC = 2;
     private static final int HANDLE_START = 3;
     private static final int HANDLE_PAUSE = 4;
-    private static final int HANDLE_RESUME_PLAY = 5;
-    private static final int HANDLE_SEEK = 6;
-    private static final int HANDLE_RELEASE = 7;
-    private static final int HANDLE_DESTROY = 8;
+    private static final int HANDLE_SEEK = 5;
+    private static final int HANDLE_RELEASE = 6;
+    private static final int HANDLE_DESTROY = 7;
 
     private boolean isDestroyed;
 
@@ -109,10 +108,6 @@ public class WePlayer {
 
                     case HANDLE_PAUSE:
                         handlePause();
-                        break;
-
-                    case HANDLE_RESUME_PLAY:
-                        handleResumePlay();
                         break;
 
                     case HANDLE_SEEK:
@@ -270,20 +265,6 @@ public class WePlayer {
         nativePause();
     }
 
-    public void resumePlay() {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_RESUME_PLAY);
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handleResumePlay() {
-        if (!isPrepared) {
-            LogUtils.e(TAG, "Can't call resumePlay method before prepare finished");
-            return;
-        }
-
-        nativeResumePlay();
-    }
-
     /**
      * Seeks to specified time position
      *
@@ -296,6 +277,11 @@ public class WePlayer {
     }
 
     private void handleSeek(Message msg) {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call seekTo method before prepare finished");
+            return;
+        }
+
         int msec = msg.arg1;
         nativeSeekTo(msec);
     }
@@ -312,6 +298,10 @@ public class WePlayer {
 
     private void handleRelease() {
         nativeRelease();
+    }
+
+    public boolean isPlaying() {
+        return nativeIsPlaying();
     }
 
     /**

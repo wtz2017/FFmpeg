@@ -58,31 +58,30 @@ void WeAudio::_startPlayer() {
 
     if (openSlPlayer == NULL) {
         openSlPlayer = new OpenSLPlayer(this);
-    }
+        int ret;
+        if ((ret = openSlPlayer->init()) != NO_ERROR) {
+            LOGE(LOG_TAG, "OpenSLPlayer init failed!");
+            // 出错首先释放资源
+            delete openSlPlayer;
+            openSlPlayer = NULL;
 
-    int ret;
-    if ((ret = openSlPlayer->init()) != NO_ERROR) {
-        LOGE(LOG_TAG, "OpenSLPlayer init failed!");
-        // 出错首先释放资源
-        delete openSlPlayer;
-        openSlPlayer = NULL;
+            // 然后设置错误状态
+            pthread_mutex_lock(&status->mutex);
+            if (status == NULL || status->isStoped()) {
+                // 只要不是“停止”状态，其它状态都可以切换到“错误”状态
+                pthread_mutex_unlock(&status->mutex);
+                startFinished = true;
+                return;
+            }
+            status->setStatus(PlayStatus::ERROR, LOG_TAG);
 
-        // 然后设置错误状态
-        pthread_mutex_lock(&status->mutex);
-        if (status == NULL || status->isStoped()) {
-            // 只要不是“停止”状态，其它状态都可以切换到“错误”状态
+            // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+            javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
+
             pthread_mutex_unlock(&status->mutex);
             startFinished = true;
             return;
         }
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
-
-        // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-        javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
-
-        pthread_mutex_unlock(&status->mutex);
-        startFinished = true;
-        return;
     }
 
     openSlPlayer->startPlay();
@@ -164,11 +163,7 @@ int WeAudio::getPcmData(void **buf) {
         break;
     }
 
-    if (ret > 0) {
-        *buf = sampledBuffer;
-    } else {
-        *buf = NULL;
-    }
+    *buf = sampledBuffer;
 
     return ret;
 }

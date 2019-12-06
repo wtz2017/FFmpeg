@@ -56,19 +56,14 @@ public:
 
     void prepareAsync();
 
-    /**
-     * 开启解封装线程
-     */
-    void startDemuxThread();
+    void start();
 
     /**
-     * 真正解封装的函数
+     * 真正解封装的函数，在 pthread 回调中调用
      */
     void _demux();
 
     void pause();
-
-    void resumePlay();
 
     /**
      * Seeks to specified time position
@@ -91,6 +86,8 @@ public:
      */
     int getCurrentPosition();
 
+    bool isPlaying();
+
     /**
      * setStopFlag 不走 java 调度线程消息队列，直接执行，避免无法立即通知结束工作
      */
@@ -100,6 +97,11 @@ public:
 
 private:
     void handleErrorOnPreparing(int errorCode);
+
+    /**
+     * 开启解封装线程
+     */
+    void startDemuxThread();
 
 };
 

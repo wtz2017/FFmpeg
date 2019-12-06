@@ -74,7 +74,8 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
         LOGD(LOG_TAG, "nativeStart...");
     }
 
-    weFFmpeg->startDemuxThread();
+//    weFFmpeg->startDemuxThread();
+    weFFmpeg->start();
 }
 
 extern "C"
@@ -96,23 +97,6 @@ Java_com_wtz_ffmpegapi_WePlayer_nativePause(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_WePlayer_nativeResumePlay(JNIEnv *env, jobject thiz) {
-    if (weFFmpeg == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass, "Have you called start before calling the resumePlay function?");
-        env->DeleteLocalRef(exceptionClass);
-        return;
-    }
-
-    if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "nativeResumePlay...");
-    }
-
-    weFFmpeg->resumePlay();
-}
-
-extern "C"
-JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeSeekTo(JNIEnv *env, jobject thiz, jint msec) {
     if (weFFmpeg == NULL) {
         jclass exceptionClass = env->FindClass("java/lang/Exception");
@@ -126,6 +110,18 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSeekTo(JNIEnv *env, jobject thiz, jint mse
     }
 
     weFFmpeg->seekTo(msec);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeIsPlaying(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        // 不涉及到控制状态，不抛异常
+        LOGE(LOG_TAG, "nativeIsPlaying...but weFFmpeg is NULL");
+        return false;
+    }
+
+    return weFFmpeg->isPlaying();
 }
 
 extern "C"

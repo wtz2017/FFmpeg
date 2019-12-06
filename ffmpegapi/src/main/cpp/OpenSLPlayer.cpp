@@ -24,15 +24,25 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
     }
 
     int size = player->pcmGenerator->getPcmData(&player->enqueueBuffer);
-    if (NULL == player->enqueueBuffer) {
-        LOGE("OpenSLPlayer", "pcmBufferCallback getPcmData failed");
+    if (size == 0) {// 已经播放完成或不在播放状态了
+        LOGW("OpenSLPlayer", "pcmBufferCallback getPcmData size=%d", size);
+        player->enqueueFailed = true;// 用于暂停后可能异步获取失败恢复播放时主动喂一次数据
         return;
     }
+
     SLresult result;
     result = (*player->pcmBufferQueue)->Enqueue(
             player->pcmBufferQueue, player->enqueueBuffer, size);
     if (SL_RESULT_SUCCESS != result) {
         LOGE("OpenSLPlayer", "pcmBufferCallback BufferQueue Enqueue exception!");
+        player->enqueueFailed = true;
+        if (player->autoEnqueCount < OpenSLPlayer::MAX_AUTO_ENQUE_COUNT) {
+            player->autoEnqueCount++;
+            pcmBufferCallback(bq, context);
+        }
+    } else {
+        player->enqueueFailed = false;
+        player->autoEnqueCount = 0;
     }
 }
 
@@ -94,6 +104,9 @@ void OpenSLPlayer::resumePlay() {
         LOGD(LOG_TAG, "resumePlay");
     }
     setPlayState(SL_PLAYSTATE_PLAYING);
+    if (enqueueFailed) {
+        pcmBufferCallback(pcmBufferQueue, this);
+    }
 }
 
 void OpenSLPlayer::stopPlay() {
