@@ -201,6 +201,9 @@ void WeFFmpeg::start() {
         return;
     }
     if (status->isPrepared() || status->isCompleted()) {
+        if (status->isCompleted()) {
+            seekToBegin = true;// 从头开始播放
+        }
         status->setStatus(PlayStatus::PLAYING, LOG_TAG);
         startDemuxThread();
     } else {
@@ -229,6 +232,11 @@ void WeFFmpeg::startDemuxThread() {
 }
 
 void WeFFmpeg::_demux() {
+    if (seekToBegin) {
+        seekToBegin = false;
+        seekTo(0);
+    }
+
     // WeAudio 模块开启新的线程从 AVPacket 队列里取包、解码、重采样、播放，没有就阻塞等待
     weAudio->queue->setProductDataComplete(false);
     weAudio->startPlayer();

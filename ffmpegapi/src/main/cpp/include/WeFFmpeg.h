@@ -32,6 +32,7 @@ class WeFFmpeg {
 private:
     JavaListenerContainer *javaListenerContainer = NULL;
     bool workFinished = false;
+    bool seekToBegin = false;
 
     char *dataSource = NULL;
     AVFormatContext *pFormatCtx = NULL;
