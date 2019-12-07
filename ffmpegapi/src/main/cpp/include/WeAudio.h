@@ -78,7 +78,11 @@ public:
      */
     double getPlayTimeSecs();
 
-    void resetPlayTime();
+    /**
+     * 设置 seek 时间
+     * @param secs 目标位置秒数
+     */
+    void setSeekTime(int secs);
 
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);

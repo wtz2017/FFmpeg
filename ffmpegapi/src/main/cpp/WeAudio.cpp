@@ -332,9 +332,9 @@ double WeAudio::getPlayTimeSecs() {
     return playTimeSecs;
 }
 
-void WeAudio::resetPlayTime() {
-    currentFrameTime = 0;
-    playTimeSecs = 0;
+void WeAudio::setSeekTime(int secs) {
+    currentFrameTime = secs;
+    playTimeSecs = secs;
 }
 
 void WeAudio::release() {

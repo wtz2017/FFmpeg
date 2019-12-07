@@ -166,8 +166,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //                mWePlayer.setDataSource("file:///sdcard/test.ac3");
 //                mWePlayer.setDataSource("file:///sdcard/test.mp4");
 //                mWePlayer.setDataSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
-                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=29750099.mp3");
-//                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=566435178.mp3");
+//                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=29750099.mp3");
+                mWePlayer.setDataSource("http://music.163.com/song/media/outer/url?id=566435178.mp3");
 //                mWePlayer.setDataSource("http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4");
 //                mWePlayer.setDataSource("http://ngcdn004.cnr.cn/live/dszs/index.m3u8");
                 mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
@@ -245,9 +245,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void startUpdateTime() {
-        // 延迟一定时间，是为了解决播放完成后再seek某位置后恢复播放时取的时间为0的问题
-        // 因卤播放完成后解码线程已经退出，再恢复播放时重新启动线程取数据需要一定时间
-        mHandler.sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME,200);
+        mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
     }
 
     private void stopUpdateTime() {

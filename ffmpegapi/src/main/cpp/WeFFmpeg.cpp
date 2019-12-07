@@ -377,7 +377,7 @@ void WeFFmpeg::seekTo(int msec) {
     // reset
     weAudio->queue->setProductDataComplete(false);// 通知解包者和播放者还有数据，尤其对于解包线已经解完进入等待状态有用
     weAudio->queue->clearQueue();
-    weAudio->resetPlayTime();
+    weAudio->setSeekTime(targetSeconds);
 
     long long seekStart, seekEnd;
     if (LOG_DEBUG) {
