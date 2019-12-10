@@ -66,24 +66,43 @@
         android:layout_height="wrap_content"
         android:text="测试 OpenSL ES" />
 
+    <TextView
+        android:id="@+id/tv_play_url"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:lines="2" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btn_open_audio_play"
+            android:id="@+id/btn_open_media"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="打开音频文件开始播放" />
+            android:text="打开媒体" />
+
+        <Button
+            android:id="@+id/btn_next_media"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="切换媒体" />
 
         <TextView
-            android:id="@+id/tv_play_time"
+            android:id="@+id/tv_error_info"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="5dp"
-            android:text="00:00:00/00:00:00" />
+            android:layout_marginLeft="5dp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_play_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="00:00:00/00:00:00" />
 
     <SeekBar
         android:id="@+id/seek_bar"

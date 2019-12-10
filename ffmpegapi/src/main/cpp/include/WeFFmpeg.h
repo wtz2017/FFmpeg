@@ -20,8 +20,8 @@ extern "C"
 #include "JavaListenerContainer.h"
 
 /**
- * 解包：开启 decode 线程；
- * 播放：开启 play 线程；
+ * 解包：单独开启线程；
+ * 播放：单独开启线程；
  * 其它调度（如 setDataSource、prepare、pause、resumePlay、release）直接使用 java 层开启的调度线程；
  * java 层的调度线程使用 HandlerThread 实现串行调度，保证调度方法之间不会有线程并发问题；
  * java 层的调度线程使用停止标志位加等待超时方式实现停止 decode 和 play 线程。
@@ -31,7 +31,10 @@ class WeFFmpeg {
 
 private:
     JavaListenerContainer *javaListenerContainer = NULL;
-    bool workFinished = false;
+
+    bool initSuccess = false;
+    bool prepareFinished = true;
+    bool demuxFinished = true;
     bool seekToBegin = false;
 
     char *dataSource = NULL;
@@ -39,30 +42,36 @@ private:
     WeAudio *weAudio = NULL;
     double duration = 0;// Duration of the stream in seconds
 
+    // 只针对解封装包数据单独用一个线程，其它走调度线程
+    LooperThread *demuxThread = NULL;
     pthread_mutex_t demuxMutex;
+    static const int MSG_DEMUX_START = 1;
 
 public:
     const char *LOG_TAG = "WeFFmpeg";
 
     PlayStatus *status = NULL;
 
-    pthread_t demuxThread;
-
 public:
     WeFFmpeg(JavaListenerContainer *javaListenerContainer);
 
     ~WeFFmpeg();
 
+    void reset();
+
     void setDataSource(char *dataSource);
 
+    /**
+     * 为新数据源做准备，或者调用过 stop 后再重新做准备
+     */
     void prepareAsync();
 
+    /**
+     * 开始解包和播放
+     */
     void start();
 
-    /**
-     * 真正解封装的函数，在 pthread 回调中调用
-     */
-    void _demux();
+    void _handleDemuxMessage(int msgType);
 
     void pause();
 
@@ -94,15 +103,36 @@ public:
      */
     void setStopFlag();
 
+    /**
+     * 具体停止工作，例如：停止播放、关闭打开的文件流
+     */
+    void stop();
+
     void release();
 
 private:
+    /**
+     * 初始化公共资源，例如：libavformat、音频播放器
+     */
+    void init();
+
     void handleErrorOnPreparing(int errorCode);
 
     /**
      * 开启解封装线程
      */
-    void startDemuxThread();
+    void createDemuxThread();
+
+    /**
+     * 真正解封装的函数
+     */
+    void demux();
+
+    void destroyDemuxThread();
+
+    int createAudioPlayer();
+
+    int startAudioPlayer();
 
 };
 

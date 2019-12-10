@@ -38,6 +38,10 @@ public class WePlayer {
 
     private native void nativeSetStopFlag();
 
+    private native void nativeStop();
+
+    private native void nativeReset();
+
     private native void nativeRelease();
 
     private native int nativeGetDuration();
@@ -59,10 +63,11 @@ public class WePlayer {
     private static final int HANDLE_START = 3;
     private static final int HANDLE_PAUSE = 4;
     private static final int HANDLE_SEEK = 5;
-    private static final int HANDLE_RELEASE = 6;
-    private static final int HANDLE_DESTROY = 7;
+    private static final int HANDLE_STOP = 6;
+    private static final int HANDLE_RESET = 7;
+    private static final int HANDLE_RELEASE = 8;
 
-    private boolean isDestroyed;
+    private boolean isReleased;
 
     public interface OnPreparedListener {
         void onPrepared();
@@ -89,7 +94,7 @@ public class WePlayer {
             public void handleMessage(Message msg) {
                 int msgType = msg.what;
                 LogUtils.d(TAG, "mWorkHandler handleMessage: " + msgType);
-                if (isDestroyed && msgType != HANDLE_DESTROY) {
+                if (isReleased && msgType != HANDLE_RELEASE) {
                     Log.e(TAG, "mWorkHandler handleMessage but Player is already destroyed!");
                     return;
                 }
@@ -114,36 +119,40 @@ public class WePlayer {
                         handleSeek(msg);
                         break;
 
-                    case HANDLE_RELEASE:
-                        handleRelease();
+                    case HANDLE_STOP:
+                        handleStop();
                         break;
 
-                    case HANDLE_DESTROY:
-                        handleDestroy();
+                    case HANDLE_RESET:
+                        handleReset();
+                        break;
+
+                    case HANDLE_RELEASE:
+                        handleRelease();
                         break;
                 }
             }
         };
     }
 
-    public void destroyPlayer() {
-        if (isDestroyed) {
+    public void release() {
+        if (isReleased) {
             return;
         }
         // 首先置总的标志位，阻止消息队列的正常消费
-        isDestroyed = true;
+        isReleased = true;
+        nativeSetStopFlag();
 
         // 然后停止前驱：工作线程
         mWorkHandler.removeCallbacksAndMessages(null);
-        Message msg = mWorkHandler.obtainMessage(HANDLE_DESTROY);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_RELEASE);
         mWorkHandler.sendMessage(msg);
 
         // 最后停止回调：工作结果
         mUIHandler.removeCallbacksAndMessages(null);
     }
 
-    private void handleDestroy() {
-        nativeSetStopFlag();
+    private void handleRelease() {
         nativeRelease();
 
         mWorkHandler.removeCallbacksAndMessages(null);
@@ -206,13 +215,13 @@ public class WePlayer {
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
     public void onNativePrepared(String dataSource) {
-        LogUtils.d(TAG, "onNativePrepared isDestroyed: " + isDestroyed + ", dataSource: " + dataSource);
+        LogUtils.d(TAG, "onNativePrepared isReleased: " + isReleased + ", dataSource: " + dataSource);
         if (!TextUtils.equals(dataSource, mDataSource)) {
             LogUtils.w(TAG, "onNativePrepared data source changed! So the preparation is invalid!");
             return;
         }
         isPrepared = true;
-        if (mOnPreparedListener != null && !isDestroyed) {
+        if (mOnPreparedListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -240,8 +249,8 @@ public class WePlayer {
      * called from native
      */
     public void onNativePlayLoading(final boolean isLoading) {
-        LogUtils.d(TAG, "onNativePlayLoading isLoading: " + isLoading + ", isDestroyed:" + isDestroyed);
-        if (mOnPlayLoadingListener != null && !isDestroyed) {
+        LogUtils.d(TAG, "onNativePlayLoading isLoading: " + isLoading + ", isReleased:" + isReleased);
+        if (mOnPlayLoadingListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -292,12 +301,31 @@ public class WePlayer {
 
         // 先清除其它所有未执行消息，再执行具体释放动作
         mWorkHandler.removeCallbacksAndMessages(null);
-        Message msg = mWorkHandler.obtainMessage(HANDLE_RELEASE);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_STOP);
         mWorkHandler.sendMessage(msg);
     }
 
-    private void handleRelease() {
-        nativeRelease();
+    private void handleStop() {
+        nativeStop();
+    }
+
+    /**
+     * Resets the MediaPlayer to its uninitialized state. After calling
+     * this method, you will have to initialize it again by setting the
+     * data source and calling prepare().
+     */
+    public void reset() {
+        isPrepared = false;
+        nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
+
+        // 先清除其它所有未执行消息，再执行具体重置动作
+        mWorkHandler.removeCallbacksAndMessages(null);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_RESET);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleReset() {
+        nativeReset();
     }
 
     public boolean isPlaying() {
@@ -336,7 +364,7 @@ public class WePlayer {
      */
     public void onNativeError(final int code, final String msg) {
         LogUtils.e(TAG, "onNativeError code=" + code + "; msg=" + msg);
-        if (mOnErrorListener != null && !isDestroyed) {
+        if (mOnErrorListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -352,7 +380,7 @@ public class WePlayer {
      */
     public void onNativeCompletion() {
         LogUtils.d(TAG, "onNativeCompletion");
-        if (mOnCompletionListener != null && !isDestroyed) {
+        if (mOnCompletionListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
                 public void run() {

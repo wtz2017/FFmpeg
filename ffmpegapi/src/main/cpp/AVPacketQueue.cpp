@@ -23,8 +23,8 @@ void AVPacketQueue::setProductDataComplete(bool complete) {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "setProductDataComplete: %d", complete);
     }
-    productDataComplete = complete;
-    if (complete) {
+    productDataComplete = complete;// 作用：当完成标志位设置早于消费者读数据时，消费者不会再 wait
+    if (complete) {// 作用：当完成标志位设置晚于消费者 wait 时，可以通知消费者退出
         pthread_cond_signal(&condition);
     }
 

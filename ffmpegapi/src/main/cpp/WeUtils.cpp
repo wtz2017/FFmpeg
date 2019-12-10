@@ -517,7 +517,263 @@ void WeUtils::print_peak(void *ctx, const char *str, uint32_t peak) {
 
 long long WeUtils::getCurrentTimeMill() {
     struct timeval tv;
-    gettimeofday(&tv,NULL);
+    gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+char *WeUtils::getAVErrorName(int avError) {
+    char *ret = "ERROR_NAME_UNKONOW";
+
+    switch (avError) {
+        // ------ include/libavutil/error.h ------
+        case AVERROR_BSF_NOT_FOUND:
+            ret = "AVERROR_BSF_NOT_FOUND";
+            break;
+        case AVERROR_BUG:
+            ret = "AVERROR_BUG";
+            break;
+        case AVERROR_BUFFER_TOO_SMALL:
+            ret = "AVERROR_BUFFER_TOO_SMALL";
+            break;
+        case AVERROR_DECODER_NOT_FOUND:
+            ret = "AVERROR_DECODER_NOT_FOUND";
+            break;
+        case AVERROR_DEMUXER_NOT_FOUND:
+            ret = "AVERROR_DEMUXER_NOT_FOUND";
+            break;
+        case AVERROR_ENCODER_NOT_FOUND:
+            ret = "AVERROR_ENCODER_NOT_FOUND";
+            break;
+        case AVERROR_EXIT:
+            ret = "AVERROR_EXIT";
+            break;
+        case AVERROR_EXTERNAL:
+            ret = "AVERROR_EXTERNAL";
+            break;
+        case AVERROR_FILTER_NOT_FOUND:
+            ret = "AVERROR_FILTER_NOT_FOUND";
+            break;
+        case AVERROR_INVALIDDATA:
+            ret = "AVERROR_INVALIDDATA";
+            break;
+        case AVERROR_MUXER_NOT_FOUND:
+            ret = "AVERROR_MUXER_NOT_FOUND";
+            break;
+        case AVERROR_OPTION_NOT_FOUND:
+            ret = "AVERROR_OPTION_NOT_FOUND";
+            break;
+        case AVERROR_PATCHWELCOME:
+            ret = "AVERROR_PATCHWELCOME";
+            break;
+        case AVERROR_PROTOCOL_NOT_FOUND:
+            ret = "AVERROR_PROTOCOL_NOT_FOUND";
+            break;
+        case AVERROR_STREAM_NOT_FOUND:
+            ret = "AVERROR_STREAM_NOT_FOUND";
+            break;
+        case AVERROR_BUG2:
+            ret = "AVERROR_BUG2";
+            break;
+        case AVERROR_UNKNOWN:
+            ret = "AVERROR_UNKNOWN";
+            break;
+        case AVERROR_EXPERIMENTAL:
+            ret = "AVERROR_EXPERIMENTAL";
+            break;
+        case AVERROR_INPUT_CHANGED:
+            ret = "AVERROR_INPUT_CHANGED";
+            break;
+        case AVERROR_OUTPUT_CHANGED:
+            ret = "AVERROR_OUTPUT_CHANGED";
+            break;
+        case AVERROR_HTTP_BAD_REQUEST:
+            ret = "AVERROR_HTTP_BAD_REQUEST";
+            break;
+        case AVERROR_HTTP_UNAUTHORIZED:
+            ret = "AVERROR_HTTP_UNAUTHORIZED";
+            break;
+        case AVERROR_HTTP_FORBIDDEN:
+            ret = "AVERROR_HTTP_FORBIDDEN";
+            break;
+        case AVERROR_HTTP_NOT_FOUND:
+            ret = "AVERROR_HTTP_NOT_FOUND";
+            break;
+        case AVERROR_HTTP_OTHER_4XX:
+            ret = "AVERROR_HTTP_OTHER_4XX";
+            break;
+        case AVERROR_HTTP_SERVER_ERROR:
+            ret = "AVERROR_HTTP_SERVER_ERROR";
+            break;
+
+        // ------ include/asm-generic/errno-base.h ------
+        case AVERROR(EPERM):
+            ret = "EPERM:Operation not permitted";
+            break;
+        case AVERROR(ENOENT):
+            ret = "ENOENT:No such file or directory";
+            break;
+        case AVERROR(ESRCH):
+            ret = "ESRCH:No such process";
+            break;
+        case AVERROR(EINTR):
+            ret = "EINTR:Interrupted system call";
+            break;
+        case AVERROR(EIO):
+            ret = "EIO:I/O error";
+            break;
+        case AVERROR(ENXIO):
+            ret = "ENXIO:No such device or address";
+            break;
+        case AVERROR(E2BIG):
+            ret = "E2BIG:Arg list too long";
+            break;
+        case AVERROR(ENOEXEC):
+            ret = "ENOEXEC:Exec format error";
+            break;
+        case AVERROR(EBADF):
+            ret = "EBADF:Bad file number";
+            break;
+        case AVERROR(ECHILD):
+            ret = "ECHILD:No child processes";
+            break;
+        case AVERROR(EAGAIN):
+            ret = "EAGAIN:Try again";
+            break;
+        case AVERROR(ENOMEM):
+            ret = "ENOMEM:Out of memory";
+            break;
+        case AVERROR(EACCES):
+            ret = "EACCES:Permission denied";
+            break;
+        case AVERROR(EFAULT):
+            ret = "EFAULT:Bad address";
+            break;
+        case AVERROR(ENOTBLK):
+            ret = "ENOTBLK:Block device required";
+            break;
+        case AVERROR(EBUSY):
+            ret = "EBUSY:Device or resource busy";
+            break;
+        case AVERROR(EEXIST):
+            ret = "EEXIST:File exists";
+            break;
+        case AVERROR(EXDEV):
+            ret = "EXDEV:Cross-device link";
+            break;
+        case AVERROR(ENODEV):
+            ret = "ENODEV:No such device";
+            break;
+        case AVERROR(ENOTDIR):
+            ret = "ENOTDIR:Not a directory";
+            break;
+        case AVERROR(EISDIR):
+            ret = "EISDIR:Is a directory";
+            break;
+        case AVERROR(EINVAL):
+            ret = "EINVAL:Invalid argument";
+            break;
+        case AVERROR(ENFILE):
+            ret = "ENFILE:File table overflow";
+            break;
+        case AVERROR(EMFILE):
+            ret = "EMFILE:Too many open files";
+            break;
+        case AVERROR(ENOTTY):
+            ret = "ENOTTY:Not a typewriter";
+            break;
+        case AVERROR(ETXTBSY):
+            ret = "ETXTBSY:Text file busy";
+            break;
+        case AVERROR(EFBIG):
+            ret = "EFBIG:File too large";
+            break;
+        case AVERROR(ENOSPC):
+            ret = "ENOSPC:No space left on device";
+            break;
+        case AVERROR(ESPIPE):
+            ret = "ESPIPE:Illegal seek";
+            break;
+        case AVERROR(EROFS):
+            ret = "EROFS:Read-only file system";
+            break;
+        case AVERROR(EMLINK):
+            ret = "EMLINK:Too many links";
+            break;
+        case AVERROR(EPIPE):
+            ret = "EPIPE:Broken pipe";
+            break;
+        case AVERROR(EDOM):
+            ret = "EDOM:Math argument out of domain of func";
+            break;
+        case AVERROR(ERANGE):
+            ret = "ERANGE:Math result out of range";
+            break;
+
+        // ------ include/asm-generic/errno.h ------（部分）
+        case AVERROR(ETIMEDOUT):
+            ret = "ETIMEDOUT:Connection timed out";
+            break;
+        case AVERROR(ENAMETOOLONG):
+            ret = "ENAMETOOLONG:File name too long";
+            break;
+        case AVERROR(ENOTEMPTY):
+            ret = "ENOTEMPTY:Directory not empty";
+            break;
+        case AVERROR(ECHRNG):
+            ret = "ECHRNG:Channel number out of range";
+            break;
+        case AVERROR(ENODATA):
+            ret = "ENODATA:No data available";
+            break;
+        case AVERROR(ENOSR):
+            ret = "ENOSR:Out of streams resources";
+            break;
+        case AVERROR(ECOMM):
+            ret = "ECOMM:Communication error on send";
+            break;
+        case AVERROR(EPROTO):
+            ret = "EPROTO:Protocol error";
+            break;
+        case AVERROR(EOVERFLOW):
+            ret = "EOVERFLOW:Value too large for defined data type";
+            break;
+        case AVERROR(EREMCHG):
+            ret = "EREMCHG:Remote address changed";
+            break;
+        case AVERROR(ESTRPIPE):
+            ret = "ESTRPIPE:Streams pipe error";
+            break;
+        case AVERROR(EMSGSIZE):
+            ret = "EMSGSIZE:Message too long";
+            break;
+        case AVERROR(EPROTOTYPE):
+            ret = "EPROTOTYPE:Protocol wrong type for socket";
+            break;
+        case AVERROR(ENOPROTOOPT):
+            ret = "ENOPROTOOPT:Protocol not available";
+            break;
+        case AVERROR(EPROTONOSUPPORT):
+            ret = "EPROTONOSUPPORT:Protocol not supported";
+            break;
+        case AVERROR(ENETDOWN):
+            ret = "ENETDOWN:Network is down";
+            break;
+        case AVERROR(ENETUNREACH):
+            ret = "ENETUNREACH:Network is unreachable";
+            break;
+        case AVERROR(ENETRESET):
+            ret = "ENETRESET:Network dropped connection because of reset";
+            break;
+        case AVERROR(ECONNRESET):
+            ret = "ECONNRESET:Connection reset by peer";
+            break;
+        case AVERROR(ENOBUFS):
+            ret = "ENOBUFS:No buffer space available";
+            break;
+        case AVERROR(ECONNREFUSED):
+            ret = "ECONNREFUSED:Connection refused";
+            break;
+    }
+    return ret;
 }
 

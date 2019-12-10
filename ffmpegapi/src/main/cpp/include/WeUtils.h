@@ -20,6 +20,7 @@ extern "C"
 #include "libavutil/stereo3d.h"
 #include "libavutil/mastering_display_metadata.h"
 #include "libavutil/spherical.h"
+#include "libavutil/error.h"
 };
 
 #define WE_UTILS_LOG_TAG "WeUtils"
@@ -32,7 +33,10 @@ class WeUtils {
 public:
     static void
     av_dump_format_for_android(AVFormatContext *ic, int index, const char *url, int is_output);
+
     static long long getCurrentTimeMill();
+
+    static char *getAVErrorName(int avError);
 
 private:
     static void dump_metadata(void *ctx, AVDictionary *m, const char *indent);

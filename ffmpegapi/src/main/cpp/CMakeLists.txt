@@ -12,6 +12,8 @@ add_library(
         WePlayerJNI.cpp
         WeFFmpeg.cpp
         WeAudio.cpp
+        AudioStream.cpp
+        LooperThread.cpp
         AVPacketQueue.cpp
         OpenSLPlayer.cpp
         PlayStatus.cpp

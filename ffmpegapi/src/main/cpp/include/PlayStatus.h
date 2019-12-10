@@ -13,7 +13,7 @@ class PlayStatus {
 
 public:
     enum Status {
-        PREPARING, PREPARED, PLAYING, PAUSED, COMPLETED, STOPPED, ERROR
+        IDLE, INITIALIZED, PREPARING, PREPARED, PLAYING, PAUSED, COMPLETED, STOPPED, ERROR, RELEASED
     };
 
     /**
@@ -38,6 +38,10 @@ public:
 
     void setStatus(Status status, const char *setterName);
 
+    bool isIdle();
+
+    bool isInitialized();
+
     bool isPreparing();
 
     bool isPrepared();
@@ -51,6 +55,8 @@ public:
     bool isStoped();
 
     bool isError();
+
+    bool isReleased();
 
     const char *getStatusName(Status status);
 

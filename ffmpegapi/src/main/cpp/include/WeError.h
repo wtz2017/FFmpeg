@@ -31,5 +31,6 @@
 #define E_CODE_AUD_SET_PLAYSTATE    10111    /* SLPlayItf SetPlayState exception */
 #define E_CODE_AUD_GETITF_ENVRVB    10112    /* GetInterface SLEnvironmentalReverbItf exception */
 #define E_CODE_AUD_SETPROP_ENVRVB   10113    /* SetEnvironmentalReverbProperties exception */
+#define E_CODE_AUD_ILLEGAL_CALL     10114    /* Illegal call */
 
 #endif //FFMPEG_WEERROR_H

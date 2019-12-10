@@ -93,6 +93,10 @@ public:
 
     int init();
 
+    int createPlayer();
+
+    void destroyPlayer();
+
     void startPlay();
 
     void pause();

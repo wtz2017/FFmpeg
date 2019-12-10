@@ -74,9 +74,14 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_stringToJNI(JNIEnv *env, jobject thiz, jstr
     LOGI(LOG_TAG, "stringToJNI GetStringUTFChars content: %s", chars);
     env->ReleaseStringUTFChars(jstr, chars);
 
-    int strLen = env->GetStringLength(jstr);
-    char *buf = new char[strLen];
-    env->GetStringUTFRegion(jstr, 0, strLen, buf);
+    /**
+     * GetStringUTFRegion 需要使用对应的 GetStringUTFLength 来获取 UTF-8 字符串所需要的
+     * 字节个数（不包括结束的 '\0'），对于 char 数组大小要比它大 1，并在 char 数组最后一位写结束符 '\0'
+     */
+    int jstrUtf8Len = env->GetStringUTFLength(jstr);
+    char *buf = new char[jstrUtf8Len + 1];
+    env->GetStringUTFRegion(jstr, 0, jstrUtf8Len, buf);
+    buf[jstrUtf8Len] = '\0';
     LOGI(LOG_TAG, "stringToJNI GetStringUTFRegion content: %s", buf);
     delete[] buf;
 }

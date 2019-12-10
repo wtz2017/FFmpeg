@@ -4,14 +4,9 @@
 
 #include "WeAudio.h"
 
-WeAudio::WeAudio(PlayStatus *status, int sampleRate, JavaListenerContainer *javaListenerContainer) {
+WeAudio::WeAudio(PlayStatus *status, JavaListenerContainer *javaListenerContainer) {
     this->status = status;
     this->javaListenerContainer = javaListenerContainer;
-
-    // 初始化采样参数
-    this->sampleRate = sampleRate;
-    this->channelNums = av_get_channel_layout_nb_channels(SAMPLE_OUT_CHANNEL_LAYOUT);
-    this->bytesPerSample = av_get_bytes_per_sample(SAMPLE_OUT_FORMAT);
 
     this->queue = new AVPacketQueue(status);
 }
@@ -20,76 +15,94 @@ WeAudio::~WeAudio() {
     release();
 }
 
-void *startPlayThreadCall(void *data) {
-    if (LOG_DEBUG) {
-        LOGD("WeAudio", "startPlayThread run");
-    }
-    WeAudio *weAudio = static_cast<WeAudio *>(data);
-
-    if (weAudio->TEST_SAMPLE) {
-        weAudio->testSaveFile = fopen(weAudio->TEST_SAVE_FILE_PATH, "w");
-    }
-
-    weAudio->_startPlayer();
-
-    if (weAudio->TEST_SAMPLE) {
-        fclose(weAudio->testSaveFile);
-    }
-
-    if (LOG_DEBUG) {
-        LOGD(weAudio->LOG_TAG, "startPlayThread exit");
-    }
-    pthread_exit(&weAudio->startPlayThread);
-}
-
-void WeAudio::startPlayer() {
-    pthread_create(&startPlayThread, NULL, startPlayThreadCall, this);
-}
-
-void WeAudio::_startPlayer() {
-    if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "_startPlayer");
-    }
-    if (sampledBuffer == NULL) {
-        // 使用 1 秒的采样字节数作为缓冲区大小
-        sampledSizePerSecond = sampleRate * channelNums * bytesPerSample;
-        sampledBuffer = static_cast<uint8_t *>(av_malloc(sampledSizePerSecond));
-    }
-
+int WeAudio::init() {
     if (openSlPlayer == NULL) {
         openSlPlayer = new OpenSLPlayer(this);
-        int ret;
-        if ((ret = openSlPlayer->init()) != NO_ERROR) {
-            LOGE(LOG_TAG, "OpenSLPlayer init failed!");
-            // 出错首先释放资源
-            delete openSlPlayer;
-            openSlPlayer = NULL;
+    }
+    int ret;
+    if ((ret = openSlPlayer->init()) != NO_ERROR) {
+        LOGE(LOG_TAG, "OpenSLPlayer init failed!");
+        delete openSlPlayer;
+        openSlPlayer = NULL;
+        return ret;
+    }
 
-            // 然后设置错误状态
-            pthread_mutex_lock(&status->mutex);
-            if (status == NULL || status->isStoped()) {
-                // 只要不是“停止”状态，其它状态都可以切换到“错误”状态
-                pthread_mutex_unlock(&status->mutex);
-                startFinished = true;
-                return;
-            }
-            status->setStatus(PlayStatus::ERROR, LOG_TAG);
+    createConsumerThread();
+    return NO_ERROR;
+}
 
-            // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-            javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
+/**
+ * 专门用单独线程处理播放行为，因为播放就是在消费数据
+ */
+void audioConsumerMessageHanler(int msgType, void *context) {
+    if (LOG_DEBUG) {
+        LOGD("WeAudio", "audioConsumerMessageHanler: msgType=%d", msgType);
+    }
+    WeAudio *weAudio = (WeAudio *) context;
+    switch (msgType) {
+        case WeAudio::AUDIO_CONSUMER_START_PLAY:
+            weAudio->_handleStartPlay();
+            break;
+        case WeAudio::AUDIO_CONSUMER_RESUME_PLAY:
+            weAudio->_handleResumePlay();
+            break;
+    }
+}
 
-            pthread_mutex_unlock(&status->mutex);
-            startFinished = true;
-            return;
-        }
+void WeAudio::createConsumerThread() {
+    if (audioConsumerThread != NULL) {
+        return;
+    }
+    audioConsumerThread = new LooperThread("AudioConsumer", this, audioConsumerMessageHanler);
+    audioConsumerThread->create();
+}
+
+int WeAudio::createPlayer() {
+    if (openSlPlayer == NULL) {
+        LOGE(LOG_TAG, "Invoke createPlayer but openSlPlayer is NULL!");
+        return E_CODE_AUD_ILLEGAL_CALL;
+    }
+
+    if (!openSlPlayer->isInitSuccess()) {
+        LOGE(LOG_TAG, "Invoke createPlayer but openSlPlayer did not initialize successfully!");
+        return E_CODE_AUD_ILLEGAL_CALL;
+    }
+
+    // 音频流采样率等参数不一样，就需要重新创建 player
+    int ret;
+    if ((ret = openSlPlayer->createPlayer()) != NO_ERROR) {
+        LOGE(LOG_TAG, "OpenSLPlayer createPlayer failed!");
+        return ret;
+    }
+
+    // 使用 1 秒的采样字节数作为缓冲区大小，音频流采样参数不一样，缓冲区大小也不一样，就需要新建 buffer
+    sampledBuffer = static_cast<uint8_t *>(av_malloc(audioStream->sampledSizePerSecond));
+
+    return NO_ERROR;
+}
+
+int WeAudio::startPlay() {
+    if (audioConsumerThread == NULL) {
+        LOGE(LOG_TAG, "Invoke startPlay but audioConsumerThread is NULL!");
+        return E_CODE_AUD_ILLEGAL_CALL;
+    }
+
+    audioConsumerThread->sendMessage(AUDIO_CONSUMER_START_PLAY);
+    return NO_ERROR;
+}
+
+void WeAudio::_handleStartPlay() {
+    if (openSlPlayer == NULL) {
+        LOGE(LOG_TAG, "_handleStartPlay but openSlPlayer is NULL!");
+        return;
+    }
+
+    if (!openSlPlayer->isInitSuccess()) {
+        LOGE(LOG_TAG, "_handleStartPlay but openSlPlayer did not initialize successfully!");
+        return;
     }
 
     openSlPlayer->startPlay();
-    startFinished = true;
-}
-
-bool WeAudio::startThreadFinished() {
-    return startFinished;
 }
 
 void WeAudio::pause() {
@@ -107,13 +120,22 @@ void WeAudio::pause() {
 }
 
 void WeAudio::resumePlay() {
+    if (audioConsumerThread == NULL) {
+        LOGE(LOG_TAG, "Invoke resumePlay but audioConsumerThread is NULL!");
+        return;
+    }
+
+    audioConsumerThread->sendMessage(AUDIO_CONSUMER_RESUME_PLAY);
+}
+
+void WeAudio::_handleResumePlay() {
     if (openSlPlayer == NULL) {
-        LOGE(LOG_TAG, "Invoke resumePlay but openSlPlayer is NULL!");
+        LOGE(LOG_TAG, "_handleResumePlay but openSlPlayer is NULL!");
         return;
     }
 
     if (!openSlPlayer->isInitSuccess()) {
-        LOGE(LOG_TAG, "Invoke resumePlay but openSlPlayer did not initialize successfully!");
+        LOGE(LOG_TAG, "_handleResumePlay but openSlPlayer did not initialize successfully!");
         return;
     }
 
@@ -178,7 +200,7 @@ bool WeAudio::decodeQueuePacket() {
     }
 
     // 把 packet 发送给解码器解码
-    int ret = avcodec_send_packet(codecContext, avPacket);
+    int ret = avcodec_send_packet(audioStream->codecContext, avPacket);
     releaseAvPacket();// 不管解码成功与否，都要先释放内存
     if (ret != 0) {
         LOGE(LOG_TAG, "avcodec_send_packet occurred exception: %d", ret);
@@ -187,7 +209,7 @@ bool WeAudio::decodeQueuePacket() {
 
     // 接收解码后的数据帧 frame
     avFrame = av_frame_alloc();
-    ret = avcodec_receive_frame(codecContext, avFrame);
+    ret = avcodec_receive_frame(audioStream->codecContext, avFrame);
     if (ret != 0) {
         LOGE(LOG_TAG, "avcodec_receive_frame occurred exception: %d", ret);
         releaseAvFrame();
@@ -212,8 +234,8 @@ int WeAudio::resample() {
     swrContext = swr_alloc_set_opts(
             NULL,
             /* 转换输出配置选项 */
-            SAMPLE_OUT_CHANNEL_LAYOUT,/* 声道布局 */
-            SAMPLE_OUT_FORMAT,/* 音频采样格式 */
+            AudioStream::SAMPLE_OUT_CHANNEL_LAYOUT,/* 声道布局 */
+            AudioStream::SAMPLE_OUT_FORMAT,/* 音频采样格式 */
             avFrame->sample_rate,/* 采样率，与输入保持一致 */
             /* 转换输入配置选项 */
             avFrame->channel_layout,
@@ -252,13 +274,10 @@ int WeAudio::resample() {
         return -1;
     }
 
-    int sampleDataBytes = channelNums * sampleNumsPerChannel * bytesPerSample;
+    int sampleDataBytes = audioStream->channelNums * sampleNumsPerChannel * audioStream->bytesPerSample;
     updatePlayTime(avFrame->pts, sampleDataBytes);
     if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
-    }
-    if (TEST_SAMPLE) {
-        fwrite(sampledBuffer, 1, sampleDataBytes, testSaveFile);
     }
 
     releaseAvFrame();
@@ -269,13 +288,13 @@ int WeAudio::resample() {
 }
 
 void WeAudio::updatePlayTime(int64_t pts, int sampleDataBytes) {
-    currentFrameTime = pts * av_q2d(streamTimeBase);
+    currentFrameTime = pts * av_q2d(audioStream->streamTimeBase);
     if (currentFrameTime < playTimeSecs) {
         // avFrame->pts maybe 0
         currentFrameTime = playTimeSecs;
     }
     // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
-    playTimeSecs = currentFrameTime + (sampleDataBytes / (double) sampledSizePerSecond);
+    playTimeSecs = currentFrameTime + (sampleDataBytes / (double) audioStream->sampledSizePerSecond);
 }
 
 void WeAudio::releaseAvPacket() {
@@ -299,33 +318,68 @@ void WeAudio::releaseAvFrame() {
 }
 
 int WeAudio::getChannelNums() {
-    return channelNums;
+    return audioStream->channelNums;
 }
 
 SLuint32 WeAudio::getOpenSLSampleRate() {
-    return OpenSLPlayer::convertToOpenSLSampleRate(sampleRate);
+    return OpenSLPlayer::convertToOpenSLSampleRate(audioStream->sampleRate);
 }
 
 int WeAudio::getBitsPerSample() {
-    return bytesPerSample * 8;
+    return audioStream->bytesPerSample * 8;
 }
 
 SLuint32 WeAudio::getOpenSLChannelLayout() {
-    return OpenSLPlayer::ffmpegToOpenSLChannelLayout(SAMPLE_OUT_CHANNEL_LAYOUT);
+    return OpenSLPlayer::ffmpegToOpenSLChannelLayout(AudioStream::SAMPLE_OUT_CHANNEL_LAYOUT);
 }
 
 void WeAudio::stopPlay() {
-    if (openSlPlayer == NULL) {
+    // 停止播放回调
+    if (openSlPlayer != NULL) {
+        openSlPlayer->stopPlay();
+    } else {
         LOGE(LOG_TAG, "Invoke stopPlay but openSlPlayer is NULL!");
-        return;
     }
 
-    if (!openSlPlayer->isInitSuccess()) {
-        LOGE(LOG_TAG, "Invoke stopPlay but openSlPlayer did not initialize successfully!");
-        return;
+    if (audioConsumerThread != NULL) {
+        audioConsumerThread->clearMessage();// 清除还未执行的播放请求消息
+    }
+}
+
+void WeAudio::destroyPlayer() {
+    if (openSlPlayer != NULL) {
+        openSlPlayer->destroyPlayer();
+    } else {
+        LOGE(LOG_TAG, "Invoke destroyPlayer but openSlPlayer is NULL!");
+    }
+}
+
+void WeAudio::clearDataAfterStop() {
+    if (queue != NULL) {
+        queue->clearQueue();// 消除音频数据缓存
     }
 
-    openSlPlayer->stopPlay();
+    if (sampledBuffer != NULL) {// 不同数据流使用的采样 buffer 不一样，需要销毁新建
+//        av_free(sampledBuffer);
+        av_freep(&sampledBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
+        sampledBuffer = NULL;
+    }
+
+    // 后释放音频流
+    releaseStream();
+
+    releaseAvPacket();
+    releaseAvFrame();
+
+    currentFrameTime = 0;
+    playTimeSecs = 0;
+}
+
+void WeAudio::releaseStream() {
+    if (audioStream != NULL) {
+        delete audioStream;
+        audioStream = NULL;
+    }
 }
 
 double WeAudio::getPlayTimeSecs() {
@@ -348,6 +402,8 @@ void WeAudio::release() {
         openSlPlayer = NULL;
     }
 
+    destroyConsumerThread();
+
     if (queue != NULL) {
         delete queue;// 启动其析构函数回收内部资源
         queue = NULL;
@@ -362,23 +418,17 @@ void WeAudio::release() {
     releaseAvPacket();
     releaseAvFrame();
 
-    // codecContext 是调用 avcodec_alloc_context3 创建的，需要使用对应函数关闭释放
-    if (codecContext != NULL) {
-        avcodec_close(codecContext);
-        avcodec_free_context(&codecContext);
-        codecContext = NULL;
-    }
-
-    // 是直接通过 pFormatCtx->streams[i]->codecpar 赋值的，只需把本指针清空即可
-    if (codecParams != NULL) {
-        codecParams = NULL;
-    }
-
-    testSaveFile = NULL;
-
     // 最顶层 WeFFmpeg 负责回收 javaListenerContainer，这里只把本指针置空
     javaListenerContainer = NULL;
 
     // 最顶层 WeFFmpeg 负责回收 status，这里只把本指针置空
     status == NULL;
+}
+
+void WeAudio::destroyConsumerThread() {
+    if (audioConsumerThread != NULL) {
+        audioConsumerThread->shutdown();
+        delete audioConsumerThread;
+        audioConsumerThread = NULL;
+    }
 }

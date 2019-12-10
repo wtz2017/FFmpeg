@@ -5,7 +5,7 @@
 #include "PlayStatus.h"
 
 PlayStatus::PlayStatus() {
-    status = STOPPED;
+    status = IDLE;
     pthread_mutex_init(&mutex, NULL);
 }
 
@@ -18,6 +18,14 @@ void PlayStatus::setStatus(PlayStatus::Status status, const char *setterName) {
         LOGW(LOG_TAG, "%s set status: %s", setterName, getStatusName(status));
     }
     this->status = status;
+}
+
+bool PlayStatus::isIdle() {
+    return status == IDLE;
+}
+
+bool PlayStatus::isInitialized() {
+    return status == INITIALIZED;
 }
 
 bool PlayStatus::isPreparing() {
@@ -48,9 +56,19 @@ bool PlayStatus::isError() {
     return status == ERROR;
 }
 
+bool PlayStatus::isReleased() {
+    return status == RELEASED;
+}
+
 const char *PlayStatus::getStatusName(PlayStatus::Status status) {
     const char *name = NULL;
     switch (status) {
+        case IDLE:
+            name = "IDLE";
+            break;
+        case INITIALIZED:
+            name = "INITIALIZED";
+            break;
         case PREPARING:
             name = "PREPARING";
             break;
@@ -72,6 +90,9 @@ const char *PlayStatus::getStatusName(PlayStatus::Status status) {
         case ERROR:
             name = "ERROR";
             break;
+        case RELEASED:
+            name = "RELEASED";
+            break;
         default:
             name = "unknown";
             break;
@@ -82,4 +103,3 @@ const char *PlayStatus::getStatusName(PlayStatus::Status status) {
 const char *PlayStatus::getCurrentStatusName() {
     return getStatusName(status);
 }
-

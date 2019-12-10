@@ -66,6 +66,21 @@ int OpenSLPlayer::init() {
     // 使用混音器设置混音效果
     setEnvironmentalReverb();
 
+    initSuccess = true;
+    return NO_ERROR;
+}
+
+int OpenSLPlayer::createPlayer() {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "createPlayer");
+    }
+
+    if (!initSuccess) {
+        LOGE(LOG_TAG, "Can't create player because init not success!");
+        return E_CODE_AUD_ILLEGAL_CALL;
+    }
+
+    int ret;
     // 使用引擎创建数据源为缓冲队列的播放器
     if ((ret = createBufferQueueAudioPlayer()) != NO_ERROR) {
         destroy();
@@ -77,8 +92,11 @@ int OpenSLPlayer::init() {
         return ret;
     }
 
-    initSuccess = true;
     return NO_ERROR;
+}
+
+void OpenSLPlayer::destroyPlayer() {
+    destroyBufferQueueAudioPlayer();
 }
 
 void OpenSLPlayer::startPlay() {
