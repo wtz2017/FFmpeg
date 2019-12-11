@@ -99,6 +99,16 @@ public:
 
     float getVolume();
 
+    /**
+     * 设置声道
+     *
+     * @param channel
+     *      CHANNEL_RIGHT = 0;
+     *      CHANNEL_LEFT = 1;
+     *      CHANNEL_STEREO = 2;
+     */
+    void setSoundChannel(int channel);
+
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);
 

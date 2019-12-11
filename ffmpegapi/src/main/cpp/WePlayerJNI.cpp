@@ -97,6 +97,17 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeGetVolume(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetSoundChannel(JNIEnv *env, jobject thiz, jint channel) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeSetSoundChannel...but weFFmpeg is NULL");
+        return;
+    }
+
+    weFFmpeg->setSoundChannel(channel);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {
         jclass exceptionClass = env->FindClass("java/lang/Exception");

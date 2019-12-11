@@ -78,7 +78,12 @@ private:
     SLObjectItf playerObject = NULL;
     SLPlayItf playController = NULL;
     SLVolumeItf volumeController = NULL;
+    SLMuteSoloItf muteSoloController = NULL;
     float volumePercent = 0.6;
+    static const int CHANNEL_RIGHT = 0;
+    static const int CHANNEL_LEFT = 1;
+    static const int CHANNEL_STEREO = 2;
+    int soundChannel = CHANNEL_STEREO;
 
     // PCM 数据参数
     int channelNums;// 声道数量
@@ -110,11 +115,22 @@ public:
 
     /**
      * 设置音量
+     *
      * @param percent 范围是：0 ~ 1.0
      */
     void setVolume(float percent);
 
     float getVolume();
+
+    /**
+     * 设置声道
+     *
+     * @param channel
+     *      CHANNEL_RIGHT = 0;
+     *      CHANNEL_LEFT = 1;
+     *      CHANNEL_STEREO = 2;
+     */
+    void setSoundChannel(int channel);
 
     /**
      * 转换采样率（Hz）为 OpenSL ES 定义的采样率
@@ -142,6 +158,10 @@ private:
     int setBufferQueueCallback(slAndroidSimpleBufferQueueCallback callback, void *pContext);
 
     int setPlayState(SLuint32 state);
+
+    void openRightChannel(bool open);
+
+    void openLeftChannel(bool open);
 
     /**
      * 确保在退出应用时销毁所有对象。

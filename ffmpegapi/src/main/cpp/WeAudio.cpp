@@ -404,6 +404,12 @@ float WeAudio::getVolume() {
     return 0;
 }
 
+void WeAudio::setSoundChannel(int channel) {
+    if (openSlPlayer != NULL) {
+        openSlPlayer->setSoundChannel(channel);
+    }
+}
+
 void WeAudio::release() {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "release...");

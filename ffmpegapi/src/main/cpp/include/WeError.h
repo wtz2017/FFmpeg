@@ -26,11 +26,12 @@
 #define E_CODE_AUD_REALIZ_AUDIOPL   10106    /* playerObject Realize exception */
 #define E_CODE_AUD_GETITF_PLAY      10107    /* GetInterface SLPlayItf exception */
 #define E_CODE_AUD_GETITF_VOLUME    10108    /* GetInterface SLVolumeItf exception */
-#define E_CODE_AUD_GETITF_BUFQUE    10109    /* GetInterface SLAndroidSimpleBufferQueueItf exception */
-#define E_CODE_AUD_REGCALL_BUFQUE   10110    /* pcmBufferQueue RegisterCallback exception */
-#define E_CODE_AUD_SET_PLAYSTATE    10111    /* SLPlayItf SetPlayState exception */
-#define E_CODE_AUD_GETITF_ENVRVB    10112    /* GetInterface SLEnvironmentalReverbItf exception */
-#define E_CODE_AUD_SETPROP_ENVRVB   10113    /* SetEnvironmentalReverbProperties exception */
-#define E_CODE_AUD_ILLEGAL_CALL     10114    /* Illegal call */
+#define E_CODE_AUD_GETITF_MUSOLO    10109    /* GetInterface SLMuteSoloItf exception */
+#define E_CODE_AUD_GETITF_BUFQUE    10110    /* GetInterface SLAndroidSimpleBufferQueueItf exception */
+#define E_CODE_AUD_REGCALL_BUFQUE   10111    /* pcmBufferQueue RegisterCallback exception */
+#define E_CODE_AUD_SET_PLAYSTATE    10112    /* SLPlayItf SetPlayState exception */
+#define E_CODE_AUD_GETITF_ENVRVB    10113    /* GetInterface SLEnvironmentalReverbItf exception */
+#define E_CODE_AUD_SETPROP_ENVRVB   10114    /* SetEnvironmentalReverbProperties exception */
+#define E_CODE_AUD_ILLEGAL_CALL     10115    /* Illegal call */
 
 #endif //FFMPEG_WEERROR_H

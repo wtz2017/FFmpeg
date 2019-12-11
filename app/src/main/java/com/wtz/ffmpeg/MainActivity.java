@@ -129,6 +129,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_destroy_audio_player).setOnClickListener(this);
+        findViewById(R.id.btn_left_channel).setOnClickListener(this);
+        findViewById(R.id.btn_right_channel).setOnClickListener(this);
+        findViewById(R.id.btn_stero).setOnClickListener(this);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
         mPlayUrl.setText(mSources[mIndex]);
@@ -298,6 +301,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 stopUpdateTime();
                 resetUI();
                 mWePlayer = null;
+                break;
+            case R.id.btn_left_channel:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.setSoundChannel(WePlayer.SoundChannel.LEFT_CHANNEL);
+                break;
+            case R.id.btn_right_channel:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.setSoundChannel(WePlayer.SoundChannel.RIGHT_CHANNEL);
+                break;
+            case R.id.btn_stero:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.setSoundChannel(WePlayer.SoundChannel.STERO);
                 break;
         }
     }

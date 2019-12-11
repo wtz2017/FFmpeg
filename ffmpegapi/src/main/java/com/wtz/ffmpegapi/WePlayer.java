@@ -32,6 +32,15 @@ public class WePlayer {
 
     private native float nativeGetVolume();
 
+    /**
+     * 设置声道
+     *
+     * @param channel CHANNEL_RIGHT = 0;
+     *                CHANNEL_LEFT = 1;
+     *                CHANNEL_STEREO = 2;
+     */
+    private native void nativeSetSoundChannel(int channel);
+
     private native void nativeStart();
 
     private native void nativePause();
@@ -67,14 +76,29 @@ public class WePlayer {
     private static final int HANDLE_SET_DATA_SOURCE = 1;
     private static final int HANDLE_PREPARE_ASYNC = 2;
     private static final int HANDLE_SET_VOLUME = 3;
-    private static final int HANDLE_START = 4;
-    private static final int HANDLE_PAUSE = 5;
-    private static final int HANDLE_SEEK = 6;
-    private static final int HANDLE_STOP = 7;
-    private static final int HANDLE_RESET = 8;
-    private static final int HANDLE_RELEASE = 9;
+    private static final int HANDLE_SET_CHANNEL = 4;
+    private static final int HANDLE_START = 5;
+    private static final int HANDLE_PAUSE = 6;
+    private static final int HANDLE_SEEK = 7;
+    private static final int HANDLE_STOP = 8;
+    private static final int HANDLE_RESET = 9;
+    private static final int HANDLE_RELEASE = 10;
 
     private boolean isReleased;
+
+    public enum SoundChannel {
+        RIGHT_CHANNEL(0), LEFT_CHANNEL(1), STERO(2);
+
+        private int nativeValue;
+
+        SoundChannel(int nativeValue) {
+            this.nativeValue = nativeValue;
+        }
+
+        public int getNativeValue() {
+            return nativeValue;
+        }
+    }
 
     public interface OnPreparedListener {
         void onPrepared();
@@ -116,6 +140,10 @@ public class WePlayer {
 
                     case HANDLE_SET_VOLUME:
                         handleSetVolume(msg);
+                        break;
+
+                    case HANDLE_SET_CHANNEL:
+                        handleSetChannel(msg);
                         break;
 
                     case HANDLE_START:
@@ -278,10 +306,26 @@ public class WePlayer {
 
     /**
      * 获取当前音量百分比
+     *
      * @return 范围是：0 ~ 1.0
      */
     public float getVolume() {
         return nativeGetVolume();
+    }
+
+    public void setSoundChannel(SoundChannel channel) {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_CHANNEL);
+        msg.obj = channel;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleSetChannel(Message msg) {
+        if (!isPrepared) {
+            return;
+        }
+
+        SoundChannel channel = (SoundChannel) msg.obj;
+        nativeSetSoundChannel(channel.getNativeValue());
     }
 
     public void start() {

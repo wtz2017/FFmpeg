@@ -523,6 +523,15 @@ float WeFFmpeg::getVolume() {
     return weAudio->getVolume();
 }
 
+void WeFFmpeg::setSoundChannel(int channel) {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "setSoundChannel but weAudio is NULL");
+        return;
+    }
+
+    weAudio->setSoundChannel(channel);
+}
+
 /**
  * Gets the duration of the file.
  *

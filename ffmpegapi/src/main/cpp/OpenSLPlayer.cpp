@@ -249,10 +249,8 @@ int OpenSLPlayer::createBufferQueueAudioPlayer() {
      */
     const int ID_COUNT = 3;
     // 如果某个功能接口没注册 id 和写为 SL_BOOLEAN_TRUE，后边通过 GetInterface 就获取不到这个接口
-    const SLInterfaceID ids[ID_COUNT] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_EFFECTSEND,
-            /*SL_IID_MUTESOLO,*/};
-    const SLboolean reqs[ID_COUNT] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE,
-            /*SL_BOOLEAN_TRUE,*/ };
+    const SLInterfaceID ids[ID_COUNT] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_MUTESOLO};
+    const SLboolean reqs[ID_COUNT] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE};
     SLresult result;
     result = (*engine)->CreateAudioPlayer(
             engine, &playerObject, &audioSrc, &audioSnk, ID_COUNT, ids, reqs);
@@ -286,6 +284,15 @@ int OpenSLPlayer::createBufferQueueAudioPlayer() {
         return E_CODE_AUD_GETITF_VOLUME;
     }
     setVolume(volumePercent);
+
+    // get muteSolo controller
+    result = (*playerObject)->GetInterface(playerObject, SL_IID_MUTESOLO, &muteSoloController);
+    if (SL_RESULT_SUCCESS != result) {
+        LOGE(LOG_TAG, "GetInterface SLMuteSoloItf exception!");
+        destroyBufferQueueAudioPlayer();
+        return E_CODE_AUD_GETITF_MUSOLO;
+    }
+    setSoundChannel(soundChannel);
 
     return NO_ERROR;
 }
@@ -335,6 +342,7 @@ void OpenSLPlayer::destroyBufferQueueAudioPlayer() {
         playerObject = NULL;
         playController = NULL;
         volumeController = NULL;
+        muteSoloController = NULL;
         pcmBufferQueue = NULL;
     }
 }
@@ -400,6 +408,45 @@ void OpenSLPlayer::setVolume(float percent) {
 
 float OpenSLPlayer::getVolume() {
     return volumePercent;
+}
+
+void OpenSLPlayer::setSoundChannel(int channel) {
+    if (muteSoloController == NULL || !initSuccess) {
+        LOGW(LOG_TAG, "setSoundChannel %d but muteSoloController is %d and init %d", channel,
+             muteSoloController, initSuccess);
+        return;
+    }
+
+    if (channel != CHANNEL_LEFT && channel != CHANNEL_RIGHT && channel != CHANNEL_STEREO) {
+        LOGE(LOG_TAG, "setSoundChannel argument %d is invalid!", channel);
+        return;
+    }
+    soundChannel = channel;
+
+    switch (channel) {
+        case CHANNEL_RIGHT:
+            openRightChannel(true);
+            openLeftChannel(false);
+            break;
+        case CHANNEL_LEFT:
+            openRightChannel(false);
+            openLeftChannel(true);
+            break;
+        case CHANNEL_STEREO:
+            openRightChannel(false);
+            openLeftChannel(false);
+            break;
+    }
+}
+
+void OpenSLPlayer::openRightChannel(bool open) {
+    // 0 是右声道
+    (*muteSoloController)->SetChannelMute(muteSoloController, 0, open);
+}
+
+void OpenSLPlayer::openLeftChannel(bool open) {
+    // 1 是左声道
+    (*muteSoloController)->SetChannelMute(muteSoloController, 1, open);
 }
 
 SLuint32 OpenSLPlayer::convertToOpenSLSampleRate(int sampleRate) {
