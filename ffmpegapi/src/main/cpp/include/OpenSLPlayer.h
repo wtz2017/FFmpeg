@@ -78,6 +78,7 @@ private:
     SLObjectItf playerObject = NULL;
     SLPlayItf playController = NULL;
     SLVolumeItf volumeController = NULL;
+    float volumePercent = 0.6;
 
     // PCM 数据参数
     int channelNums;// 声道数量
@@ -106,6 +107,14 @@ public:
     void stopPlay();
 
     bool isInitSuccess();
+
+    /**
+     * 设置音量
+     * @param percent 范围是：0 ~ 1.0
+     */
+    void setVolume(float percent);
+
+    float getVolume();
 
     /**
      * 转换采样率（Hz）为 OpenSL ES 定义的采样率

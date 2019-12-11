@@ -391,6 +391,19 @@ void WeAudio::setSeekTime(int secs) {
     playTimeSecs = secs;
 }
 
+void WeAudio::setVolume(float percent) {
+    if (openSlPlayer != NULL) {
+        openSlPlayer->setVolume(percent);
+    }
+}
+
+float WeAudio::getVolume() {
+    if (openSlPlayer != NULL) {
+        return openSlPlayer->getVolume();
+    }
+    return 0;
+}
+
 void WeAudio::release() {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "release...");

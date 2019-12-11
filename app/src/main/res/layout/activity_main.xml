@@ -6,65 +6,79 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/sample_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Hello World!" />
-
     <Button
-        android:id="@+id/btn_simple_pthread"
+        android:id="@+id/btn_base_test_control"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="简单的 C++ 线程创建" />
+        android:text="显示基本测试" />
 
     <LinearLayout
+        android:id="@+id/base_test_root"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:visibility="gone"
+        android:orientation="vertical">
 
-        <Button
-            android:id="@+id/btn_start_product_consumer"
+        <TextView
+            android:id="@+id/sample_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="C++ 线程开始生产消费" />
+            android:text="Hello World!" />
 
         <Button
-            android:id="@+id/btn_stop_product_consumer"
+            android:id="@+id/btn_simple_pthread"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="C++ 线程停止生产消费" />
+            android:text="简单的 C++ 线程创建" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_start_product_consumer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="C++ 线程开始生产消费" />
+
+            <Button
+                android:id="@+id/btn_stop_product_consumer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="C++ 线程停止生产消费" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_c_thread_call_java"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="C++ 线程回调 java" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_java_set_byte_array_to_c"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="java 传递byte[] 到 C++" />
+
+            <Button
+                android:id="@+id/btn_c_set_byte_array_to_java"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="C++ 传递byte[] 到 java" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_test_opensl_es"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="测试 OpenSL ES" />
     </LinearLayout>
-
-    <Button
-        android:id="@+id/btn_c_thread_call_java"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="C++ 线程回调 java" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btn_java_set_byte_array_to_c"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="java 传递byte[] 到 C++" />
-
-        <Button
-            android:id="@+id/btn_c_set_byte_array_to_java"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="C++ 传递byte[] 到 java" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btn_test_opensl_es"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="测试 OpenSL ES" />
 
     <TextView
         android:id="@+id/tv_play_url"
@@ -105,7 +119,29 @@
         android:text="00:00:00/00:00:00" />
 
     <SeekBar
-        android:id="@+id/seek_bar"
+        android:id="@+id/seek_bar_play"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxWidth="150dp"
+        android:minWidth="150dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/seekbar_style"
+        android:secondaryProgress="0"
+        android:thumb="@drawable/seekbar_thumb"
+        android:thumbOffset="0dp" />
+
+    <TextView
+        android:id="@+id/tv_volume"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="音量" />
+
+    <SeekBar
+        android:id="@+id/seek_bar_volume"
         android:layout_width="150dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"

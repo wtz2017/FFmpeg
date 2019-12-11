@@ -12,6 +12,7 @@ import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -19,6 +20,8 @@ import com.wtz.ffmpeg.utils.DateTimeUtil;
 import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.CppThreadDemo;
+
+import java.text.DecimalFormat;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "FFmpegActivity";
@@ -31,12 +34,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private boolean isSeeking;
     private boolean isLoading;
 
+    private View mBaseTestRoot;
+
+    private ProgressDialog mProgressDialog;
     private TextView mPlayUrl;
     private TextView mError;
     private TextView mPlayTimeView;
     private String mDurationText;
-    private ProgressDialog mProgressDialog;
-    private SeekBar mSeekBar;
+    private SeekBar mPlaySeekBar;
+
+    private TextView mVolume;
+    private SeekBar mVolumeSeekBar;
+    private static final DecimalFormat VOLUME_FORMAT = new DecimalFormat("0%");
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
@@ -104,6 +113,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mCppThreadDemo = new CppThreadDemo();
         mCppThreadDemo.stringToJNI("hello! I'm java!");
 
+        mBaseTestRoot = findViewById(R.id.base_test_root);
+        findViewById(R.id.btn_base_test_control).setOnClickListener(this);
         ((TextView) findViewById(R.id.sample_text)).setText(mCppThreadDemo.stringFromJNI());
         findViewById(R.id.btn_simple_pthread).setOnClickListener(this);
         findViewById(R.id.btn_start_product_consumer).setOnClickListener(this);
@@ -123,9 +134,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mPlayUrl.setText(mSources[mIndex]);
         mError = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
+        mVolume = findViewById(R.id.tv_volume);
 
-        mSeekBar = findViewById(R.id.seek_bar);
-        mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        mPlaySeekBar = findViewById(R.id.seek_bar_play);
+        setSeekbarWith(mPlaySeekBar);
+        mPlaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
                 if (isSeeking) {
@@ -138,30 +151,67 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "onStartTrackingTouch");
+                Log.d(TAG, "mPlaySeekBar onStartTrackingTouch");
                 isSeeking = true;
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "onStopTrackingTouch");
+                Log.d(TAG, "mPlaySeekBar onStopTrackingTouch");
                 if (mWePlayer != null) {
                     mWePlayer.seekTo(seekBar.getProgress());
                 }
                 isSeeking = false;
             }
         });
+
+        mVolumeSeekBar = findViewById(R.id.seek_bar_volume);
+        mVolumeSeekBar.setMax(100);
+        setSeekbarWith(mVolumeSeekBar);
+        mVolumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                if (mWePlayer != null) {
+                    float percent = seekBar.getProgress() / (float) seekBar.getMax();
+                    mVolume.setText("音量：" + VOLUME_FORMAT.format(percent));
+                    mWePlayer.setVolume(percent);
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "mVolumeSeekBar onStartTrackingTouch");
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "mVolumeSeekBar onStopTrackingTouch");
+            }
+        });
+    }
+
+    private void setSeekbarWith(SeekBar seekbar) {
         int[] wh = ScreenUtils.getScreenPixels(this);
         int seekWith = (int) Math.round(0.75 * wh[0]);
-        ViewGroup.LayoutParams lp = mSeekBar.getLayoutParams();
+
+        ViewGroup.LayoutParams lp = seekbar.getLayoutParams();
         lp.width = seekWith;
-        mSeekBar.setLayoutParams(lp);
+        seekbar.setLayoutParams(lp);
     }
 
     @Override
     public void onClick(View view) {
         Log.d(TAG, "onClick " + view);
         switch (view.getId()) {
+            case R.id.btn_base_test_control:
+                if (mBaseTestRoot.getVisibility() == View.VISIBLE) {
+                    mBaseTestRoot.setVisibility(View.GONE);
+                    ((Button) view).setText("显示基本测试");
+                } else {
+                    mBaseTestRoot.setVisibility(View.VISIBLE);
+                    ((Button) view).setText("隐藏基本测试");
+                }
+                break;
             case R.id.btn_simple_pthread:
                 mCppThreadDemo.testSimpleThread();
                 break;
@@ -261,8 +311,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Log.d(TAG, "WePlayer onPrepared");
                     mWePlayer.start();
 
+                    float volume = mWePlayer.getVolume();
+                    mVolume.setText("音量：" + VOLUME_FORMAT.format(volume));
+                    mVolumeSeekBar.setProgress((int) (mVolumeSeekBar.getMax() * volume));
+
                     mDuration = mWePlayer.getDuration();
-                    mSeekBar.setMax(mDuration);
+                    mPlaySeekBar.setMax(mDuration);
                     mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
                     startUpdateTime();
                 }
@@ -314,7 +368,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mPlayUrl.setText("");
         mError.setText("");
         mPlayTimeView.setText("00:00:00/" + mDurationText);
-        mSeekBar.setProgress(0);
+        mPlaySeekBar.setProgress(0);
     }
 
     private void updatePlayTime() {
@@ -322,14 +376,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         if (isSeeking) {
             // seek 时 seekbar 会自动更新位置，只需要根据 seek 位置更新时间
-            String currentPosition = DateTimeUtil.changeRemainTimeToHms(mSeekBar.getProgress());
+            String currentPosition = DateTimeUtil.changeRemainTimeToHms(mPlaySeekBar.getProgress());
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);
         } else if (mWePlayer.isPlaying()) {
             // 没有 seek 时，如果还在播放中，就正常按实际播放时间更新时间和 seekbar
             int position = mWePlayer.getCurrentPosition();
             String currentPosition = DateTimeUtil.changeRemainTimeToHms(position);
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);
-            mSeekBar.setProgress(position);
+            mPlaySeekBar.setProgress(position);
         } else {
             // 既没有 seek，也没有播放，那就不更新
         }

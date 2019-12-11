@@ -75,6 +75,28 @@ Java_com_wtz_ffmpegapi_WePlayer_nativePrepareAsync(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetVolume(JNIEnv *env, jobject thiz, jfloat percent) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeSetVolume...but weFFmpeg is NULL");
+        return;
+    }
+
+    weFFmpeg->setVolume(percent);
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetVolume(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetVolume...but weFFmpeg is NULL");
+        return 0;
+    }
+
+    return weFFmpeg->getVolume();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {
         jclass exceptionClass = env->FindClass("java/lang/Exception");

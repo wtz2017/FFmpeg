@@ -91,6 +91,14 @@ public:
      */
     void setSeekTime(int secs);
 
+    /**
+     * 设置音量
+     * @param percent 范围是：0 ~ 1.0
+     */
+    void setVolume(float percent);
+
+    float getVolume();
+
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);
 

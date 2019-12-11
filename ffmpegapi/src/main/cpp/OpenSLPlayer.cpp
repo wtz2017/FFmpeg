@@ -248,6 +248,7 @@ int OpenSLPlayer::createBufferQueueAudioPlayer() {
      *     for fast audio case
      */
     const int ID_COUNT = 3;
+    // 如果某个功能接口没注册 id 和写为 SL_BOOLEAN_TRUE，后边通过 GetInterface 就获取不到这个接口
     const SLInterfaceID ids[ID_COUNT] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_EFFECTSEND,
             /*SL_IID_MUTESOLO,*/};
     const SLboolean reqs[ID_COUNT] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE,
@@ -284,6 +285,7 @@ int OpenSLPlayer::createBufferQueueAudioPlayer() {
         destroyBufferQueueAudioPlayer();
         return E_CODE_AUD_GETITF_VOLUME;
     }
+    setVolume(volumePercent);
 
     return NO_ERROR;
 }
@@ -355,6 +357,49 @@ void OpenSLPlayer::destroyEngine() {
 
 bool OpenSLPlayer::isInitSuccess() {
     return initSuccess;
+}
+
+/**
+ * 设置音量
+ * @param percent 范围是：0 ~ 1.0
+ */
+void OpenSLPlayer::setVolume(float percent) {
+    if (percent < 0) {
+        percent = 0;
+    } else if (percent > 1.0) {
+        percent = 1.0;
+    }
+    volumePercent = percent;
+
+    if (volumeController == NULL || !initSuccess) {
+        LOGW(LOG_TAG, "setVolume %f but volumeController is %d and init %d", volumePercent,
+             volumeController, initSuccess);
+        return;
+    }
+    // 第 2 个参数有效范围是：0 ~ -5000，其中 0 表示最大音量，-5000 表示静音
+    if (volumePercent > 0.30) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -20);
+    } else if (volumePercent > 0.25) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -22);
+    } else if (volumePercent > 0.20) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -25);
+    } else if (volumePercent > 0.15) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -28);
+    } else if (volumePercent > 0.10) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -30);
+    } else if (volumePercent > 0.05) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -34);
+    } else if (volumePercent > 0.03) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -37);
+    } else if (volumePercent > 0.01) {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -40);
+    } else {
+        (*volumeController)->SetVolumeLevel(volumeController, 100 * (1 - volumePercent) * -100);
+    }
+}
+
+float OpenSLPlayer::getVolume() {
+    return volumePercent;
 }
 
 SLuint32 OpenSLPlayer::convertToOpenSLSampleRate(int sampleRate) {

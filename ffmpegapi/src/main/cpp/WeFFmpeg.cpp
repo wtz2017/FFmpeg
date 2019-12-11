@@ -233,6 +233,17 @@ void WeFFmpeg::prepareAsync() {
         return;
     }
 
+    // 为新数据流创建音频播放器
+    if ((ret = weAudio->createPlayer()) != NO_ERROR) {
+        LOGE(LOG_TAG, "createAudioPlayer failed!");
+        handleErrorOnPreparing(ret);
+        prepareFinished = true;
+        return;
+    }
+
+    // 设置数据生产未完成
+    weAudio->queue->setProductDataComplete(false);
+
     // 状态确认需要加锁同步，判断在准备期间是否已经被停止
     pthread_mutex_lock(&status->mutex);
     if (status == NULL || !status->isPreparing()) {
@@ -290,25 +301,18 @@ void WeFFmpeg::start() {
         pthread_mutex_unlock(&status->mutex);
         return;
     }
-    if (status->isPrepared()) {
-        status->setStatus(PlayStatus::PLAYING, LOG_TAG);
-        if (createAudioPlayer() != NO_ERROR) {
-            return;
-        }
-        if (weAudio->queue->isProductDataComplete()) {
-            weAudio->queue->setProductDataComplete(false);
-        }
-        if (startAudioPlayer() != NO_ERROR) {
-            return;
-        }
-        demuxThread->sendMessage(MSG_DEMUX_START);
-    } else if (status->isCompleted()) {
+    if (status->isPrepared() || status->isCompleted()) {
         status->setStatus(PlayStatus::PLAYING, LOG_TAG);
         if (weAudio->queue->isProductDataComplete()) {
             seekToBegin = true;// 在播放完成后，如果用户没有 seek，就从头开始播放
-            weAudio->queue->setProductDataComplete(false);
         }
-        if (startAudioPlayer() != NO_ERROR) {
+        int ret;
+        if ((ret = weAudio->startPlay()) != NO_ERROR) {
+            LOGE(LOG_TAG, "startAudioPlayer failed!");
+            status->setStatus(PlayStatus::ERROR, LOG_TAG);
+            // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+            javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
+            pthread_mutex_unlock(&status->mutex);
             return;
         }
         demuxThread->sendMessage(MSG_DEMUX_START);
@@ -317,38 +321,6 @@ void WeFFmpeg::start() {
         weAudio->resumePlay();// 要先设置播放状态，才能恢复播放
     }
     pthread_mutex_unlock(&status->mutex);
-}
-
-int WeFFmpeg::createAudioPlayer() {
-    int ret;
-    if ((ret = weAudio->createPlayer()) != NO_ERROR) {
-        LOGE(LOG_TAG, "weAudio createPlayer failed!");
-        pthread_mutex_lock(&status->mutex);
-        if (status != NULL && !status->isReleased()) {
-            status->setStatus(PlayStatus::ERROR, LOG_TAG);
-            // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-            javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
-        }
-        pthread_mutex_unlock(&status->mutex);
-        return ret;
-    }
-    return NO_ERROR;
-}
-
-int WeFFmpeg::startAudioPlayer() {
-    int ret;
-    if ((ret = weAudio->startPlay()) != NO_ERROR) {
-        LOGE(LOG_TAG, "weAudio startPlay failed!");
-        pthread_mutex_lock(&status->mutex);
-        if (status != NULL && !status->isReleased()) {
-            status->setStatus(PlayStatus::ERROR, LOG_TAG);
-            // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-            javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
-        }
-        pthread_mutex_unlock(&status->mutex);
-        return ret;
-    }
-    return NO_ERROR;
 }
 
 void WeFFmpeg::demux() {
@@ -531,6 +503,24 @@ void WeFFmpeg::seekTo(int msec) {
     }
 
     status->isSeeking = false;
+}
+
+void WeFFmpeg::setVolume(float percent) {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "setVolume but weAudio is NULL");
+        return;
+    }
+
+    weAudio->setVolume(percent);
+}
+
+float WeFFmpeg::getVolume() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "getVolume but weAudio is NULL");
+        return 0;
+    }
+
+    return weAudio->getVolume();
 }
 
 /**

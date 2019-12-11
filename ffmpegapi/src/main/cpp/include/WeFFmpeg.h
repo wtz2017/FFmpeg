@@ -83,6 +83,14 @@ public:
     void seekTo(int msec);
 
     /**
+     * 设置音量
+     * @param percent 范围是：0 ~ 1.0
+     */
+    void setVolume(float percent);
+
+    float getVolume();
+
+    /**
      * Gets the duration of the file.
      *
      * @return the duration in milliseconds
@@ -129,10 +137,6 @@ private:
     void demux();
 
     void destroyDemuxThread();
-
-    int createAudioPlayer();
-
-    int startAudioPlayer();
 
 };
 

@@ -28,6 +28,10 @@ public class WePlayer {
 
     private native void nativePrepareAsync();
 
+    private native void nativeSetVolume(float percent);
+
+    private native float nativeGetVolume();
+
     private native void nativeStart();
 
     private native void nativePause();
@@ -52,7 +56,9 @@ public class WePlayer {
     private OnPlayLoadingListener mOnPlayLoadingListener;
     private OnErrorListener mOnErrorListener;
     private OnCompletionListener mOnCompletionListener;
+
     private String mDataSource;
+    private float mVolumePercent = -1;
     private boolean isPrepared;
 
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
@@ -60,12 +66,13 @@ public class WePlayer {
     private HandlerThread mWorkThread;
     private static final int HANDLE_SET_DATA_SOURCE = 1;
     private static final int HANDLE_PREPARE_ASYNC = 2;
-    private static final int HANDLE_START = 3;
-    private static final int HANDLE_PAUSE = 4;
-    private static final int HANDLE_SEEK = 5;
-    private static final int HANDLE_STOP = 6;
-    private static final int HANDLE_RESET = 7;
-    private static final int HANDLE_RELEASE = 8;
+    private static final int HANDLE_SET_VOLUME = 3;
+    private static final int HANDLE_START = 4;
+    private static final int HANDLE_PAUSE = 5;
+    private static final int HANDLE_SEEK = 6;
+    private static final int HANDLE_STOP = 7;
+    private static final int HANDLE_RESET = 8;
+    private static final int HANDLE_RELEASE = 9;
 
     private boolean isReleased;
 
@@ -105,6 +112,10 @@ public class WePlayer {
 
                     case HANDLE_PREPARE_ASYNC:
                         handlePrepareAsync();
+                        break;
+
+                    case HANDLE_SET_VOLUME:
+                        handleSetVolume(msg);
                         break;
 
                     case HANDLE_START:
@@ -220,7 +231,9 @@ public class WePlayer {
             LogUtils.w(TAG, "onNativePrepared data source changed! So the preparation is invalid!");
             return;
         }
+
         isPrepared = true;
+        setCacheVolume();
         if (mOnPreparedListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
@@ -229,6 +242,46 @@ public class WePlayer {
                 }
             });
         }
+    }
+
+    /**
+     * 设置音量
+     *
+     * @param percent 范围是：0 ~ 1.0
+     */
+    public void setVolume(float percent) {
+        // 1. 范围判断底层会处理；2. 准备前设置的先缓存，准备好后会自动设置缓存的值
+        mVolumePercent = percent;
+
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_VOLUME);
+        msg.obj = percent;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void setCacheVolume() {
+        if (mVolumePercent < 0) {
+            return;
+        }
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_VOLUME);
+        msg.obj = mVolumePercent;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleSetVolume(Message msg) {
+        if (!isPrepared) {
+            return;
+        }
+
+        float percent = (float) msg.obj;
+        nativeSetVolume(percent);
+    }
+
+    /**
+     * 获取当前音量百分比
+     * @return 范围是：0 ~ 1.0
+     */
+    public float getVolume() {
+        return nativeGetVolume();
     }
 
     public void start() {
