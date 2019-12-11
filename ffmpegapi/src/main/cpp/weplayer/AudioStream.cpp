@@ -2,7 +2,7 @@
 // Created by WTZ on 2019/12/7.
 //
 
-#include "include/AudioStream.h"
+#include "AudioStream.h"
 
 AudioStream::AudioStream(int streamIndex, AVCodecParameters *codecParams,
                          AVRational streamTimeBase) {

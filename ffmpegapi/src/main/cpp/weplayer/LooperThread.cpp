@@ -2,7 +2,7 @@
 // Created by WTZ on 2019/12/8.
 //
 
-#include "include/LooperThread.h"
+#include "LooperThread.h"
 
 LooperThread::LooperThread(const char *threadName, void *context,
                            void (*messageHanler)(int msgType, void *data)) {

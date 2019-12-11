@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4.1)
 
-include_directories(include/)
+include_directories(ffmpeg/include/)
+include_directories(weplayer/include/)
+include_directories(test/include/)
 
 # Creates and names a library, sets it as either STATIC or SHARED,
 # and provides the relative paths to its source code.
@@ -9,22 +11,22 @@ add_library(
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
-        WePlayerJNI.cpp
-        WeFFmpeg.cpp
-        WeAudio.cpp
-        AudioStream.cpp
-        LooperThread.cpp
-        AVPacketQueue.cpp
-        OpenSLPlayer.cpp
-        PlayStatus.cpp
-        JavaListener.cpp
-        WeUtils.cpp)
+        weplayer/WePlayerJNI.cpp
+        weplayer/WeFFmpeg.cpp
+        weplayer/WeAudio.cpp
+        weplayer/AudioStream.cpp
+        weplayer/LooperThread.cpp
+        weplayer/AVPacketQueue.cpp
+        weplayer/OpenSLPlayer.cpp
+        weplayer/PlayStatus.cpp
+        weplayer/JavaListener.cpp
+        weplayer/WeUtils.cpp)
 
 add_library(
         thread_demo
         SHARED
-        ThreadDemo.cpp
-        JavaListener.cpp)
+        test/ThreadDemo.cpp
+        weplayer/JavaListener.cpp)
 
 add_library(avcodec SHARED IMPORTED)
 set_target_properties(avcodec
