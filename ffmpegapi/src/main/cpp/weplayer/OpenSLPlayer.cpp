@@ -23,10 +23,12 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
         return;
     }
 
+    player->enqueueFinished = false;
     int size = player->pcmGenerator->getPcmData(&player->enqueueBuffer);
     if (size == 0) {// 已经播放完成或不在播放状态了
         LOGW("OpenSLPlayer", "pcmBufferCallback getPcmData size=%d", size);
         player->enqueueFailed = true;// 用于暂停后可能异步获取失败恢复播放时主动喂一次数据
+        player->enqueueFinished = true;
         return;
     }
 
@@ -44,6 +46,7 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
         player->enqueueFailed = false;
         player->autoEnqueCount = 0;
     }
+    player->enqueueFinished = true;
 }
 
 int OpenSLPlayer::init() {
@@ -344,6 +347,7 @@ void OpenSLPlayer::destroyBufferQueueAudioPlayer() {
         volumeController = NULL;
         muteSoloController = NULL;
         pcmBufferQueue = NULL;
+        enqueueBuffer = NULL;
     }
 }
 

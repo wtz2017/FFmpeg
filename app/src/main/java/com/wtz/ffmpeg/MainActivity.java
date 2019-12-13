@@ -45,7 +45,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private TextView mVolume;
     private SeekBar mVolumeSeekBar;
+    private TextView mPitch;
+    private SeekBar mPitchSeekBar;
+    private TextView mTempo;
+    private SeekBar mTempoSeekBar;
     private static final DecimalFormat VOLUME_FORMAT = new DecimalFormat("0%");
+    private static final DecimalFormat PITCH_FORMAT = new DecimalFormat("0.0");
+    private static final float MAX_PITCH = 3.0f;
+    private static final float PITCH_ACCURACY = 0.1f;
+    private static final DecimalFormat TEMPO_FORMAT = new DecimalFormat("0.0");
+    private static final float MAX_TEMPO = 3.0f;
+    private static final float TEMPO_ACCURACY = 0.1f;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
@@ -138,6 +148,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mError = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
         mVolume = findViewById(R.id.tv_volume);
+        mPitch = findViewById(R.id.tv_pitch);
+        mTempo = findViewById(R.id.tv_tempo);
 
         mPlaySeekBar = findViewById(R.id.seek_bar_play);
         setSeekbarWith(mPlaySeekBar);
@@ -189,6 +201,54 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 Log.d(TAG, "mVolumeSeekBar onStopTrackingTouch");
+            }
+        });
+
+        mPitchSeekBar = findViewById(R.id.seek_bar_pitch);
+        mPitchSeekBar.setMax((int) (MAX_PITCH / PITCH_ACCURACY));
+        setSeekbarWith(mPitchSeekBar);
+        mPitchSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                if (mWePlayer != null) {
+                    float pitch = seekBar.getProgress() / (float) seekBar.getMax() * MAX_PITCH;
+                    mPitch.setText("音调：" + PITCH_FORMAT.format(pitch));
+                    mWePlayer.setPitch(pitch);
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "mPitchSeekBar onStartTrackingTouch");
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "mPitchSeekBar onStopTrackingTouch");
+            }
+        });
+
+        mTempoSeekBar = findViewById(R.id.seek_bar_tempo);
+        mTempoSeekBar.setMax((int) (MAX_TEMPO / TEMPO_ACCURACY));
+        setSeekbarWith(mTempoSeekBar);
+        mTempoSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                if (mWePlayer != null) {
+                    float tempo = seekBar.getProgress() / (float) seekBar.getMax() * MAX_TEMPO;
+                    mTempo.setText("音速：" + TEMPO_FORMAT.format(tempo));
+                    mWePlayer.setTempo(tempo);
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "mTempoSeekBar onStartTrackingTouch");
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                Log.d(TAG, "mTempoSeekBar onStopTrackingTouch");
             }
         });
     }
@@ -335,6 +395,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     float volume = mWePlayer.getVolume();
                     mVolume.setText("音量：" + VOLUME_FORMAT.format(volume));
                     mVolumeSeekBar.setProgress((int) (mVolumeSeekBar.getMax() * volume));
+
+                    float pitch = mWePlayer.getPitch();
+                    mPitch.setText("音调：" + PITCH_FORMAT.format(pitch));
+                    mPitchSeekBar.setProgress((int) (pitch / MAX_PITCH * mPitchSeekBar.getMax()));
+
+                    float tempo = mWePlayer.getTempo();
+                    mTempo.setText("音速：" + TEMPO_FORMAT.format(tempo));
+                    mTempoSeekBar.setProgress((int) (tempo / MAX_TEMPO * mTempoSeekBar.getMax()));
 
                     mDuration = mWePlayer.getDuration();
                     mPlaySeekBar.setMax(mDuration);

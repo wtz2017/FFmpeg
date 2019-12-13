@@ -53,10 +53,11 @@ public:
     PcmGenerator *pcmGenerator;
 
     // 播放数据入队 buffer
-    void *enqueueBuffer;
+    void *enqueueBuffer = NULL;
     bool enqueueFailed = false;
     static const int MAX_AUTO_ENQUE_COUNT = 5;
     int autoEnqueCount = 0;// 入队失败后自动尝试入队次数
+    bool enqueueFinished = true;
 
     // 播放缓冲队列
     SLAndroidSimpleBufferQueueItf pcmBufferQueue = NULL;

@@ -101,6 +101,24 @@ public:
     void setSoundChannel(int channel);
 
     /**
+     * 设置音调
+     *
+     * @param pitch
+     */
+    void setPitch(float pitch);
+
+    float getPitch();
+
+    /**
+     * 设置音速
+     *
+     * @param tempo
+     */
+    void setTempo(float tempo);
+
+    float getTempo();
+
+    /**
      * Gets the duration of the file.
      *
      * @return the duration in milliseconds

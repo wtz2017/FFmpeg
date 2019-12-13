@@ -76,7 +76,7 @@ int WeAudio::createPlayer() {
     }
 
     // 使用 1 秒的采样字节数作为缓冲区大小，音频流采样参数不一样，缓冲区大小也不一样，就需要新建 buffer
-    sampledBuffer = static_cast<uint8_t *>(av_malloc(audioStream->sampledSizePerSecond));
+    sampleBuffer = static_cast<uint8_t *>(av_malloc(audioStream->sampledSizePerSecond));
 
     return NO_ERROR;
 }
@@ -177,15 +177,29 @@ int WeAudio::getPcmData(void **buf) {
         }
 
         // 对解出来的 AVFrame 重采样
-        ret = resample();
+        ret = resample(&sampleBuffer);
         if (ret < 0) {
             continue;
         }
 
+        if (pitch != NORMAL_PITCH || tempo != NORMAL_TEMPO) {
+            // 需要变调、变速
+            if (soundTouchBuffer == NULL || soundTouch == NULL) {
+                initSoundTouch();
+            }
+
+            ret = adjustPitchTempo(sampleBuffer, ret, soundTouchBuffer);
+            if (ret <= 0) {
+                continue;
+            }
+
+            *buf = soundTouchBuffer;
+        } else {
+            *buf = sampleBuffer;
+        }
+
         break;
     }
-
-    *buf = sampledBuffer;
 
     return ret;
 }
@@ -219,7 +233,7 @@ bool WeAudio::decodeQueuePacket() {
     return true;
 }
 
-int WeAudio::resample() {
+int WeAudio::resample(uint8_t **out) {
     // 处理可能缺少的声道个数和声道布局参数
     if (avFrame->channels == 0 && avFrame->channel_layout == 0) {
         LOGE(LOG_TAG, "Both avFrame channels and channel_layout are 0");
@@ -262,7 +276,7 @@ int WeAudio::resample() {
     // 重采样转换，返回值为每个声道采样个数
     int sampleNumsPerChannel = swr_convert(
             swrContext,
-            &sampledBuffer,/* 转换后接收数据的 buffer */
+            out,/* 转换后接收数据的 buffer */
             avFrame->nb_samples,/* 输出此帧每个通道包含的采样个数 */
             (const uint8_t **) avFrame->data,/* 需要重采样的原始数据 */
             avFrame->nb_samples);/* 输入此帧每个通道包含的采样个数 */
@@ -274,7 +288,8 @@ int WeAudio::resample() {
         return -1;
     }
 
-    int sampleDataBytes = audioStream->channelNums * sampleNumsPerChannel * audioStream->bytesPerSample;
+    int sampleDataBytes =
+            audioStream->channelNums * sampleNumsPerChannel * audioStream->bytesPerSample;
     updatePlayTime(avFrame->pts, sampleDataBytes);
     if (LOG_REPEAT_DEBUG) {
         LOGD(LOG_TAG, "resample data size bytes: %d", sampleDataBytes);
@@ -294,7 +309,49 @@ void WeAudio::updatePlayTime(int64_t pts, int sampleDataBytes) {
         currentFrameTime = playTimeSecs;
     }
     // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
-    playTimeSecs = currentFrameTime + (sampleDataBytes / (double) audioStream->sampledSizePerSecond);
+    playTimeSecs =
+            currentFrameTime + (sampleDataBytes / (double) audioStream->sampledSizePerSecond);
+}
+
+void WeAudio::initSoundTouch() {
+    if (soundTouchBuffer == NULL) {
+        // 创建所需的 buffer，大小要与重采样 buffer 一样大
+        soundTouchBuffer = static_cast<SAMPLETYPE *>(malloc(
+                audioStream->sampledSizePerSecond));
+    }
+
+    if (soundTouch == NULL) {
+        soundTouch = new SoundTouch();
+        soundTouch->setSampleRate(audioStream->sampleRate);
+        soundTouch->setChannels(audioStream->channelNums);
+        soundTouch->setPitch(pitch);
+        soundTouch->setTempo(tempo);
+    }
+}
+
+int WeAudio::adjustPitchTempo(uint8_t *in, int inSize, SAMPLETYPE *out) {
+    // 因为 FFmpeg 重采样出来的 PCM 数据是 uint8 的，
+    // 而 SoundTouch 中最低是 SAMPLETYPE(16bit integer sample type)，
+    // 所以我们需要将 8bit 的数据转换成 16bit 后再给 SoundTouch 处理。
+    for (int i = 0; i < inSize / 2 + 1; i++) {
+        out[i] = (in[i * 2] | ((in[i * 2 + 1]) << 8));
+    }
+
+    // 开始调整音调和音速
+    int sampleNumsPerChannel = inSize / audioStream->channelNums / audioStream->bytesPerSample;
+    soundTouch->putSamples(out, sampleNumsPerChannel);
+    int adjustSampleNumsPerChannel = soundTouch->receiveSamples(out, sampleNumsPerChannel);
+
+// soundTouch->flush();// TODO 如何处理 flush
+// Flushes the last samples from the processing pipeline to the output.
+// Clears also the internal processing buffers.
+//
+// Note: This function is meant for extracting the last samples of a sound
+// stream. This function may introduce additional blank samples in the end
+// of the sound stream, and thus it's not recommended to call this function
+// in the middle of a sound stream.
+
+    return audioStream->channelNums * adjustSampleNumsPerChannel * 2;// SoundTouch 是 16bit 编码
 }
 
 void WeAudio::releaseAvPacket() {
@@ -354,15 +411,31 @@ void WeAudio::destroyPlayer() {
     }
 }
 
+bool WeAudio::workFinished() {
+    if (openSlPlayer != NULL) {
+        return openSlPlayer->enqueueFinished;
+    }
+    return true;
+}
+
 void WeAudio::clearDataAfterStop() {
     if (queue != NULL) {
         queue->clearQueue();// 消除音频数据缓存
     }
 
-    if (sampledBuffer != NULL) {// 不同数据流使用的采样 buffer 不一样，需要销毁新建
+    if (sampleBuffer != NULL) {// 不同数据流使用的采样 buffer 不一样，需要销毁新建
 //        av_free(sampledBuffer);
-        av_freep(&sampledBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
-        sampledBuffer = NULL;
+        av_freep(&sampleBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
+        sampleBuffer = NULL;
+    }
+
+    if (soundTouchBuffer != NULL) {
+        free(soundTouchBuffer);
+        soundTouchBuffer = NULL;
+    }
+
+    if (soundTouch != NULL) {
+        soundTouch->clear();
     }
 
     // 后释放音频流
@@ -410,6 +483,28 @@ void WeAudio::setSoundChannel(int channel) {
     }
 }
 
+void WeAudio::setPitch(float pitch) {
+    this->pitch = pitch;
+    if (soundTouch != NULL) {
+        soundTouch->setPitch(pitch);
+    }
+}
+
+float WeAudio::getPitch() {
+    return pitch;
+}
+
+void WeAudio::setTempo(float tempo) {
+    this->tempo = tempo;
+    if (soundTouch != NULL) {
+        soundTouch->setTempo(tempo);
+    }
+}
+
+float WeAudio::getTempo() {
+    return tempo;
+}
+
 void WeAudio::release() {
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "release...");
@@ -428,10 +523,21 @@ void WeAudio::release() {
         queue = NULL;
     }
 
-    if (sampledBuffer != NULL) {
+    if (sampleBuffer != NULL) {
 //        av_free(sampledBuffer);
-        av_freep(&sampledBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
-        sampledBuffer = NULL;
+        av_freep(&sampleBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
+        sampleBuffer = NULL;
+    }
+
+    if (soundTouchBuffer != NULL) {
+        free(soundTouchBuffer);
+        soundTouchBuffer = NULL;
+    }
+
+    if (soundTouch != NULL) {
+        soundTouch->clear();
+        delete soundTouch;
+        soundTouch = NULL;
     }
 
     releaseAvPacket();

@@ -108,6 +108,50 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetSoundChannel(JNIEnv *env, jobject thiz,
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetPitch(JNIEnv *env, jobject thiz, jfloat pitch) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeSetPitch...but weFFmpeg is NULL");
+        return;
+    }
+
+    weFFmpeg->setPitch(pitch);
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetPitch(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetPitch...but weFFmpeg is NULL");
+        return 1.0;
+    }
+
+    return weFFmpeg->getPitch();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetTempo(JNIEnv *env, jobject thiz, jfloat tempo) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeSetTempo...but weFFmpeg is NULL");
+        return;
+    }
+
+    weFFmpeg->setTempo(tempo);
+}
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetTempo(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetTempo...but weFFmpeg is NULL");
+        return 1.0;
+    }
+
+    return weFFmpeg->getTempo();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {
         jclass exceptionClass = env->FindClass("java/lang/Exception");
@@ -145,7 +189,8 @@ JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeSeekTo(JNIEnv *env, jobject thiz, jint msec) {
     if (weFFmpeg == NULL) {
         jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass, "Have you called prepare before calling the seekTo function?");
+        env->ThrowNew(exceptionClass,
+                      "Have you called prepare before calling the seekTo function?");
         env->DeleteLocalRef(exceptionClass);
         return;
     }

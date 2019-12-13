@@ -1,15 +1,18 @@
 cmake_minimum_required(VERSION 3.4.1)
 
-include_directories(ffmpeg/include/)
 include_directories(weplayer/include/)
+include_directories(ffmpeg/include/)
+include_directories(soundtouch/include/)
 include_directories(test/include/)
 
 # Creates and names a library, sets it as either STATIC or SHARED,
 # and provides the relative paths to its source code.
 add_library(
         weplayer
+
         # Sets the library as a shared library.
         SHARED
+
         # Provides a relative path to your source file(s).
         weplayer/WePlayerJNI.cpp
         weplayer/WeFFmpeg.cpp
@@ -20,7 +23,20 @@ add_library(
         weplayer/OpenSLPlayer.cpp
         weplayer/PlayStatus.cpp
         weplayer/JavaListener.cpp
-        weplayer/WeUtils.cpp)
+        weplayer/WeUtils.cpp
+
+        soundtouch/AAFilter.cpp
+        soundtouch/FIFOSampleBuffer.cpp
+        soundtouch/FIRFilter.cpp
+        soundtouch/cpu_detect_x86.cpp
+        soundtouch/sse_optimized.cpp
+        soundtouch/RateTransposer.cpp
+        soundtouch/SoundTouch.cpp
+        soundtouch/InterpolateCubic.cpp
+        soundtouch/InterpolateLinear.cpp
+        soundtouch/InterpolateShannon.cpp
+        soundtouch/TDStretch.cpp
+        soundtouch/PeakFinder.cpp )
 
 add_library(
         thread_demo

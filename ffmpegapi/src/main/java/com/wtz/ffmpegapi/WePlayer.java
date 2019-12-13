@@ -41,6 +41,14 @@ public class WePlayer {
      */
     private native void nativeSetSoundChannel(int channel);
 
+    private native void nativeSetPitch(float pitch);
+
+    private native float nativeGetPitch();
+
+    private native void nativeSetTempo(float tempo);
+
+    private native float nativeGetTempo();
+
     private native void nativeStart();
 
     private native void nativePause();
@@ -77,12 +85,14 @@ public class WePlayer {
     private static final int HANDLE_PREPARE_ASYNC = 2;
     private static final int HANDLE_SET_VOLUME = 3;
     private static final int HANDLE_SET_CHANNEL = 4;
-    private static final int HANDLE_START = 5;
-    private static final int HANDLE_PAUSE = 6;
-    private static final int HANDLE_SEEK = 7;
-    private static final int HANDLE_STOP = 8;
-    private static final int HANDLE_RESET = 9;
-    private static final int HANDLE_RELEASE = 10;
+    private static final int HANDLE_SET_PITCH = 5;
+    private static final int HANDLE_SET_TEMPO = 6;
+    private static final int HANDLE_START = 7;
+    private static final int HANDLE_PAUSE = 8;
+    private static final int HANDLE_SEEK = 9;
+    private static final int HANDLE_STOP = 10;
+    private static final int HANDLE_RESET = 11;
+    private static final int HANDLE_RELEASE = 12;
 
     private boolean isReleased;
 
@@ -144,6 +154,14 @@ public class WePlayer {
 
                     case HANDLE_SET_CHANNEL:
                         handleSetChannel(msg);
+                        break;
+
+                    case HANDLE_SET_PITCH:
+                        handleSetPitch(msg);
+                        break;
+
+                    case HANDLE_SET_TEMPO:
+                        handleSetTempo(msg);
                         break;
 
                     case HANDLE_START:
@@ -326,6 +344,54 @@ public class WePlayer {
 
         SoundChannel channel = (SoundChannel) msg.obj;
         nativeSetSoundChannel(channel.getNativeValue());
+    }
+
+    /**
+     * 设置音调
+     *
+     * @param pitch
+     */
+    public void setPitch(float pitch) {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_PITCH);
+        msg.obj = pitch;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleSetPitch(Message msg) {
+        if (!isPrepared) {
+            return;
+        }
+
+        float pitch = (float) msg.obj;
+        nativeSetPitch(pitch);
+    }
+
+    public float getPitch() {
+        return nativeGetPitch();
+    }
+
+    /**
+     * 设置音速
+     *
+     * @param tempo
+     */
+    public void setTempo(float tempo) {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_TEMPO);
+        msg.obj = tempo;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleSetTempo(Message msg) {
+        if (!isPrepared) {
+            return;
+        }
+
+        float tempo = (float) msg.obj;
+        nativeSetTempo(tempo);
+    }
+
+    public float getTempo() {
+        return nativeGetTempo();
     }
 
     public void start() {

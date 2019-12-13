@@ -305,6 +305,7 @@ void WeFFmpeg::start() {
         status->setStatus(PlayStatus::PLAYING, LOG_TAG);
         if (weAudio->queue->isProductDataComplete()) {
             seekToBegin = true;// 在播放完成后，如果用户没有 seek，就从头开始播放
+            weAudio->queue->setProductDataComplete(false);
         }
         int ret;
         if ((ret = weAudio->startPlay()) != NO_ERROR) {
@@ -532,6 +533,42 @@ void WeFFmpeg::setSoundChannel(int channel) {
     weAudio->setSoundChannel(channel);
 }
 
+void WeFFmpeg::setPitch(float pitch) {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "setPitch but weAudio is NULL");
+        return;
+    }
+
+    weAudio->setPitch(pitch);
+}
+
+float WeFFmpeg::getPitch() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "getPitch but weAudio is NULL");
+        return 0;
+    }
+
+    return weAudio->getPitch();
+}
+
+void WeFFmpeg::setTempo(float tempo) {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "setTempo but weAudio is NULL");
+        return;
+    }
+
+    weAudio->setTempo(tempo);
+}
+
+float WeFFmpeg::getTempo() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "getTempo but weAudio is NULL");
+        return 0;
+    }
+
+    return weAudio->getTempo();
+}
+
 /**
  * Gets the duration of the file.
  *
@@ -604,7 +641,7 @@ void WeFFmpeg::stop() {
     }
     // 等待工作线程结束
     int sleepCount = 0;
-    while (!prepareFinished || !demuxFinished) {
+    while (!prepareFinished || !demuxFinished || (weAudio != NULL && !weAudio->workFinished())) {
         if (sleepCount > 300) {
             break;
         }
@@ -650,7 +687,7 @@ void WeFFmpeg::release() {
     }
     // 等待工作线程结束
     int sleepCount = 0;
-    while (!prepareFinished || !demuxFinished) {
+    while (!prepareFinished || !demuxFinished || (weAudio != NULL && !weAudio->workFinished())) {
         if (sleepCount > 300) {
             break;
         }
