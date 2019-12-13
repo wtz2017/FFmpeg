@@ -151,6 +151,17 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeGetTempo(JNIEnv *env, jobject thiz) {
 }
 
 extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetSoundDecibels(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetSoundDecibels...but weFFmpeg is NULL");
+        return 0;
+    }
+
+    return weFFmpeg->getSoundDecibels();
+}
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
     if (weFFmpeg == NULL) {

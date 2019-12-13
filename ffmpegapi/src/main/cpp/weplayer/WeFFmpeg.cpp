@@ -569,6 +569,15 @@ float WeFFmpeg::getTempo() {
     return weAudio->getTempo();
 }
 
+double WeFFmpeg::getSoundDecibels() {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "getSoundDecibels but weAudio is NULL");
+        return 0;
+    }
+
+    return weAudio->getSoundDecibels();
+}
+
 /**
  * Gets the duration of the file.
  *

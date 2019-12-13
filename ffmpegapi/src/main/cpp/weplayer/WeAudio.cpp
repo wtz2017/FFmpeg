@@ -201,6 +201,8 @@ int WeAudio::getPcmData(void **buf) {
         break;
     }
 
+    updatePCM16bitDB(reinterpret_cast<char *>(*buf), ret);
+
     return ret;
 }
 
@@ -354,6 +356,42 @@ int WeAudio::adjustPitchTempo(uint8_t *in, int inSize, SAMPLETYPE *out) {
     return audioStream->channelNums * adjustSampleNumsPerChannel * 2;// SoundTouch 是 16bit 编码
 }
 
+/**
+ * 关于“分贝与负分贝数”
+ * 一开始，用声强 Pa 表示声音的强弱，但发现与我们耳朵的感觉相差太大，后来换成了分贝来表示声音的强弱，叫做响度。
+ * 汽车声音 0.2Pa，对应为 80dB，发令枪声 7000Pa，对应为 171dB，此时看发令枪的声音就大约是汽车声的两倍了，
+ * 这比较符合人的听觉感受。
+ *
+ * 帕转换为分贝要用到数学中的对数知识，公式：20 * log10{ Pa / [2 * 10^(-5)] }
+ *
+ * 人耳能感觉到的最低声压为 2×10E-5Pa，把这一声压级定为 0dB，当声压超过 130dB 时人耳将无法忍受，
+ * 故人耳听觉的动态范围为 0～130dB。
+ * 声强小于 2×10E-5Pa 的声音响度的都为负分贝数了。就像开尔文温标转化为摄氏温标一样，开尔文温标没有负数，
+ * 摄氏温标就有负数了。例如，冬天哈尔滨室外温度 -37℃，这个负数温度也是有温度的，只是温度低而已。
+ */
+void WeAudio::updatePCM16bitDB(char *data, int dataBytes) {
+    // 虽然我们在重采样设置统一转换为 16bit 采样，但是 FFmpeg 重采样转换接收 buffer 是 8 位的，
+    // 因此这里要把两个 8 位转成 16 位的数据再计算振幅
+    short int amplitude = 0;// 16bit 采样值
+    double amplitudeSum = 0;// 16bit 采样值加和
+    for (int i = 0; i < dataBytes; i += 2) {
+        memcpy(&amplitude, data + i, 2);// 把 char（8位） 转为 short int（16位）
+        amplitudeSum += abs(amplitude);// 把这段时间的所有采样值加和
+    }
+    // 更新振幅平均值
+    amplitudeAvg = amplitudeSum / (dataBytes / 2);// 除数是 16 位采样点个数
+
+    // 更新分贝值：分贝 = 20 * log10(振幅)
+    if (amplitudeAvg > 0) {
+        soundDecibels = 20 * log10(amplitudeAvg);
+    } else {
+        soundDecibels = 0;
+    }
+    if (LOG_REPEAT_DEBUG) {
+        LOGD(LOG_TAG, "amplitudeAvg %lf, soundDecibels %lf", amplitudeAvg, soundDecibels);
+    }
+}
+
 void WeAudio::releaseAvPacket() {
     if (avPacket == NULL) {
         return;
@@ -503,6 +541,10 @@ void WeAudio::setTempo(float tempo) {
 
 float WeAudio::getTempo() {
     return tempo;
+}
+
+double WeAudio::getSoundDecibels() {
+    return soundDecibels;
 }
 
 void WeAudio::release() {

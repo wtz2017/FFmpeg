@@ -49,6 +49,8 @@ public class WePlayer {
 
     private native float nativeGetTempo();
 
+    private native double nativeGetSoundDecibels();
+
     private native void nativeStart();
 
     private native void nativePause();
@@ -392,6 +394,13 @@ public class WePlayer {
 
     public float getTempo() {
         return nativeGetTempo();
+    }
+
+    /**
+     * 获取当前播放声音分贝值，单位：dB
+     */
+    public double getSoundDecibels() {
+        return nativeGetSoundDecibels();
     }
 
     public void start() {

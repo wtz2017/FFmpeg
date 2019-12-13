@@ -43,12 +43,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String mDurationText;
     private SeekBar mPlaySeekBar;
 
+    private TextView mDecibels;
     private TextView mVolume;
     private SeekBar mVolumeSeekBar;
     private TextView mPitch;
     private SeekBar mPitchSeekBar;
     private TextView mTempo;
     private SeekBar mTempoSeekBar;
+    private static final DecimalFormat DECIBELS_FORMAT = new DecimalFormat("0.00dB");
     private static final DecimalFormat VOLUME_FORMAT = new DecimalFormat("0%");
     private static final DecimalFormat PITCH_FORMAT = new DecimalFormat("0.0");
     private static final float MAX_PITCH = 3.0f;
@@ -58,7 +60,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final float TEMPO_ACCURACY = 0.1f;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
+    private static final int UPDATE_SOUND_DECIBELS_INTERVAL = 200;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
+    private static final int MSG_UPDATE_SOUND_DECIBELS = 2;
     private Handler mHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(@NonNull Message msg) {
@@ -67,6 +71,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     updatePlayTime();
                     removeMessages(MSG_UPDATE_PLAY_TIME);
                     sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME, UPDATE_PLAY_TIME_INTERVAL);
+                    break;
+                case MSG_UPDATE_SOUND_DECIBELS:
+                    updateSoundDecibels();
+                    removeMessages(MSG_UPDATE_SOUND_DECIBELS);
+                    sendEmptyMessageDelayed(MSG_UPDATE_SOUND_DECIBELS, UPDATE_SOUND_DECIBELS_INTERVAL);
                     break;
             }
         }
@@ -147,6 +156,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mPlayUrl.setText(mSources[mIndex]);
         mError = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
+        mDecibels = findViewById(R.id.tv_decibels);
         mVolume = findViewById(R.id.tv_volume);
         mPitch = findViewById(R.id.tv_pitch);
         mTempo = findViewById(R.id.tv_tempo);
@@ -344,6 +354,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 mWePlayer.start();
                 startUpdateTime();
+                startUpdateDecibels();
                 break;
             case R.id.btn_stop_play_audio:
                 if (mWePlayer == null) {
@@ -351,6 +362,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 mWePlayer.stop();
                 stopUpdateTime();
+                stopUpdateDecibels();
                 resetUI();
                 break;
             case R.id.btn_destroy_audio_player:
@@ -359,6 +371,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 mWePlayer.release();
                 stopUpdateTime();
+                stopUpdateDecibels();
                 resetUI();
                 mWePlayer = null;
                 break;
@@ -408,6 +421,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     mPlaySeekBar.setMax(mDuration);
                     mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
                     startUpdateTime();
+                    startUpdateDecibels();
                 }
             });
             mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
@@ -417,9 +431,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     MainActivity.this.isLoading = isLoading;
                     if (isLoading) {
                         stopUpdateTime();
+                        stopUpdateDecibels();
                         showProgressDialog(MainActivity.this);
                     } else {
                         startUpdateTime();
+                        startUpdateDecibels();
                         hideProgressDialog();
                     }
                 }
@@ -453,6 +469,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
     }
 
+    private void startUpdateDecibels() {
+        mHandler.sendEmptyMessage(MSG_UPDATE_SOUND_DECIBELS);
+    }
+
+    private void stopUpdateDecibels() {
+        mHandler.removeMessages(MSG_UPDATE_SOUND_DECIBELS);
+    }
+
     private void resetUI() {
         mPlayUrl.setText("");
         mError.setText("");
@@ -476,6 +500,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             // 既没有 seek，也没有播放，那就不更新
         }
+    }
+
+    private void updateSoundDecibels() {
+        if (mWePlayer == null || isLoading || !mWePlayer.isPlaying()) return;
+
+        mDecibels.setText("分贝：" + DECIBELS_FORMAT.format(mWePlayer.getSoundDecibels()));
     }
 
     private void showProgressDialog(Context context) {

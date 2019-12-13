@@ -119,6 +119,11 @@ public:
     float getTempo();
 
     /**
+     * 获取当前播放声音分贝值，单位：dB
+     */
+    double getSoundDecibels();
+
+    /**
      * Gets the duration of the file.
      *
      * @return the duration in milliseconds

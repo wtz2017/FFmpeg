@@ -50,6 +50,9 @@ private:
     double currentFrameTime = 0;// 当前帧时间，单位：秒
     double playTimeSecs = 0;// 当前播放时间，单位：秒
 
+    double amplitudeAvg = 0;// 当前播放声音振幅平均值，即当前所有 16bit 采样值大小平均值
+    double soundDecibels = 0;// 当前播放声音分贝值，单位：dB
+
     // 播放器只针对取数据单独用一个线程，其它播放控制走调度线程
     LooperThread *audioConsumerThread = NULL;
 
@@ -144,6 +147,11 @@ public:
 
     float getTempo();
 
+    /**
+     * 获取当前播放声音分贝值，单位：dB
+     */
+    double getSoundDecibels();
+
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);
 
@@ -182,6 +190,8 @@ private:
      * @return <= 0 if failed, or adjusted bytes
      */
     int adjustPitchTempo(uint8_t *in, int inSize, SAMPLETYPE *out);
+
+    void updatePCM16bitDB(char *data, int dataBytes);
 
     void release();
 
