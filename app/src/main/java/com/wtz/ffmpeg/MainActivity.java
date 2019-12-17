@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -25,7 +26,7 @@ import com.wtz.ffmpegapi.CppThreadDemo;
 import java.io.File;
 import java.text.DecimalFormat;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, RadioGroup.OnCheckedChangeListener {
     private static final String TAG = "FFmpegActivity";
 
     private CppThreadDemo mCppThreadDemo;
@@ -35,6 +36,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private int mDuration;
     private boolean isSeeking;
     private boolean isLoading;
+
+    private PCMRecorder.RecordType mRecordType = PCMRecorder.RecordType.AAC;
+    private File mAACFile;
+    private File mWAVFile;
     private File mRecordAudioFile;
 
     private View mBaseTestRoot;
@@ -45,6 +50,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private TextView mPlayTimeView;
     private String mDurationText;
     private SeekBar mPlaySeekBar;
+    private TextView mRecordTimeView;
 
     private TextView mDecibels;
     private TextView mVolume;
@@ -64,8 +70,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int UPDATE_SOUND_DECIBELS_INTERVAL = 200;
+    private static final int UPDATE_RECORD_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
     private static final int MSG_UPDATE_SOUND_DECIBELS = 2;
+    private static final int MSG_UPDATE_RECORD_TIME = 3;
     private Handler mHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(@NonNull Message msg) {
@@ -79,6 +87,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     updateSoundDecibels();
                     removeMessages(MSG_UPDATE_SOUND_DECIBELS);
                     sendEmptyMessageDelayed(MSG_UPDATE_SOUND_DECIBELS, UPDATE_SOUND_DECIBELS_INTERVAL);
+                    break;
+                case MSG_UPDATE_RECORD_TIME:
+                    updateRecordTime();
+                    removeMessages(MSG_UPDATE_RECORD_TIME);
+                    sendEmptyMessageDelayed(MSG_UPDATE_RECORD_TIME, UPDATE_RECORD_TIME_INTERVAL);
                     break;
             }
         }
@@ -154,10 +167,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_left_channel).setOnClickListener(this);
         findViewById(R.id.btn_right_channel).setOnClickListener(this);
         findViewById(R.id.btn_stero).setOnClickListener(this);
+
         findViewById(R.id.btn_start_record_audio).setOnClickListener(this);
         findViewById(R.id.btn_pause_record_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_record_audio).setOnClickListener(this);
         findViewById(R.id.btn_stop_record_audio).setOnClickListener(this);
+        ((RadioGroup) findViewById(R.id.rg_record_type)).setOnCheckedChangeListener(this);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
         mPlayUrl.setText(mSources[mIndex]);
@@ -167,6 +182,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mVolume = findViewById(R.id.tv_volume);
         mPitch = findViewById(R.id.tv_pitch);
         mTempo = findViewById(R.id.tv_tempo);
+        mRecordTimeView = findViewById(R.id.tv_record_time);
 
         mPlaySeekBar = findViewById(R.id.seek_bar_play);
         setSeekbarWith(mPlaySeekBar);
@@ -407,26 +423,49 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (mRecordAudioFile == null) {
                     mRecordAudioFile = new File("/sdcard/pcm_record.aac");
                 }
-//                mWePlayer.startRecord(PCMRecorder.RecordType.WAV, mRecordAudioFile);
-                mWePlayer.startRecord(PCMRecorder.RecordType.AAC, mRecordAudioFile);
+                mWePlayer.startRecord(mRecordType, mRecordAudioFile);
+                startUpdateRecordTime();
                 break;
             case R.id.btn_pause_record_audio:
                 if (mWePlayer == null) {
                     return;
                 }
                 mWePlayer.pauseRecord();
+                stopUpdateRecordTime();
                 break;
             case R.id.btn_resume_record_audio:
                 if (mWePlayer == null) {
                     return;
                 }
                 mWePlayer.resumeRecord();
+                startUpdateRecordTime();
                 break;
             case R.id.btn_stop_record_audio:
+                stopUpdateRecordTime();
                 if (mWePlayer == null) {
                     return;
                 }
                 mWePlayer.stopRecord();
+                break;
+        }
+    }
+
+    @Override
+    public void onCheckedChanged(RadioGroup radioGroup, int checkedId) {
+        switch (checkedId) {
+            case R.id.rb_wav:
+                mRecordType = PCMRecorder.RecordType.WAV;
+                if (mWAVFile == null) {
+                    mWAVFile = new File("/sdcard/pcm_record.wav");
+                }
+                mRecordAudioFile = mWAVFile;
+                break;
+            case R.id.rb_aac:
+                mRecordType = PCMRecorder.RecordType.AAC;
+                if (mAACFile == null) {
+                    mAACFile = new File("/sdcard/pcm_record.aac");
+                }
+                mRecordAudioFile = mAACFile;
                 break;
         }
     }
@@ -512,6 +551,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mHandler.removeMessages(MSG_UPDATE_SOUND_DECIBELS);
     }
 
+    private void startUpdateRecordTime() {
+        mHandler.sendEmptyMessage(MSG_UPDATE_RECORD_TIME);
+    }
+
+    private void stopUpdateRecordTime() {
+        mHandler.removeMessages(MSG_UPDATE_RECORD_TIME);
+    }
+
     private void resetUI() {
         mPlayUrl.setText("");
         mError.setText("");
@@ -541,6 +588,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (mWePlayer == null || isLoading || !mWePlayer.isPlaying()) return;
 
         mDecibels.setText("分贝：" + DECIBELS_FORMAT.format(mWePlayer.getSoundDecibels()));
+    }
+
+    private void updateRecordTime() {
+        long recordTime = Math.round(mWePlayer.getRecordTimeSecs() * 1000);
+        String recordTimeStr = DateTimeUtil.changeRemainTimeToHms(recordTime);
+        mRecordTimeView.setText(recordTimeStr);
     }
 
     private void showProgressDialog(Context context) {

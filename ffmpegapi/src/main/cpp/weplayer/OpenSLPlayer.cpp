@@ -250,10 +250,13 @@ int OpenSLPlayer::createBufferQueueAudioPlayer() {
      *     fast audio does not support when SL_IID_EFFECTSEND is required, skip it
      *     for fast audio case
      */
-    const int ID_COUNT = 3;
+    const int ID_COUNT = 4;
     // 如果某个功能接口没注册 id 和写为 SL_BOOLEAN_TRUE，后边通过 GetInterface 就获取不到这个接口
-    const SLInterfaceID ids[ID_COUNT] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_MUTESOLO};
-    const SLboolean reqs[ID_COUNT] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE};
+    // 打开 SL_IID_PLAYBACKRATE 功能是为了解决变速变调卡顿问题
+    const SLInterfaceID ids[ID_COUNT] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_MUTESOLO,
+                                         SL_IID_PLAYBACKRATE};
+    const SLboolean reqs[ID_COUNT] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE,
+                                      SL_BOOLEAN_TRUE};
     SLresult result;
     result = (*engine)->CreateAudioPlayer(
             engine, &playerObject, &audioSrc, &audioSnk, ID_COUNT, ids, reqs);

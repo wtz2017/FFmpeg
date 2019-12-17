@@ -80,6 +80,9 @@ public class PCMRecorder {
     private static final int HANDLE_STOP = 3;
     private static final int HANDLE_RELEASE = 4;
 
+    private int mSampledSizePerSecond;// 1秒最大采样字节大小
+    private double mRecordTimeSecs;// 当前已录制时间，单位：秒
+
     public PCMRecorder() {
         mWorkThread = new HandlerThread("PCMRecorder");
         mWorkThread.start();
@@ -148,6 +151,8 @@ public class PCMRecorder {
         }
 
         mRecordState = RECORD_STARTING;
+        mRecordTimeSecs = 0;
+        mSampledSizePerSecond = startParams.channelNums * startParams.sampleRate * startParams.bitsPerSample / 8;
         switch (startParams.type) {
             case WAV:
                 mEncoder = new WAVSaver();
@@ -191,7 +196,12 @@ public class PCMRecorder {
             return;
         }
 
+        mRecordTimeSecs += msg.arg1 * 1.0 / mSampledSizePerSecond;
         mEncoder.encode((byte[]) msg.obj, msg.arg1);
+    }
+
+    public double getRecordTimeSecs() {
+        return mRecordTimeSecs;
     }
 
     public void stop() {

@@ -664,6 +664,10 @@ public class WePlayer {
         }
     }
 
+    public double getRecordTimeSecs() {
+        return mPCMRecorder != null ? mPCMRecorder.getRecordTimeSecs() : 0;
+    }
+
     /**
      * Called by native
      *
