@@ -13,6 +13,7 @@
 #include "WeError.h"
 #include "LooperThread.h"
 #include "SoundTouch.h"
+#include "OnPCMDataCall.h"
 
 extern "C"
 {
@@ -44,6 +45,8 @@ private:
     static const float NORMAL_TEMPO = 1.0f;
     float pitch = NORMAL_PITCH;// 音调
     float tempo = NORMAL_TEMPO;// 音速
+
+    bool needRecordPCM = false;// 是否录制 PCM
 
     OpenSLPlayer *openSlPlayer = NULL;
 
@@ -91,6 +94,11 @@ public:
     void _handleResumePlay();
 
     void stopPlay();
+
+    /**
+     * @param record true:录制 PCM
+     */
+    void setRecordPCMFlag(bool record);
 
     void destroyPlayer();
 
@@ -151,6 +159,8 @@ public:
      * 获取当前播放声音分贝值，单位：dB
      */
     double getSoundDecibels();
+
+    int getPcmMaxBytesPerCallback();
 
     // 以下是继承 PcmGenerator 要实现的方法
     int getPcmData(void **buf);

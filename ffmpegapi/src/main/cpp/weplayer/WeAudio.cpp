@@ -142,6 +142,14 @@ void WeAudio::_handleResumePlay() {
     openSlPlayer->resumePlay();
 }
 
+int WeAudio::getPcmMaxBytesPerCallback() {
+    if (audioStream == NULL) {
+        LOGE(LOG_TAG, "getPcmMaxBytesPerCallback but audioStream is NULL");
+        return 0;
+    }
+    return audioStream->sampledSizePerSecond;
+}
+
 /**
  * 实现 PcmGenerator 声明的虚函数，提供 PCM 数据
  *
@@ -202,6 +210,10 @@ int WeAudio::getPcmData(void **buf) {
     }
 
     updatePCM16bitDB(reinterpret_cast<char *>(*buf), ret);
+
+    if (needRecordPCM) {
+        javaListenerContainer->onPcmDataCall->callback(2, *buf, ret);
+    }
 
     return ret;
 }
@@ -439,6 +451,10 @@ void WeAudio::stopPlay() {
     if (audioConsumerThread != NULL) {
         audioConsumerThread->clearMessage();// 清除还未执行的播放请求消息
     }
+}
+
+void WeAudio::setRecordPCMFlag(bool record) {
+    needRecordPCM = record;
 }
 
 void WeAudio::destroyPlayer() {

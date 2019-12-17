@@ -10,6 +10,7 @@
 #include "OnPlayLoadingListener.h"
 #include "OnErrorListener.h"
 #include "OnCompletionListener.h"
+#include "OnPCMDataCall.h"
 
 class JavaListenerContainer {
 
@@ -18,6 +19,7 @@ public:
     OnPlayLoadingListener *onPlayLoadingListener;
     OnErrorListener *onErrorListener;
     OnCompletionListener *onCompletionListener;
+    OnPCMDataCall *onPcmDataCall;
 
 public:
     JavaListenerContainer() {

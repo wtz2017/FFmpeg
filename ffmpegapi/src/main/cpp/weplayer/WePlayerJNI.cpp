@@ -37,6 +37,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
         javaListenerContainer->onPlayLoadingListener = new OnPlayLoadingListener(jvm, env, thiz);
         javaListenerContainer->onErrorListener = new OnErrorListener(jvm, env, thiz);
         javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
+        javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);
         weFFmpeg = new WeFFmpeg(javaListenerContainer);
     }
 
@@ -247,6 +248,61 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeGetCurrentPosition(JNIEnv *env, jobject th
     }
 
     return weFFmpeg->getCurrentPosition();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetAudioSampleRate(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetAudioSampleRate...but weFFmpeg is NULL");
+        return 0;
+    }
+
+    return weFFmpeg->getAudioSampleRate();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetAudioChannelNums(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetAudioChannelNums...but weFFmpeg is NULL");
+        return 0;
+    }
+
+    return weFFmpeg->getAudioChannelNums();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetAudioBitsPerSample(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "natvieGetAudioBitsPerSample...but weFFmpeg is NULL");
+        return 0;
+    }
+
+    return weFFmpeg->getAudioBitsPerSample();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeGetPcmMaxBytesPerCallback(JNIEnv *env, jobject thiz) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeGetPcmMaxBytesPerCallback...but weFFmpeg is NULL");
+        return 0;
+    }
+
+    return weFFmpeg->getPcmMaxBytesPerCallback();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetRecordPCMFlag(JNIEnv *env, jobject thiz, jboolean record) {
+    if (weFFmpeg == NULL) {
+        LOGE(LOG_TAG, "nativeSetRecordPCMFlag...but weFFmpeg is NULL");
+        return;
+    }
+
+    weFFmpeg->setRecordPCMFlag(record);
 }
 
 extern "C"

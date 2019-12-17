@@ -9,6 +9,8 @@ import android.util.Log;
 
 import com.wtz.ffmpegapi.utils.LogUtils;
 
+import java.io.File;
+
 public class WePlayer {
     private static final String TAG = "WePlayerJava";
 
@@ -71,6 +73,16 @@ public class WePlayer {
 
     private native int nativeGetCurrentPosition();
 
+    private native int nativeGetAudioSampleRate();
+
+    private native int nativeGetAudioChannelNums();
+
+    private native int nativeGetAudioBitsPerSample();
+
+    private native int nativeGetPcmMaxBytesPerCallback();
+
+    private native void nativeSetRecordPCMFlag(boolean record);
+
     private OnPreparedListener mOnPreparedListener;
     private OnPlayLoadingListener mOnPlayLoadingListener;
     private OnErrorListener mOnErrorListener;
@@ -79,6 +91,9 @@ public class WePlayer {
     private String mDataSource;
     private float mVolumePercent = -1;
     private boolean isPrepared;
+    private boolean isReleased;
+
+    private PCMRecorder mPCMRecorder;
 
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
@@ -95,8 +110,6 @@ public class WePlayer {
     private static final int HANDLE_STOP = 10;
     private static final int HANDLE_RESET = 11;
     private static final int HANDLE_RELEASE = 12;
-
-    private boolean isReleased;
 
     public enum SoundChannel {
         RIGHT_CHANNEL(0), LEFT_CHANNEL(1), STERO(2);
@@ -200,7 +213,13 @@ public class WePlayer {
         }
         // 首先置总的标志位，阻止消息队列的正常消费
         isReleased = true;
+        isPrepared = false;
         nativeSetStopFlag();
+
+        if (mPCMRecorder != null) {
+            mPCMRecorder.release();
+            mPCMRecorder = null;
+        }
 
         // 然后停止前驱：工作线程
         mWorkHandler.removeCallbacksAndMessages(null);
@@ -273,7 +292,7 @@ public class WePlayer {
      * called from native
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
-    public void onNativePrepared(String dataSource) {
+    private void onNativePrepared(String dataSource) {
         LogUtils.d(TAG, "onNativePrepared isReleased: " + isReleased + ", dataSource: " + dataSource);
         if (!TextUtils.equals(dataSource, mDataSource)) {
             LogUtils.w(TAG, "onNativePrepared data source changed! So the preparation is invalid!");
@@ -420,7 +439,7 @@ public class WePlayer {
     /**
      * called from native
      */
-    public void onNativePlayLoading(final boolean isLoading) {
+    private void onNativePlayLoading(final boolean isLoading) {
         LogUtils.d(TAG, "onNativePlayLoading isLoading: " + isLoading + ", isReleased:" + isReleased);
         if (mOnPlayLoadingListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
@@ -470,6 +489,7 @@ public class WePlayer {
     public void stop() {
         isPrepared = false;
         nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
+        stopRecord();
 
         // 先清除其它所有未执行消息，再执行具体释放动作
         mWorkHandler.removeCallbacksAndMessages(null);
@@ -489,6 +509,7 @@ public class WePlayer {
     public void reset() {
         isPrepared = false;
         nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
+        stopRecord();
 
         // 先清除其它所有未执行消息，再执行具体重置动作
         mWorkHandler.removeCallbacksAndMessages(null);
@@ -530,11 +551,38 @@ public class WePlayer {
         return nativeGetCurrentPosition();
     }
 
+    public int getAudioSampleRate() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getAudioSampleRate method before prepare finished");
+            return 0;
+        }
+
+        return nativeGetAudioSampleRate();
+    }
+
+    public int getAudioChannelNums() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getAudioChannelNums method before prepare finished");
+            return 0;
+        }
+
+        return nativeGetAudioChannelNums();
+    }
+
+    public int getAudioBitsPerSample() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getAudioBitsPerSample method before prepare finished");
+            return 0;
+        }
+
+        return nativeGetAudioBitsPerSample();
+    }
+
     /**
      * called from native
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
-    public void onNativeError(final int code, final String msg) {
+    private void onNativeError(final int code, final String msg) {
         LogUtils.e(TAG, "onNativeError code=" + code + "; msg=" + msg);
         if (mOnErrorListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
@@ -550,7 +598,7 @@ public class WePlayer {
      * called from native
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
-    public void onNativeCompletion() {
+    private void onNativeCompletion() {
         LogUtils.d(TAG, "onNativeCompletion");
         if (mOnCompletionListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
@@ -560,6 +608,80 @@ public class WePlayer {
                 }
             });
         }
+    }
+
+    public void startRecord(PCMRecorder.RecordType type, File saveFile) {
+        LogUtils.d(TAG, "PCM startRecord...");
+        if (!isPrepared) {
+            LogUtils.e(TAG, "startRecord but audio is not prepared");
+            return;
+        }
+
+        if (saveFile == null) {
+            LogUtils.e(TAG, "startRecord but saveFile is null");
+            return;
+        }
+
+        int sampleRate = getAudioSampleRate();
+        int channelNums = getAudioChannelNums();
+        int bitsPerSample = getAudioBitsPerSample();
+        LogUtils.d(TAG, "startRecord sampleRate=" + sampleRate + ";channelNums=" + channelNums);
+        if (sampleRate <= 0 || channelNums <= 0 || bitsPerSample <= 0) {
+            LogUtils.e(TAG, "startRecord but sampleRate <= 0 or channelNums <= 0 or bitsPerSample <= 0");
+            return;
+        }
+
+        int maxBytesPerCallback = nativeGetPcmMaxBytesPerCallback();
+        LogUtils.d(TAG, "PCM maxBytesPerCallback: " + maxBytesPerCallback);
+        if (mPCMRecorder == null) {
+            mPCMRecorder = new PCMRecorder();
+        }
+        mPCMRecorder.start(type, sampleRate, channelNums, bitsPerSample, maxBytesPerCallback, saveFile,
+                new PCMRecorder.OnStartResultListener() {
+                    @Override
+                    public void onResult(boolean success) {
+                        LogUtils.d(TAG, "PCMRecorder start onResult: " + success);
+                        if (success) {
+                            nativeSetRecordPCMFlag(true);
+                        }
+                    }
+                });
+    }
+
+    public void pauseRecord() {
+        nativeSetRecordPCMFlag(false);
+    }
+
+    public void resumeRecord() {
+        nativeSetRecordPCMFlag(true);
+    }
+
+    public void stopRecord() {
+        LogUtils.d(TAG, "PCM stopRecord...");
+        nativeSetRecordPCMFlag(false);
+        if (mPCMRecorder != null) {
+            mPCMRecorder.stop();
+        }
+    }
+
+    /**
+     * Called by native
+     *
+     * @param pcmData
+     * @param size
+     */
+    private void onNativePCMDataCall(byte[] pcmData, int size) {
+        if (pcmData == null || size <= 0 || pcmData.length < size) {
+            LogUtils.e(TAG, "onNativePCMDataCall but pcmData=" + pcmData + ";size=" + size);
+            return;
+        }
+
+        if (mPCMRecorder == null) {
+            LogUtils.e(TAG, "onNativePCMDataCall but mPCMRecorder is null");
+            return;
+        }
+
+        mPCMRecorder.encode(pcmData, size);
     }
 
 }

@@ -18,9 +18,11 @@ import android.widget.TextView;
 
 import com.wtz.ffmpeg.utils.DateTimeUtil;
 import com.wtz.ffmpeg.utils.ScreenUtils;
+import com.wtz.ffmpegapi.PCMRecorder;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.CppThreadDemo;
 
+import java.io.File;
 import java.text.DecimalFormat;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -33,6 +35,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private int mDuration;
     private boolean isSeeking;
     private boolean isLoading;
+    private File mRecordAudioFile;
 
     private View mBaseTestRoot;
 
@@ -151,6 +154,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.btn_left_channel).setOnClickListener(this);
         findViewById(R.id.btn_right_channel).setOnClickListener(this);
         findViewById(R.id.btn_stero).setOnClickListener(this);
+        findViewById(R.id.btn_start_record_audio).setOnClickListener(this);
+        findViewById(R.id.btn_pause_record_audio).setOnClickListener(this);
+        findViewById(R.id.btn_resume_record_audio).setOnClickListener(this);
+        findViewById(R.id.btn_stop_record_audio).setOnClickListener(this);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
         mPlayUrl.setText(mSources[mIndex]);
@@ -392,6 +399,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     return;
                 }
                 mWePlayer.setSoundChannel(WePlayer.SoundChannel.STERO);
+                break;
+            case R.id.btn_start_record_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
+                if (mRecordAudioFile == null) {
+                    mRecordAudioFile = new File("/sdcard/pcm_record.aac");
+                }
+//                mWePlayer.startRecord(PCMRecorder.RecordType.WAV, mRecordAudioFile);
+                mWePlayer.startRecord(PCMRecorder.RecordType.AAC, mRecordAudioFile);
+                break;
+            case R.id.btn_pause_record_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.pauseRecord();
+                break;
+            case R.id.btn_resume_record_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.resumeRecord();
+                break;
+            case R.id.btn_stop_record_audio:
+                if (mWePlayer == null) {
+                    return;
+                }
+                mWePlayer.stopRecord();
                 break;
         }
     }

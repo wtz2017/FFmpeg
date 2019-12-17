@@ -605,8 +605,49 @@ int WeFFmpeg::getCurrentPosition() {
     return ret;
 }
 
+int WeFFmpeg::getAudioSampleRate() {
+    if (weAudio != NULL && weAudio->audioStream != NULL) {
+        return weAudio->audioStream->sampleRate;
+    }
+
+    return 0;
+}
+
+int WeFFmpeg::getAudioChannelNums() {
+    if (weAudio != NULL && weAudio->audioStream != NULL) {
+        return weAudio->audioStream->channelNums;
+    }
+
+    return 0;
+}
+
+int WeFFmpeg::getAudioBitsPerSample() {
+    if (weAudio != NULL && weAudio->audioStream != NULL) {
+        return weAudio->audioStream->bytesPerSample * 8;
+    }
+
+    return 0;
+}
+
+int WeFFmpeg::getPcmMaxBytesPerCallback() {
+    if (weAudio != NULL) {
+        return weAudio->getPcmMaxBytesPerCallback();
+    }
+
+    return 0;
+}
+
 bool WeFFmpeg::isPlaying() {
     return status != NULL && status->isPlaying();
+}
+
+void WeFFmpeg::setRecordPCMFlag(bool record) {
+    if (weAudio == NULL) {
+        LOGE(LOG_TAG, "setRecordPCMFlag but weAudio is NULL");
+        return;
+    }
+
+    weAudio->setRecordPCMFlag(record);
 }
 
 /**
