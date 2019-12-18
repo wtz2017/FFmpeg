@@ -341,9 +341,11 @@ void WeFFmpeg::demux() {
     AVPacket *avPacket = NULL;
     while (status != NULL && !status->isStoped() && !status->isError() && !status->isReleased()) {
         if (status->isSeeking) {
+            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
         if (weAudio->queue->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
+            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
 
@@ -394,7 +396,7 @@ void WeFFmpeg::demux() {
             while (status != NULL && !status->isStoped() && !status->isError() &&
                    !status->isReleased()) {
                 if (weAudio->queue->getQueueSize() > 0) {// 还没有播放完成
-                    av_usleep(10 * 1000);// 每次睡眠 10 ms
+                    av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
                     continue;
                 }
 

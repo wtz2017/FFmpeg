@@ -19,6 +19,7 @@ extern "C"
 {
 #include "libavcodec/avcodec.h"
 #include "libswresample/swresample.h"
+#include "libavutil/time.h"
 };
 
 using namespace soundtouch;

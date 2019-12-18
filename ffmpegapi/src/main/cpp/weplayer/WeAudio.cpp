@@ -170,6 +170,8 @@ int WeAudio::getPcmData(void **buf) {
                 status->isPlayLoading = true;
                 javaListenerContainer->onPlayLoadingListener->callback(1, true);
             }
+
+            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
 
@@ -181,12 +183,14 @@ int WeAudio::getPcmData(void **buf) {
 
         // 解 AVPacket 包
         if (!decodeQueuePacket()) {
+            // 解码失败直接取下一个包，不用等待
             continue;
         }
 
         // 对解出来的 AVFrame 重采样
         ret = resample(&sampleBuffer);
         if (ret < 0) {
+            // 重采样失败直接取下一个包，不用等待
             continue;
         }
 
@@ -198,6 +202,7 @@ int WeAudio::getPcmData(void **buf) {
 
             ret = adjustPitchTempo(sampleBuffer, ret, soundTouchBuffer);
             if (ret <= 0) {
+                // 调音失败直接取下一个包，不用等待
                 continue;
             }
 
