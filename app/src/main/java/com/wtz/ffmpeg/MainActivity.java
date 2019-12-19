@@ -98,6 +98,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     };
 
     private static final String[] mSources = {
+            // Local File
+            "file:///sdcard/test.mp3",
+            "file:///sdcard/test.ac3",
+            "file:///sdcard/test.mp4",
+            "file:///sdcard/王铮亮-真爱你的云.ape",
+            "file:///sdcard/邓超-电台情歌.ape",
+            "file:///sdcard/邓紫棋-爱你.flac",
+
             // HLS(HTTP Live Streaming)
             "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清
             "http://ivi.bupt.edu.cn/hls/cctv6hd.m3u8",//CCTV6高清
@@ -112,11 +120,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             // TODO 打不开 应该是当前库不支持 https
             "https://lhttp.qingting.fm/live/20462/64k.mp3",//经典调频北京FM969
-
-            // Local File
-            "file:///sdcard/test.mp3",
-            "file:///sdcard/test.ac3",
-            "file:///sdcard/test.mp4",
 
             "http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3",
             "http://music.163.com/song/media/outer/url?id=29750099.mp3",
@@ -142,11 +145,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate ");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         mCppThreadDemo = new CppThreadDemo();
-        mCppThreadDemo.stringToJNI("hello! I'm java!");
+        mCppThreadDemo.stringToJNI("hello! I'm java!这是汉字！");
 
         mBaseTestRoot = findViewById(R.id.base_test_root);
         findViewById(R.id.btn_base_test_control).setOnClickListener(this);
@@ -612,7 +616,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
+    protected void onStop() {
+        Log.d(TAG, "onStop");
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
+        Log.d(TAG, "onDestroy");
+        if (mWePlayer != null) {
+            mWePlayer.release();
+            stopUpdateTime();
+            stopUpdateDecibels();
+            mWePlayer = null;
+        }
+
         mHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }

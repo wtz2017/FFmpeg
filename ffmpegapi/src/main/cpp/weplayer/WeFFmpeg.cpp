@@ -361,8 +361,8 @@ void WeFFmpeg::demux() {
             // 读包成功
             if (avPacket->stream_index == weAudio->audioStream->streamIndex) {
                 // 当前包为音频包
-                packetCount++;
                 if (LOG_REPEAT_DEBUG) {
+                    packetCount++;
                     LOGD(LOG_TAG, "Read Audio packet, current count is %d", packetCount);
                 }
                 // 缓存音频包到队列
@@ -685,7 +685,6 @@ void WeFFmpeg::stop() {
 
     if (weAudio != NULL) {
         weAudio->stopPlay();
-        weAudio->destroyPlayer();// 不同采样参数数据流使用的 openSlPlayer 不一样，需要销毁新建
     }
 
     if (LOG_DEBUG) {
@@ -705,6 +704,7 @@ void WeFFmpeg::stop() {
     }
 
     if (weAudio != NULL) {
+        weAudio->destroyPlayer();// 不同采样参数数据流使用的 openSlPlayer 不一样，需要销毁新建
         weAudio->clearDataAfterStop();
     }
 

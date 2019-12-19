@@ -25,7 +25,7 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
 
     player->enqueueFinished = false;
     int size = player->pcmGenerator->getPcmData(&player->enqueueBuffer);
-    if (size == 0) {// 已经播放完成或不在播放状态了
+    if (size <= 0) {// 已经播放完成或不在播放状态了
         LOGW("OpenSLPlayer", "pcmBufferCallback getPcmData size=%d", size);
         player->enqueueFailed = true;// 用于暂停后可能异步获取失败恢复播放时主动喂一次数据
         player->enqueueFinished = true;

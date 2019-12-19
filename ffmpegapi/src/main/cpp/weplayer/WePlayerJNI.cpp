@@ -42,12 +42,24 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
     }
 
     /**
-     * GetStringUTFRegion 需要使用对应的 GetStringUTFLength 来获取 UTF-8 字符串所需要的
-     * 字节个数（不包括结束的 '\0'），对于 char 数组大小要比它大 1，并在 char 数组最后一位写结束符 '\0'
+     * java 内部是使用16bit的unicode编码（UTF-16）来表示字符串的，无论中文英文都是2字节；
+     * jni 内部是使用UTF-8编码来表示字符串的，UTF-8是变长编码的unicode，一般ascii字符是1字节，中文是3字节；
+     * c/c++ 使用的是原始数据，ascii就是一个字节了，中文一般是GB2312编码，用两个字节来表示一个汉字。
+     *
+     * GetStringLength 用来获取 java 原始字符串 UTF-16 字节个数
+     * GetStringUTFLength 用来获取 UTF-8 字符串所需要的字节个数（不包括结束的 '\0'），
+     * 对于用来存储字符串的 char 数组大小要比字符串长度大 1，并在 char 数组最后一位写结束符 '\0'
+     *
+     * GetStringUTFRegion 用来获取转成 UTF-8 后的字符串，第2、3两个参数指原始字串（UTF-16）的长度范围
      */
+    int jstrUtf16Len = env->GetStringLength(dataSource);
     int jstrUtf8Len = env->GetStringUTFLength(dataSource);
-    char *source = new char[jstrUtf8Len + 1];
-    env->GetStringUTFRegion(dataSource, 0, jstrUtf8Len, source);
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "GetString UTF-16 Length: %d; UTF-8 Length: %d", jstrUtf16Len, jstrUtf8Len);
+    }
+
+    char *source = new char[jstrUtf8Len + 1];// 回收放在 WeFFmpeg 中
+    env->GetStringUTFRegion(dataSource, 0, jstrUtf16Len, source);
     source[jstrUtf8Len] = '\0';
 
     if (LOG_DEBUG) {

@@ -14,6 +14,7 @@
 #include "LooperThread.h"
 #include "SoundTouch.h"
 #include "OnPCMDataCall.h"
+#include "WeUtils.h"
 
 extern "C"
 {
@@ -32,6 +33,7 @@ private:
 
     AVPacket *avPacket = NULL;
     AVFrame *avFrame = NULL;
+    bool readAllFramesComplete = true;// 是否读完了一个 AVPacket 里的所有 AVFrame
 
     uint8_t *sampleBuffer = NULL;
 
@@ -178,7 +180,26 @@ public:
 private:
     void createConsumerThread();
 
-    bool decodeQueuePacket();
+    /**
+     * 从队列中取 AVPacket
+     *
+     * @return 0：取包成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常
+     */
+    int getPacket();
+
+    /**
+     * 把 packet 发送给解码器解码
+     *
+     * @return true:发送解码成功
+     */
+    bool sendPacket();
+
+    /**
+     * 接收解码后的数据帧 frame
+     *
+     * @return true:接收成功
+     */
+    bool receiveFrame();
 
     /**
      * 重采样

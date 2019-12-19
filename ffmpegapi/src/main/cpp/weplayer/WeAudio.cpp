@@ -160,37 +160,47 @@ int WeAudio::getPcmData(void **buf) {
     int ret = 0;
     // 循环是为了本次操作如果失败就再从队列里取下一个操作，也就是理想情况只操作一次
     while (status != NULL && status->isPlaying()) {
-        if (queue->getQueueSize() == 0) {
-            if (queue->isProductDataComplete()) {
-                break;
-            }
-
-            // 队列中无数据且生产数据未完成，表示正在加载中
-            if (!status->isPlayLoading) {
-                status->isPlayLoading = true;
-                javaListenerContainer->onPlayLoadingListener->callback(1, true);
-            }
-
+        if (status->isSeeking) {
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
 
-        // 队列中有数据
-        if (status->isPlayLoading) {
-            status->isPlayLoading = false;
-            javaListenerContainer->onPlayLoadingListener->callback(1, false);
+        if (readAllFramesComplete) {
+            // 前一个包解出的帧都读完后，再从队列中取新的 AVPacket
+            ret = getPacket();
+            if (ret == -1) {
+                // 数据加载中，等一会儿再来取
+                av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
+                continue;
+            } else if (ret == -2) {
+                // 已经播放到末尾，直接退出循环
+                break;
+            } else if (ret == -3) {
+                // 取包异常直接取下一个包，不用等待
+                continue;
+            }
+
+            // 发送 AVPacket 给解码器解码
+            if (!sendPacket()) {
+                // 发送失败直接取下一个包，不用等待
+                continue;
+            }
         }
 
-        // 解 AVPacket 包
-        if (!decodeQueuePacket()) {
-            // 解码失败直接取下一个包，不用等待
+        // 取解码后的 AVFrame 帧，可能一个 AVPacket 对应多个 AVFrame，例如 ape 类型的音频
+        if (!receiveFrame()) {
+            // 取帧失败直接取下一个包解码，不用等待
+            readAllFramesComplete = true;
             continue;
+        } else {
+            // 取帧成功，可能这个包里还有帧
+            readAllFramesComplete = false;
         }
 
         // 对解出来的 AVFrame 重采样
         ret = resample(&sampleBuffer);
         if (ret < 0) {
-            // 重采样失败直接取下一个包，不用等待
+            // 重采样失败直接取下一帧，不用等待
             continue;
         }
 
@@ -202,7 +212,7 @@ int WeAudio::getPcmData(void **buf) {
 
             ret = adjustPitchTempo(sampleBuffer, ret, soundTouchBuffer);
             if (ret <= 0) {
-                // 调音失败直接取下一个包，不用等待
+                // 调音失败直接取下一帧，不用等待
                 continue;
             }
 
@@ -214,37 +224,87 @@ int WeAudio::getPcmData(void **buf) {
         break;
     }
 
+    if (ret < 0) {
+        ret = 0;
+    }
+
     updatePCM16bitDB(reinterpret_cast<char *>(*buf), ret);
 
-    if (needRecordPCM) {
+    if (ret > 0 && needRecordPCM) {
         javaListenerContainer->onPcmDataCall->callback(2, *buf, ret);
     }
 
     return ret;
 }
 
-bool WeAudio::decodeQueuePacket() {
+/**
+ * 从队列中取 AVPacket
+ *
+ * @return 0：取包成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常
+ */
+int WeAudio::getPacket() {
+    if (queue->getQueueSize() == 0) {
+        // 队列中无数据
+        if (queue->isProductDataComplete()) {
+            // 已经播放到末尾
+            return -2;
+        }
+
+        // 队列中无数据且生产数据未完成，表示正在加载中
+        if (!status->isPlayLoading) {
+            status->isPlayLoading = true;
+            javaListenerContainer->onPlayLoadingListener->callback(1, true);
+        }
+        return -1;
+    }
+
+    // 队列中有数据
+    if (status->isPlayLoading) {
+        status->isPlayLoading = false;
+        javaListenerContainer->onPlayLoadingListener->callback(1, false);
+    }
+
     // 从队列中取出 packet
     avPacket = av_packet_alloc();
     if (!queue->getAVpacket(avPacket)) {
         LOGE(LOG_TAG, "getAVpacket from queue failed");
         releaseAvPacket();
-        return false;
+        return -3;
     }
 
-    // 把 packet 发送给解码器解码
+    return 0;
+}
+
+/**
+ * 把 packet 发送给解码器解码
+ *
+ * @return true:发送解码成功
+ */
+bool WeAudio::sendPacket() {
     int ret = avcodec_send_packet(audioStream->codecContext, avPacket);
     releaseAvPacket();// 不管解码成功与否，都要先释放内存
     if (ret != 0) {
-        LOGE(LOG_TAG, "avcodec_send_packet occurred exception: %d", ret);
+        LOGE(LOG_TAG, "avcodec_send_packet occurred exception: %d %s", ret,
+             WeUtils::getAVErrorName(ret));
         return false;
     }
 
-    // 接收解码后的数据帧 frame
+    return true;
+}
+
+/**
+ * 接收解码后的数据帧 frame
+ *
+ * @return true:接收成功
+ */
+bool WeAudio::receiveFrame() {
     avFrame = av_frame_alloc();
-    ret = avcodec_receive_frame(audioStream->codecContext, avFrame);
+    int ret = avcodec_receive_frame(audioStream->codecContext, avFrame);
     if (ret != 0) {
-        LOGE(LOG_TAG, "avcodec_receive_frame occurred exception: %d", ret);
+        if (ret != AVERROR(EAGAIN)) {
+            // 之所以屏蔽打印 EAGAIN 是因为考虑一包多帧时尝试多读一次来判断是否还有帧，避免频繁打印 EAGAIN
+            LOGE(LOG_TAG, "avcodec_receive_frame: %d %s", ret, WeUtils::getAVErrorName(ret));
+        }
         releaseAvFrame();
         return false;
     }
@@ -252,6 +312,12 @@ bool WeAudio::decodeQueuePacket() {
     return true;
 }
 
+/**
+ * 重采样
+ *
+ * @param out 接收采样后的数据 buffer
+ * @return -1 if failed, or sampled bytes
+ */
 int WeAudio::resample(uint8_t **out) {
     // 处理可能缺少的声道个数和声道布局参数
     if (avFrame->channels == 0 && avFrame->channel_layout == 0) {
@@ -284,8 +350,9 @@ int WeAudio::resample(uint8_t **out) {
     }
 
     // 重采样参数设置或修改参数之后必须调用 swr_init() 对 SwrContext 进行初始化
-    if (swr_init(swrContext) < 0) {
-        LOGE(LOG_TAG, "swr_init occurred exception");
+    int ret = 0;
+    if ((ret = swr_init(swrContext)) < 0) {
+        LOGE(LOG_TAG, "swr_init occurred exception: %d %s", ret, WeUtils::getAVErrorName(ret));
         releaseAvFrame();
         swr_free(&swrContext);
         swrContext = NULL;
@@ -348,6 +415,14 @@ void WeAudio::initSoundTouch() {
     }
 }
 
+/**
+ * 调整音调、音速
+ *
+ * @param in 需要调整的数据 buffer
+ * @param inSize 需要调整的数据大小
+ * @param out 接收调整后的数据 buffer
+ * @return <= 0 if failed, or adjusted bytes
+ */
 int WeAudio::adjustPitchTempo(uint8_t *in, int inSize, SAMPLETYPE *out) {
     // 因为 FFmpeg 重采样出来的 PCM 数据是 uint8 的，
     // 而 SoundTouch 中最低是 SAMPLETYPE(16bit integer sample type)，
@@ -387,6 +462,11 @@ int WeAudio::adjustPitchTempo(uint8_t *in, int inSize, SAMPLETYPE *out) {
  * 摄氏温标就有负数了。例如，冬天哈尔滨室外温度 -37℃，这个负数温度也是有温度的，只是温度低而已。
  */
 void WeAudio::updatePCM16bitDB(char *data, int dataBytes) {
+    if (dataBytes == 0) {
+        amplitudeAvg = 0;
+        soundDecibels = 0;
+        return;
+    }
     // 虽然我们在重采样设置统一转换为 16bit 采样，但是 FFmpeg 重采样转换接收 buffer 是 8 位的，
     // 因此这里要把两个 8 位转成 16 位的数据再计算振幅
     short int amplitude = 0;// 16bit 采样值
