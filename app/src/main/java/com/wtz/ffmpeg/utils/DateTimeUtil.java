@@ -1,6 +1,20 @@
 package com.wtz.ffmpeg.utils;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 public class DateTimeUtil {
+
+    /**
+     * @param format e.g. "yy-MM-dd_HH-mm-ss"
+     * @return DateTime
+     */
+    public static String getCurrentDateTime(String format) {
+        Date date = new Date();
+        SimpleDateFormat df = new SimpleDateFormat(format);
+        String nowTime = df.format(date);
+        return nowTime;
+    }
 
     /**
      * 把剩余毫秒数转化成“时:分:秒”字符串

@@ -22,6 +22,7 @@ import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.PCMRecorder;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.CppThreadDemo;
+import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
 import java.text.DecimalFormat;
@@ -573,7 +574,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void updatePlayTime() {
         if (mWePlayer == null || isLoading) return;
 
-        if (isSeeking) {
+        if (mDuration == 0) {
+            // 直播，显示日期时间
+            String currentPosition = DateTimeUtil.getCurrentDateTime("HH:mm:ss/yyyy-MM-dd");
+            mPlayTimeView.setText(currentPosition);
+        } else if (isSeeking) {
             // seek 时 seekbar 会自动更新位置，只需要根据 seek 位置更新时间
             String currentPosition = DateTimeUtil.changeRemainTimeToHms(mPlaySeekBar.getProgress());
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);

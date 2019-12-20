@@ -39,6 +39,7 @@ private:
 
     char *dataSource = NULL;
     AVFormatContext *pFormatCtx = NULL;
+    AVPacket *avPacket = NULL;
     WeAudio *weAudio = NULL;
     double duration = 0;// Duration of the stream in seconds
 
@@ -181,6 +182,8 @@ private:
      * 真正解封装的函数
      */
     void demux();
+
+    void releaseAvPacket();
 
     void destroyDemuxThread();
 

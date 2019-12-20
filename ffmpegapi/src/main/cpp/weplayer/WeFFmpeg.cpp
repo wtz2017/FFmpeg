@@ -183,6 +183,7 @@ void WeFFmpeg::prepareAsync() {
             if (duration < 0) {
                 duration = 0;
             }
+            weAudio->duration = duration;
             break;
         }
     }
@@ -338,13 +339,8 @@ void WeFFmpeg::demux() {
     // 本线程开始读 AVPacket 包并缓存入队
     int packetCount = 0;
     int readRet = -1;
-    AVPacket *avPacket = NULL;
     while (status != NULL && !status->isStoped() && !status->isError() && !status->isReleased()) {
-        if (status->isSeeking) {
-            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
-            continue;
-        }
-        if (weAudio->queue->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
+        if (status->isSeeking || weAudio->queue->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
@@ -369,10 +365,7 @@ void WeFFmpeg::demux() {
                 weAudio->queue->putAVpacket(avPacket);
             } else {
                 // 不是音频就释放内存
-                av_packet_free(&avPacket);
-//                av_free(avPacket);
-                av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
-                avPacket = NULL;
+                releaseAvPacket();
             }
         } else {
             if (readRet == AVERROR_EOF) {
@@ -385,49 +378,57 @@ void WeFFmpeg::demux() {
             }
             weAudio->queue->setProductDataComplete(true);
 
-            // 减少 avPacket 对 packet 数据的引用计数
-            av_packet_free(&avPacket);
-            // 释放 avPacket 结构体本身
-//            av_free(avPacket);
-            av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
-            avPacket = NULL;
+            releaseAvPacket();
 
-            // 等待队列数据取完后退出，否则造成播放不完整
+            // 等待播放完成后退出，否则造成播放不完整
             while (status != NULL && !status->isStoped() && !status->isError() &&
                    !status->isReleased()) {
-                if (weAudio->queue->getQueueSize() > 0) {// 还没有播放完成
+                if (!weAudio->queue->isProductDataComplete()) {
+                    // 等待播放完成过程中 seek 了
+                    LOGW(LOG_TAG, "Break to seek point while waiting play complete");
+                    weAudio->resumePlay();// 可能播放器已经因取不到数据停止播放，需要重启播放
+                    break;// 跳出本循环，回到大循环继续读数据
+                }
+
+                if (!weAudio->isPlayComplete()) {// 还没有播放完成
                     av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
                     continue;
                 }
 
-                // 到这里说明队列已经没有数据了，原因有两个：1.播放完成；2. seek 主动清空了数据
-                if (!weAudio->queue->isProductDataComplete()) {
-                    // seek 主动清空了数据
-                    break;// 跳出本循环，回到大循环继续读数据
-                } else {
-                    // 播放完成
-                    av_usleep(200 * 1000);// 再睡眠一定时间等待真正播放完成，解决上层依据状态更新时间时不能更新最后一秒的问题
-                    pthread_mutex_lock(&status->mutex);
-                    if (status == NULL || !status->isPlaying()) {
-                        // 只有“播放中”状态才可以切换到“播放完成”状态
-                        pthread_mutex_unlock(&status->mutex);
-                        demuxFinished = true;
-                        return;// 结束 demux 线程
-                    }
-                    status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
-
-                    // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-                    javaListenerContainer->onCompletionListener->callback(0);
-
+                LOGW(LOG_TAG, "Go to call java play complete");
+                // 真正播放完成
+                pthread_mutex_lock(&status->mutex);
+                if (status == NULL || !status->isPlaying()) {
+                    // 只有“播放中”状态才可以切换到“播放完成”状态
                     pthread_mutex_unlock(&status->mutex);
                     demuxFinished = true;
-                    return;// 结束 demux 线程
+                    return;// 结束 demux 工作
                 }
-            } // 读完等待循环
+                status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
+
+                // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+                javaListenerContainer->onCompletionListener->callback(0);
+
+                pthread_mutex_unlock(&status->mutex);
+                demuxFinished = true;
+                return;// 结束 demux 工作
+            } // 读完等待播放完成循环
         } // 读完分支
     } // 读包大循环
     weAudio->queue->setProductDataComplete(true);// 提前中断解包
     demuxFinished = true;// 提前中断退出
+}
+
+void WeFFmpeg::releaseAvPacket() {
+    if (avPacket == NULL) {
+        return;
+    }
+    // 减少 avPacket 对 packet 数据的引用计数
+    av_packet_free(&avPacket);
+    // 释放 avPacket 结构体本身
+    // av_free(avPacket);
+    av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
+    avPacket = NULL;
 }
 
 void WeFFmpeg::pause() {
@@ -466,7 +467,7 @@ void WeFFmpeg::seekTo(int msec) {
         LOGE(LOG_TAG, "Can't seek because duration <= 0");
         return;
     }
-    int targetSeconds = roundf(((float) msec) / 1000);
+    double targetSeconds = round(((double) msec) / 1000);
     if (targetSeconds < 0) {
         targetSeconds = 0;
     } else if (targetSeconds > duration) {
@@ -483,6 +484,7 @@ void WeFFmpeg::seekTo(int msec) {
     // reset
     weAudio->queue->setProductDataComplete(false);// 通知解包者和播放者还有数据，尤其对于解包线已经解完进入等待状态有用
     weAudio->queue->clearQueue();
+    weAudio->flushCodecBuffers();
     weAudio->setSeekTime(targetSeconds);
 
     long long seekStart, seekEnd;
@@ -600,11 +602,7 @@ int WeFFmpeg::getCurrentPosition() {
         // 不涉及到控制，不设置错误状态
         return 0;
     }
-    int ret = weAudio->getPlayTimeSecs() * 1000;
-    if (LOG_REPEAT_DEBUG) {
-        LOGD(LOG_TAG, "getCurrentPosition: %d", ret);
-    }
-    return ret;
+    return weAudio->getPlayTimeSecs() * 1000;
 }
 
 int WeFFmpeg::getAudioSampleRate() {

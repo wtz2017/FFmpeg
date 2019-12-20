@@ -33,6 +33,7 @@ private:
 
     AVPacket *avPacket = NULL;
     AVFrame *avFrame = NULL;
+    bool readAllPacketComplete = true;// 是否读完了所有 AVPacket
     bool readAllFramesComplete = true;// 是否读完了一个 AVPacket 里的所有 AVFrame
 
     uint8_t *sampleBuffer = NULL;
@@ -62,12 +63,15 @@ private:
     // 播放器只针对取数据单独用一个线程，其它播放控制走调度线程
     LooperThread *audioConsumerThread = NULL;
 
+    pthread_mutex_t decodeMutex;
+
 public:
     const char *LOG_TAG = "WeAudio";
 
     static const int AUDIO_CONSUMER_START_PLAY = 1;
     static const int AUDIO_CONSUMER_RESUME_PLAY = 2;
 
+    double duration = 0;// Duration of the stream in seconds
     AudioStream *audioStream = NULL;
     AVPacketQueue *queue = NULL;
 
@@ -96,7 +100,15 @@ public:
 
     void _handleResumePlay();
 
+    /**
+     * Reset the internal decoder state / flush internal buffers. Should be called
+     * e.g. when seeking or when switching to a different stream.
+     */
+    void flushCodecBuffers();
+
     void stopPlay();
+
+    bool isPlayComplete();
 
     /**
      * @param record true:录制 PCM
@@ -120,7 +132,7 @@ public:
      * 设置 seek 时间
      * @param secs 目标位置秒数
      */
-    void setSeekTime(int secs);
+    void setSeekTime(double secs);
 
     /**
      * 设置音量

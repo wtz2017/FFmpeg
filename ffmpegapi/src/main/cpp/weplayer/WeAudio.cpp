@@ -9,6 +9,7 @@ WeAudio::WeAudio(PlayStatus *status, JavaListenerContainer *javaListenerContaine
     this->javaListenerContainer = javaListenerContainer;
 
     this->queue = new AVPacketQueue(status);
+    pthread_mutex_init(&decodeMutex, NULL);
 }
 
 WeAudio::~WeAudio() {
@@ -224,6 +225,12 @@ int WeAudio::getPcmData(void **buf) {
         break;
     }
 
+    // 这里加一条判断 loading 是为了补充非播放状态时退出 while 循环的场景
+    if (status->isPlayLoading) {
+        status->isPlayLoading = false;
+        javaListenerContainer->onPlayLoadingListener->callback(1, false);
+    }
+
     if (ret < 0) {
         ret = 0;
     }
@@ -237,6 +244,11 @@ int WeAudio::getPcmData(void **buf) {
     return ret;
 }
 
+bool WeAudio::isPlayComplete() {
+    return readAllPacketComplete && readAllFramesComplete &&
+           (openSlPlayer == NULL || openSlPlayer->enqueueFinished);
+}
+
 /**
  * 从队列中取 AVPacket
  *
@@ -247,8 +259,11 @@ int WeAudio::getPacket() {
         // 队列中无数据
         if (queue->isProductDataComplete()) {
             // 已经播放到末尾
+            readAllPacketComplete = true;
+            LOGW(LOG_TAG, "Get all packet complete from queue");
             return -2;
         }
+        readAllPacketComplete = false;
 
         // 队列中无数据且生产数据未完成，表示正在加载中
         if (!status->isPlayLoading) {
@@ -257,6 +272,7 @@ int WeAudio::getPacket() {
         }
         return -1;
     }
+    readAllPacketComplete = false;
 
     // 队列中有数据
     if (status->isPlayLoading) {
@@ -276,12 +292,29 @@ int WeAudio::getPacket() {
 }
 
 /**
+ * Reset the internal decoder state / flush internal buffers. Should be called
+ * e.g. when seeking or when switching to a different stream.
+ */
+void WeAudio::flushCodecBuffers() {
+    pthread_mutex_lock(&decodeMutex);
+    avcodec_flush_buffers(audioStream->codecContext);
+    pthread_mutex_unlock(&decodeMutex);
+}
+
+/**
  * 把 packet 发送给解码器解码
  *
  * @return true:发送解码成功
  */
 bool WeAudio::sendPacket() {
+    if (status == NULL || !status->isPlaying() || status->isSeeking) {
+        return false;
+    }
+
+    pthread_mutex_lock(&decodeMutex);
     int ret = avcodec_send_packet(audioStream->codecContext, avPacket);
+    pthread_mutex_unlock(&decodeMutex);
+
     releaseAvPacket();// 不管解码成功与否，都要先释放内存
     if (ret != 0) {
         LOGE(LOG_TAG, "avcodec_send_packet occurred exception: %d %s", ret,
@@ -298,8 +331,15 @@ bool WeAudio::sendPacket() {
  * @return true:接收成功
  */
 bool WeAudio::receiveFrame() {
+    if (status == NULL || !status->isPlaying() || status->isSeeking) {
+        return false;
+    }
+
     avFrame = av_frame_alloc();
+    pthread_mutex_lock(&decodeMutex);
     int ret = avcodec_receive_frame(audioStream->codecContext, avFrame);
+    pthread_mutex_unlock(&decodeMutex);
+
     if (ret != 0) {
         if (ret != AVERROR(EAGAIN)) {
             // 之所以屏蔽打印 EAGAIN 是因为考虑一包多帧时尝试多读一次来判断是否还有帧，避免频繁打印 EAGAIN
@@ -389,6 +429,9 @@ int WeAudio::resample(uint8_t **out) {
 }
 
 void WeAudio::updatePlayTime(int64_t pts, int sampleDataBytes) {
+    if (duration <= 0) {
+        return;
+    }
     currentFrameTime = pts * av_q2d(audioStream->streamTimeBase);
     if (currentFrameTime < playTimeSecs) {
         // avFrame->pts maybe 0
@@ -397,6 +440,10 @@ void WeAudio::updatePlayTime(int64_t pts, int sampleDataBytes) {
     // 实际播放时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
     playTimeSecs =
             currentFrameTime + (sampleDataBytes / (double) audioStream->sampledSizePerSecond);
+    if (playTimeSecs > duration) {
+        // 测试发现 ape 音频文件 seek 到末尾后再播放时计算会大于总时长 1s 左右
+        playTimeSecs = duration;
+    }
 }
 
 void WeAudio::initSoundTouch() {
@@ -585,6 +632,7 @@ void WeAudio::clearDataAfterStop() {
 
     currentFrameTime = 0;
     playTimeSecs = 0;
+    duration = 0;
 }
 
 void WeAudio::releaseStream() {
@@ -598,7 +646,10 @@ double WeAudio::getPlayTimeSecs() {
     return playTimeSecs;
 }
 
-void WeAudio::setSeekTime(int secs) {
+void WeAudio::setSeekTime(double secs) {
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "setSeekTime %lf", secs);
+    }
     currentFrameTime = secs;
     playTimeSecs = secs;
 }
@@ -685,6 +736,8 @@ void WeAudio::release() {
 
     releaseAvPacket();
     releaseAvFrame();
+
+    pthread_mutex_destroy(&decodeMutex);
 
     // 最顶层 WeFFmpeg 负责回收 javaListenerContainer，这里只把本指针置空
     javaListenerContainer = NULL;
