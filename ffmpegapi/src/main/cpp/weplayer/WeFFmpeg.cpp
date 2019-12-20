@@ -337,7 +337,6 @@ void WeFFmpeg::demux() {
         LOGD(LOG_TAG, "Start read AVPacket...");
     }
     // 本线程开始读 AVPacket 包并缓存入队
-    int packetCount = 0;
     int readRet = -1;
     while (status != NULL && !status->isStoped() && !status->isError() && !status->isReleased()) {
         if (status->isSeeking || weAudio->queue->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
@@ -356,12 +355,7 @@ void WeFFmpeg::demux() {
         if (readRet == 0) {
             // 读包成功
             if (avPacket->stream_index == weAudio->audioStream->streamIndex) {
-                // 当前包为音频包
-                if (LOG_REPEAT_DEBUG) {
-                    packetCount++;
-                    LOGD(LOG_TAG, "Read Audio packet, current count is %d", packetCount);
-                }
-                // 缓存音频包到队列
+                // 当前包为音频包，缓存音频包到队列
                 weAudio->queue->putAVpacket(avPacket);
             } else {
                 // 不是音频就释放内存
@@ -376,47 +370,61 @@ void WeFFmpeg::demux() {
                 LOGE(LOG_TAG, "AVPacket read failed! AVERROR=%d %s", readRet,
                      WeUtils::getAVErrorName(readRet));
             }
-            weAudio->queue->setProductDataComplete(true);
 
+            weAudio->queue->setProductDataComplete(true);
             releaseAvPacket();
 
             // 等待播放完成后退出，否则造成播放不完整
-            while (status != NULL && !status->isStoped() && !status->isError() &&
-                   !status->isReleased()) {
-                if (!weAudio->queue->isProductDataComplete()) {
-                    // 等待播放完成过程中 seek 了
-                    LOGW(LOG_TAG, "Break to seek point while waiting play complete");
-                    weAudio->resumePlay();// 可能播放器已经因取不到数据停止播放，需要重启播放
-                    break;// 跳出本循环，回到大循环继续读数据
-                }
-
-                if (!weAudio->isPlayComplete()) {// 还没有播放完成
-                    av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
-                    continue;
-                }
-
-                LOGW(LOG_TAG, "Go to call java play complete");
-                // 真正播放完成
-                pthread_mutex_lock(&status->mutex);
-                if (status == NULL || !status->isPlaying()) {
-                    // 只有“播放中”状态才可以切换到“播放完成”状态
-                    pthread_mutex_unlock(&status->mutex);
-                    demuxFinished = true;
-                    return;// 结束 demux 工作
-                }
-                status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
-
-                // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-                javaListenerContainer->onCompletionListener->callback(0);
-
-                pthread_mutex_unlock(&status->mutex);
+            int ret = waitPlayComplete();
+            if (ret == 0 || ret == -2) {
+                // 真正播放完成，或因停止或释放提前退出
                 demuxFinished = true;
                 return;// 结束 demux 工作
-            } // 读完等待播放完成循环
+            } else if (ret == -1) {
+                LOGW(LOG_TAG, "Break to seek point while waiting play complete");
+                weAudio->resumePlay();// 可能播放器已经因取不到数据停止播放，需要重启播放
+                continue;// 回到读包大循环继续读数据
+            }
         } // 读完分支
     } // 读包大循环
     weAudio->queue->setProductDataComplete(true);// 提前中断解包
     demuxFinished = true;// 提前中断退出
+}
+
+/**
+ * 在解封装完成或失败后，等待播放器播放完成处理工作
+ *
+ * @return 0：真正播放完成；-1：等待播放完成过程中 seek 了，需要重新解封装；-2：因停止或释放提前退出；
+ */
+int WeFFmpeg::waitPlayComplete() {
+    while (status != NULL && !status->isStoped() && !status->isError() && !status->isReleased()) {
+        if (!weAudio->queue->isProductDataComplete()) {
+            // 等待播放完成过程中 seek 了
+            return -1;
+        }
+
+        if (!weAudio->isPlayComplete()) {// 还没有播放完成
+            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
+            continue;
+        }
+
+        LOGW(LOG_TAG, "Go to call java play complete");
+        // 真正播放完成
+        pthread_mutex_lock(&status->mutex);
+        if (status == NULL || !status->isPlaying()) {
+            // 只有“播放中”状态才可以切换到“播放完成”状态
+            pthread_mutex_unlock(&status->mutex);
+            return 0;
+        }
+        status->setStatus(PlayStatus::COMPLETED, LOG_TAG);
+
+        // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+        javaListenerContainer->onCompletionListener->callback(0);
+
+        pthread_mutex_unlock(&status->mutex);
+        return 0;
+    }
+    return -2;
 }
 
 void WeFFmpeg::releaseAvPacket() {

@@ -183,6 +183,13 @@ private:
      */
     void demux();
 
+    /**
+     * 在解封装完成或失败后，等待播放器播放完成处理工作
+     *
+     * @return 0：真正播放完成；-1：等待播放完成过程中 seek 了，需要重新解封装；-2：因停止或释放提前退出；
+     */
+    int waitPlayComplete();
+
     void releaseAvPacket();
 
     void destroyDemuxThread();
