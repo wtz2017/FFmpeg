@@ -21,6 +21,7 @@ public:
     AVCodecParameters *codecParams = NULL;
     AVCodecContext *codecContext = NULL;
     AVRational streamTimeBase;
+    double duration = 0;// Duration of the stream in seconds
 
     int sampledSizePerSecond;// 1 秒的采样字节数
     int sampleRate;// 采样率（Hz）与原数据保持一致，从外部传参
@@ -30,7 +31,7 @@ public:
     int bytesPerSample;// 由采样格式计算得出每个声道每次采样字节数
 
 public:
-    AudioStream(int streamIndex, AVCodecParameters *codecParams, AVRational streamTimeBase);
+    AudioStream(int streamIndex, AVCodecParameters *codecParams, AVRational streamTimeBase, double duration);
 
     ~AudioStream();
 

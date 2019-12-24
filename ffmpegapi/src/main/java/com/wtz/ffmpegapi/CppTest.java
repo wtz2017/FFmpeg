@@ -1,9 +1,9 @@
 package com.wtz.ffmpegapi;
 
-public class CppThreadDemo {
+public class CppTest {
 
     static {
-        System.loadLibrary("thread_demo");
+        System.loadLibrary("cpp_test");
     }
 
     public native String stringFromJNI();
@@ -15,6 +15,12 @@ public class CppThreadDemo {
     public native void startProduceConsumeThread();
 
     public native void stopProduceConsumeThread();
+
+    public native void callbackFromC();
+
+    public native void setByteArray(byte[] data);
+
+    public native byte[] getByteArray();
 
     public native void playPCM(String path);
 
@@ -36,11 +42,5 @@ public class CppThreadDemo {
             onResultListener.onResult(code, msg);
         }
     }
-
-    public native void callbackFromC();
-
-    public native void setByteArray(byte[] data);
-
-    public native byte[] getByteArray();
 
 }

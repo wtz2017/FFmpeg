@@ -610,7 +610,7 @@ public class WePlayer {
         }
     }
 
-    public void startRecord(PCMRecorder.RecordType type, File saveFile) {
+    public void startRecord(PCMRecorder.Encoder encoder, File saveFile) {
         LogUtils.d(TAG, "PCM startRecord...");
         if (!isPrepared) {
             LogUtils.e(TAG, "startRecord but audio is not prepared");
@@ -636,7 +636,7 @@ public class WePlayer {
         if (mPCMRecorder == null) {
             mPCMRecorder = new PCMRecorder();
         }
-        mPCMRecorder.start(type, sampleRate, channelNums, bitsPerSample, maxBytesPerCallback, saveFile,
+        mPCMRecorder.start(encoder, sampleRate, channelNums, bitsPerSample, maxBytesPerCallback, saveFile,
                 new PCMRecorder.OnStartResultListener() {
                     @Override
                     public void onResult(boolean success) {

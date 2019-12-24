@@ -4,8 +4,9 @@
 
 #include "OpenSLPlayer.h"
 
-OpenSLPlayer::OpenSLPlayer(PcmGenerator *pcmGenerator) {
+OpenSLPlayer::OpenSLPlayer(PcmGenerator *pcmGenerator, int64_t ffmpegChannelLayout) {
     this->pcmGenerator = pcmGenerator;
+    this->channelMask = ffmpegToOpenSLChannelLayout(ffmpegChannelLayout);
 }
 
 OpenSLPlayer::~OpenSLPlayer() {
@@ -233,10 +234,10 @@ int OpenSLPlayer::createBufferQueueAudioPlayer() {
     SLDataFormat_PCM pcmFormat = {
             SL_DATAFORMAT_PCM,// 数据格式：pcm
             pcmGenerator->getChannelNums(),// 声道数
-            pcmGenerator->getOpenSLSampleRate(),// 采样率
+            convertToOpenSLSampleRate(pcmGenerator->getSampleRate()),// 采样率
             pcmGenerator->getBitsPerSample(),// bitsPerSample
             pcmGenerator->getBitsPerSample(),// containerSize：和采样位数一致就行
-            pcmGenerator->getOpenSLChannelLayout(),// 声道布局
+            channelMask,// 声道布局
             SL_BYTEORDER_LITTLEENDIAN// 字节排列顺序：小端 little-endian，将低序字节存储在起始地址
     };
     SLDataSource audioSrc = {&bufferQueueLocator, &pcmFormat};

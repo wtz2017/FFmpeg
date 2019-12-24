@@ -14,7 +14,7 @@ extern "C"
 #include <SLES/OpenSLES_Android.h>
 }
 
-#define LOG_TAG "ThreadDemo"
+#define LOG_TAG "CppTestJni"
 
 JavaVM *jvm;
 
@@ -62,7 +62,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_stringFromJNI(JNIEnv *env, jobject thiz) {
+Java_com_wtz_ffmpegapi_CppTest_stringFromJNI(JNIEnv *env, jobject thiz) {
 //    std::string hello = "Welcome to FFmpeg!欢迎您！";
     char *hello2 = "Welcome to FFmpeg!欢迎您！";
 //    return env->NewStringUTF(hello.c_str());
@@ -71,7 +71,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_stringFromJNI(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_stringToJNI(JNIEnv *env, jobject thiz, jstring jstr) {
+Java_com_wtz_ffmpegapi_CppTest_stringToJNI(JNIEnv *env, jobject thiz, jstring jstr) {
     const char *chars = env->GetStringUTFChars(jstr, NULL);
     LOGI(LOG_TAG, "stringToJNI GetStringUTFChars content: %s", chars);
     env->ReleaseStringUTFChars(jstr, chars);
@@ -103,7 +103,7 @@ void *simpleThreadCallback(void *data) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_testSimpleThread(JNIEnv *env, jobject thiz) {
+Java_com_wtz_ffmpegapi_CppTest_testSimpleThread(JNIEnv *env, jobject thiz) {
     LOGI(LOG_TAG, "Call testSimpleThread from java!(pid=%d tid=%d)", getpid(), gettid());
     pthread_create(&simpleThread, NULL, simpleThreadCallback, NULL);
 }
@@ -148,7 +148,7 @@ void *consumerCallback(void *data) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_startProduceConsumeThread(JNIEnv *env, jobject thiz) {
+Java_com_wtz_ffmpegapi_CppTest_startProduceConsumeThread(JNIEnv *env, jobject thiz) {
     LOGI(LOG_TAG, "Call startProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
     stopProduce = false;
 
@@ -170,7 +170,7 @@ void clearQueue(std::queue<int> &queue) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_stopProduceConsumeThread(JNIEnv *env, jobject thiz) {
+Java_com_wtz_ffmpegapi_CppTest_stopProduceConsumeThread(JNIEnv *env, jobject thiz) {
     LOGI(LOG_TAG, "Call stopProduceConsumeThread from java!(pid=%d tid=%d)", getpid(), gettid());
     stopProduce = true;
 
@@ -190,7 +190,7 @@ void *callJavaThreadCallback(void *data) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_callbackFromC(JNIEnv *env, jobject thiz) {
+Java_com_wtz_ffmpegapi_CppTest_callbackFromC(JNIEnv *env, jobject thiz) {
     // JavaListener 构造方法需要在 C++ 主线程中调用，即直接从 java 层调用下来的线程
     JavaListener *javaListener = new OnResultListener(jvm, env, thiz);
 
@@ -201,7 +201,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_callbackFromC(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_setByteArray(JNIEnv *env, jobject thiz, jbyteArray jarray) {
+Java_com_wtz_ffmpegapi_CppTest_setByteArray(JNIEnv *env, jobject thiz, jbyteArray jarray) {
     // 1. 获取 java 数组长度
     int arrayLen = env->GetArrayLength(jarray);
 
@@ -246,7 +246,7 @@ Java_com_wtz_ffmpegapi_CppThreadDemo_setByteArray(JNIEnv *env, jobject thiz, jby
 
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_getByteArray(JNIEnv *env, jobject thiz) {
+Java_com_wtz_ffmpegapi_CppTest_getByteArray(JNIEnv *env, jobject thiz) {
     int arrayLen = 10;
 
 //    jbyte *pbuf = (jbyte *) malloc(sizeof(jbyte) * arrayLen);
@@ -520,7 +520,7 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
 // https://github.com/android/ndk-samples/blob/master/native-audio/app/src/main/cpp/native-audio-jni.c
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_CppThreadDemo_playPCM(JNIEnv *env, jobject thiz, jstring jpath) {
+Java_com_wtz_ffmpegapi_CppTest_playPCM(JNIEnv *env, jobject thiz, jstring jpath) {
     // 读取 pcm 文件
     const char *path = env->GetStringUTFChars(jpath, 0);
     pcmFile = fopen(path, "r");

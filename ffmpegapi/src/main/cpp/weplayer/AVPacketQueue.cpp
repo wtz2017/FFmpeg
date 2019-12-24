@@ -4,17 +4,21 @@
 
 #include "AVPacketQueue.h"
 
-AVPacketQueue::AVPacketQueue(PlayStatus *status) {
-    this->status = status;
+AVPacketQueue::AVPacketQueue() {
+    allowOperation = true;
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&condition, NULL);
 }
 
 AVPacketQueue::~AVPacketQueue() {
+    allowOperation = false;
     releaseQueue();
     pthread_cond_destroy(&condition);
     pthread_mutex_destroy(&mutex);
-    status = NULL;// 最顶层 WeFFmpeg 负责回收 status，这里只把本指针置空
+}
+
+void AVPacketQueue::setAllowOperation(bool allow) {
+    this->allowOperation = allow;
 }
 
 void AVPacketQueue::setProductDataComplete(bool complete) {
@@ -56,7 +60,7 @@ bool AVPacketQueue::getAVpacket(AVPacket *packet) {
     pthread_mutex_lock(&mutex);
 
     // 循环是为了在队列为空导致阻塞等待后被唤醒时继续取下一个
-    while (status != NULL && status->isPlaying()) {
+    while (allowOperation) {
         if (queue.size() > 0) {
             // 获取队首 AVPacket
             AVPacket *avPacket = queue.front();

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">FFmpeg</string>
+    <string name="title_activity_base_test">BaseTestActivity</string>
 </resources>

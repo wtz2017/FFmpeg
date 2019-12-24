@@ -6,12 +6,6 @@
 #define FFMPEG_PCMGENERATOR_H
 
 
-extern "C"
-{
-#include <SLES/OpenSLES.h>
-#include <SLES/OpenSLES_Android.h>
-}
-
 class PcmGenerator {
 
 public:
@@ -33,19 +27,14 @@ public:
     virtual int getChannelNums() = 0;
 
     /**
-     * @return OpenSL ES 定义的采样率
+     * @return 采样率
      */
-    virtual SLuint32 getOpenSLSampleRate() = 0;
+    virtual int getSampleRate() = 0;
 
     /**
      * @return 每个声道每次采样比特位数
      */
     virtual int getBitsPerSample() = 0;
-
-    /**
-     * @return OpenSL ES 定义的声道布局
-     */
-    virtual SLuint32 getOpenSLChannelLayout() = 0;
 
 };
 

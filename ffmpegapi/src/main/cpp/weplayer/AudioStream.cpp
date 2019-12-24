@@ -5,10 +5,11 @@
 #include "AudioStream.h"
 
 AudioStream::AudioStream(int streamIndex, AVCodecParameters *codecParams,
-                         AVRational streamTimeBase) {
+                         AVRational streamTimeBase, double duration) {
     this->streamIndex = streamIndex;
     this->codecParams = codecParams;
     this->streamTimeBase = streamTimeBase;
+    this->duration = duration;
 
     // 初始化采样参数
     this->sampleRate = codecParams->sample_rate;

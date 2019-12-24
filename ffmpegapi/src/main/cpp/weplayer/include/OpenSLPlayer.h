@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "AndroidLog.h"
 #include "PcmGenerator.h"
+#include "AudioStream.h"
 #include "WeError.h"
 
 extern "C"
@@ -51,6 +52,7 @@ class OpenSLPlayer {
 public:
     // PCM 数据生成器
     PcmGenerator *pcmGenerator;
+    SLuint32 channelMask;
 
     // 播放数据入队 buffer
     void *enqueueBuffer = NULL;
@@ -94,7 +96,7 @@ private:
 
 
 public:
-    OpenSLPlayer(PcmGenerator *pcmGenerator);
+    OpenSLPlayer(PcmGenerator *pcmGenerator, int64_t ffmpegChannelLayout);
 
     ~OpenSLPlayer();
 

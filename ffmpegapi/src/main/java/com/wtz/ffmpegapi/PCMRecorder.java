@@ -11,23 +11,12 @@ import java.io.File;
 
 public class PCMRecorder {
 
-    public enum RecordType {
-        WAV, AAC
-    }
-
-    public interface OnStartResultListener {
-        /**
-         * @param success true:启动成功
-         */
-        void onResult(boolean success);
-    }
-
     /**
      * Encode pcm data to another mime type data
      */
     public interface Encoder {
         /**
-         * 开始准备录制，不可以耗时阻塞
+         * 对 PCM 编码前的准备工作，不可以耗时阻塞
          *
          * @param sampleRate          采样率
          * @param channelNums         通道个数
@@ -52,8 +41,15 @@ public class PCMRecorder {
         void stop();
     }
 
+    public interface OnStartResultListener {
+        /**
+         * @param success true:启动成功
+         */
+        void onResult(boolean success);
+    }
+
     static class StartParams {
-        public RecordType type;
+        public Encoder encoder;
         public int sampleRate;
         public int channelNums;
         public int bitsPerSample;
@@ -118,7 +114,7 @@ public class PCMRecorder {
         };
     }
 
-    public void start(RecordType type, int sampleRate, int channelNums, int bitsPerSample, int maxBytesPerCallback, File saveFile,
+    public void start(Encoder encoder, int sampleRate, int channelNums, int bitsPerSample, int maxBytesPerCallback, File saveFile,
                       OnStartResultListener listener) {
         if (isReleased) {
             LogUtils.e(TAG, "Call start but is already released");
@@ -127,7 +123,7 @@ public class PCMRecorder {
         }
 
         StartParams startParams = new StartParams();
-        startParams.type = type;
+        startParams.encoder = encoder;
         startParams.sampleRate = sampleRate;
         startParams.channelNums = channelNums;
         startParams.bitsPerSample = bitsPerSample;
@@ -150,18 +146,18 @@ public class PCMRecorder {
             return;
         }
 
+        if (startParams.encoder == null) {
+            LogUtils.e(TAG, "handleStart but encoder is null");
+            if (startParams.listener != null) {
+                startParams.listener.onResult(false);
+            }
+            return;
+        }
+
         mRecordState = RECORD_STARTING;
+        mEncoder = startParams.encoder;
         mRecordTimeSecs = 0;
         mSampledSizePerSecond = startParams.channelNums * startParams.sampleRate * startParams.bitsPerSample / 8;
-        switch (startParams.type) {
-            case WAV:
-                mEncoder = new WAVSaver();
-                break;
-            case AAC:
-            default:
-                mEncoder = new AACEncoder();
-                break;
-        }
         if (!mEncoder.start(startParams.sampleRate, startParams.channelNums,
                 startParams.bitsPerSample, startParams.maxBytesPerCallback, startParams.saveFile)) {
             mEncoder.stop();

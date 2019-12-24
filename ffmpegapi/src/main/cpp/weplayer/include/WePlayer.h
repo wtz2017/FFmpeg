@@ -2,22 +2,14 @@
 // Created by WTZ on 2019/11/19.
 //
 
-#ifndef FFMPEG_WEFFMPEG_H
-#define FFMPEG_WEFFMPEG_H
+#ifndef FFMPEG_WEPLAYER_H
+#define FFMPEG_WEPLAYER_H
 
-#include <pthread.h>
-#include "JavaListener.h"
-#include "AndroidLog.h"
-#include "WeUtils.h"
-
-extern "C"
-{
-#include "libavformat/avformat.h"
-#include "libavutil/time.h"
-};
-
-#include "WeAudio.h"
+#include "WeDemux.h"
+#include "WeAudioPlayer.h"
+#include "LooperThread.h"
 #include "JavaListenerContainer.h"
+#include "AndroidLog.h"
 
 /**
  * 解包：单独开启线程；
@@ -27,7 +19,7 @@ extern "C"
  * java 层的调度线程使用停止标志位加等待超时方式实现停止 decode 和 play 线程。
  * 其中 setStopFlag 不走 java 调度线程消息队列，直接执行，避免无法立即通知结束工作
  */
-class WeFFmpeg {
+class WePlayer {
 
 private:
     JavaListenerContainer *javaListenerContainer = NULL;
@@ -37,26 +29,25 @@ private:
     bool demuxFinished = true;
     bool seekToBegin = false;
 
-    char *dataSource = NULL;
-    AVFormatContext *pFormatCtx = NULL;
+    WeDemux *weDemux = NULL;
+    WeAudioPlayer *weAudioPlayer = NULL;
     AVPacket *avPacket = NULL;
-    WeAudio *weAudio = NULL;
-    double duration = 0;// Duration of the stream in seconds
 
     // 只针对解封装包数据单独用一个线程，其它走调度线程
     LooperThread *demuxThread = NULL;
-    pthread_mutex_t demuxMutex;
     static const int MSG_DEMUX_START = 1;
 
 public:
-    const char *LOG_TAG = "WeFFmpeg";
+    const char *LOG_TAG = "WePlayer";
 
     PlayStatus *status = NULL;
 
 public:
-    WeFFmpeg(JavaListenerContainer *javaListenerContainer);
+    WePlayer(JavaListenerContainer *javaListenerContainer);
 
-    ~WeFFmpeg();
+    ~WePlayer();
+
+    void _handleDemuxMessage(int msgType);
 
     void reset();
 
@@ -71,8 +62,6 @@ public:
      * 开始解包和播放
      */
     void start();
-
-    void _handleDemuxMessage(int msgType);
 
     void pause();
 
@@ -171,12 +160,12 @@ private:
      */
     void init();
 
-    void handleErrorOnPreparing(int errorCode);
-
     /**
      * 开启解封装线程
      */
     void createDemuxThread();
+
+    void handleErrorOnPreparing(int errorCode);
 
     /**
      * 真正解封装的函数
@@ -192,9 +181,7 @@ private:
 
     void releaseAvPacket();
 
-    void destroyDemuxThread();
-
 };
 
 
-#endif //FFMPEG_WEFFMPEG_H
+#endif //FFMPEG_WEPLAYER_H

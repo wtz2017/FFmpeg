@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/sample_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Hello World!" />
+
+    <Button
+        android:id="@+id/btn_simple_pthread"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="简单的 C++ 线程创建" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_start_product_consumer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="C++ 线程开始生产消费" />
+
+        <Button
+            android:id="@+id/btn_stop_product_consumer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="C++ 线程停止生产消费" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_c_thread_call_java"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="C++ 线程回调 java" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_java_set_byte_array_to_c"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="java 传递byte[] 到 C++" />
+
+        <Button
+            android:id="@+id/btn_c_set_byte_array_to_java"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="C++ 传递byte[] 到 java" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_test_opensl_es"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="测试 OpenSL ES" />
+
+</LinearLayout>

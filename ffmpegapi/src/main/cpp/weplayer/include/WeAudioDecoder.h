@@ -1,20 +1,9 @@
 //
-// Created by WTZ on 2019/11/20.
+// Created by WTZ on 2019/12/23.
 //
 
-#ifndef FFMPEG_WEAUDIO_H
-#define FFMPEG_WEAUDIO_H
-
-#include "AudioStream.h"
-#include "AVPacketQueue.h"
-#include "OpenSLPlayer.h"
-#include "OnPlayLoadingListener.h"
-#include "JavaListenerContainer.h"
-#include "WeError.h"
-#include "LooperThread.h"
-#include "SoundTouch.h"
-#include "OnPCMDataCall.h"
-#include "WeUtils.h"
+#ifndef FFMPEG_WEAUDIODECODER_H
+#define FFMPEG_WEAUDIODECODER_H
 
 extern "C"
 {
@@ -23,13 +12,21 @@ extern "C"
 #include "libavutil/time.h"
 };
 
+#include "AudioStream.h"
+#include "AVPacketQueue.h"
+#include "SoundTouch.h"
+#include "WeUtils.h"
+
 using namespace soundtouch;
 
-class WeAudio : public PcmGenerator {
+class WeAudioDecoder {
 
 private:
-    PlayStatus *status = NULL;
-    JavaListenerContainer *javaListenerContainer = NULL;
+    const char *LOG_TAG = "WeAudioDecoder";
+
+    pthread_mutex_t decodeMutex;
+
+    AVPacketQueue *queue = NULL;
 
     AVPacket *avPacket = NULL;
     AVFrame *avFrame = NULL;
@@ -37,6 +34,8 @@ private:
     bool readAllFramesComplete = true;// 是否读完了一个 AVPacket 里的所有 AVFrame
 
     uint8_t *sampleBuffer = NULL;
+    double currentFrameTime = 0;// 当前帧时间，单位：秒
+    double sampleTimeSecs = 0;// 当前采样时间，单位：秒
 
     // 1.需要在 soundtouch/include/STTypes.h 中把 “#define SOUNDTOUCH_INTEGER_SAMPLES 1 ”放开，
     // 同时注释掉 “#define SOUNDTOUCH_FLOAT_SAMPLES 1”
@@ -50,55 +49,24 @@ private:
     float pitch = NORMAL_PITCH;// 音调
     float tempo = NORMAL_TEMPO;// 音速
 
-    bool needRecordPCM = false;// 是否录制 PCM
-
-    OpenSLPlayer *openSlPlayer = NULL;
-
-    double currentFrameTime = 0;// 当前帧时间，单位：秒
-    double playTimeSecs = 0;// 当前播放时间，单位：秒
-
     double amplitudeAvg = 0;// 当前播放声音振幅平均值，即当前所有 16bit 采样值大小平均值
     double soundDecibels = 0;// 当前播放声音分贝值，单位：dB
 
-    // 播放器只针对取数据单独用一个线程，其它播放控制走调度线程
-    LooperThread *audioConsumerThread = NULL;
-
-    pthread_mutex_t decodeMutex;
-
 public:
-    const char *LOG_TAG = "WeAudio";
-
-    static const int AUDIO_CONSUMER_START_PLAY = 1;
-    static const int AUDIO_CONSUMER_RESUME_PLAY = 2;
-
-    double duration = 0;// Duration of the stream in seconds
     AudioStream *audioStream = NULL;
-    AVPacketQueue *queue = NULL;
 
 public:
-    WeAudio(PlayStatus *status, JavaListenerContainer *javaListenerContainer);
+    WeAudioDecoder(AVPacketQueue *queue);
 
-    ~WeAudio();
+    ~WeAudioDecoder();
 
-    int init();
+    void initStream(AudioStream *audioStream);
 
-    int createPlayer();
+    void releaseStream();
 
-    /**
-     * 播放器只针对取数据单独用一个线程，其它播放控制走调度线程，启动播放是取数据
-     */
-    int startPlay();
+    void start();
 
-    void _handleStartPlay();
-
-    void pause();
-
-    /**
-     * 播放器只针对取数据单独用一个线程，其它播放控制走调度线程，恢复播放是取数据
-     */
-    void resumePlay();
-
-    void _handleResumePlay();
+    void stop();
 
     /**
      * Reset the internal decoder state / flush internal buffers. Should be called
@@ -106,51 +74,34 @@ public:
      */
     void flushCodecBuffers();
 
-    void stopPlay();
+    /**
+     * 从队列中取 AVPacket 解码生成 PCM 数据
+     *
+     * @return >0：sampled bytes；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
+     * -4：发送解码失败；-5：接收解码数据帧失败；-6：重采样失败；-7：调音失败；
+     */
+    int getPcmData(void **buf);
 
-    bool isPlayComplete();
+    bool readAllDataComplete();
+
+    int getChannelNums();
+
+    int getSampleRate();
+
+    int getBitsPerSample();
+
+    int getSampledSizePerSecond();
 
     /**
-     * @param record true:录制 PCM
+     * @return 当前解码时间，单位：秒
      */
-    void setRecordPCMFlag(bool record);
-
-    void destroyPlayer();
-
-    bool workFinished();
-
-    void clearDataAfterStop();
-
-    void releaseStream();
-
-    /**
-     * @return 当前播放时间，单位：秒
-     */
-    double getPlayTimeSecs();
+    double getCurrentTimeSecs();
 
     /**
      * 设置 seek 时间
      * @param secs 目标位置秒数
      */
     void setSeekTime(double secs);
-
-    /**
-     * 设置音量
-     * @param percent 范围是：0 ~ 1.0
-     */
-    void setVolume(float percent);
-
-    float getVolume();
-
-    /**
-     * 设置声道
-     *
-     * @param channel
-     *      CHANNEL_RIGHT = 0;
-     *      CHANNEL_LEFT = 1;
-     *      CHANNEL_STEREO = 2;
-     */
-    void setSoundChannel(int channel);
 
     /**
      * 设置音调
@@ -175,23 +126,7 @@ public:
      */
     double getSoundDecibels();
 
-    int getPcmMaxBytesPerCallback();
-
-    // 以下是继承 PcmGenerator 要实现的方法
-    int getPcmData(void **buf);
-
-    int getChannelNums();
-
-    SLuint32 getOpenSLSampleRate();
-
-    int getBitsPerSample();
-
-    SLuint32 getOpenSLChannelLayout();
-
-
 private:
-    void createConsumerThread();
-
     /**
      * 从队列中取 AVPacket
      *
@@ -221,7 +156,7 @@ private:
      */
     int resample(uint8_t **out);
 
-    void updatePlayTime(int64_t pts, int sampleDataBytes);
+    void updateTime(int64_t pts, int sampleDataBytes);
 
     void initSoundTouch();
 
@@ -237,14 +172,11 @@ private:
 
     void updatePCM16bitDB(char *data, int dataBytes);
 
-    void release();
-
-    void destroyConsumerThread();
-
     void releaseAvPacket();
 
     void releaseAvFrame();
+
 };
 
 
-#endif //FFMPEG_WEAUDIO_H
+#endif //FFMPEG_WEAUDIODECODER_H

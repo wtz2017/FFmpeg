@@ -6,7 +6,6 @@
 #define FFMPEG_ONERRORLISTENER_H
 
 #include "JavaListener.h"
-#include "AndroidLog.h"
 
 class OnErrorListener : public JavaListener {
 
@@ -31,9 +30,6 @@ public:
     void reallyCallback(JNIEnv *env, jobject obj, jmethodID methodId, va_list args) {
         int code = va_arg(args, int);
         char *msg = va_arg(args, char *);
-        if (LOG_DEBUG) {
-            LOGD(LOG_TAG, "%s args=%d;%s", getMethodName(), code, msg);
-        }
 
         jstring jStrUtf = env->NewStringUTF(msg);
         env->CallVoidMethod(obj, methodId, code, jStrUtf);

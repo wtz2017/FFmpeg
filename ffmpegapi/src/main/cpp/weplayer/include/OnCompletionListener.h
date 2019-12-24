@@ -6,7 +6,6 @@
 #define FFMPEG_ONCOMPLETIONLISTENER_H
 
 #include "JavaListener.h"
-#include "AndroidLog.h"
 
 class OnCompletionListener : public JavaListener {
 
@@ -30,10 +29,6 @@ public:
     }
 
     void reallyCallback(JNIEnv *env, jobject obj, jmethodID methodId, va_list args) {
-        if (LOG_DEBUG) {
-            LOGD(LOG_TAG, "%s", getMethodName());
-        }
-
         env->CallVoidMethod(obj, methodId);
     }
 

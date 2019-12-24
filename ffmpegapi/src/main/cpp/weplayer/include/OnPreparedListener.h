@@ -6,7 +6,6 @@
 #define FFMPEG_ONPREPAREDLISTENER_H
 
 #include "JavaListener.h"
-#include "AndroidLog.h"
 
 class OnPreparedListener : public JavaListener {
 private:
@@ -30,9 +29,6 @@ public:
 
     void reallyCallback(JNIEnv *env, jobject obj, jmethodID methodId, va_list args) {
         char *msg = va_arg(args, char *);
-        if (LOG_DEBUG) {
-            LOGD(LOG_TAG, "%s args=%s", getMethodName(), msg);
-        }
 
         jstring stringUtf = env->NewStringUTF(msg);
         env->CallVoidMethod(obj, methodId, stringUtf);

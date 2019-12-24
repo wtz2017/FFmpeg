@@ -14,9 +14,11 @@ add_library(
         SHARED
 
         # Provides a relative path to your source file(s).
-        weplayer/WePlayerJNI.cpp
-        weplayer/WeFFmpeg.cpp
-        weplayer/WeAudio.cpp
+        weplayer/WeJNI.cpp
+        weplayer/WeDemux.cpp
+        weplayer/WePlayer.cpp
+        weplayer/WeAudioDecoder.cpp
+        weplayer/WeAudioPlayer.cpp
         weplayer/AudioStream.cpp
         weplayer/LooperThread.cpp
         weplayer/AVPacketQueue.cpp
@@ -39,9 +41,11 @@ add_library(
         soundtouch/PeakFinder.cpp )
 
 add_library(
-        thread_demo
+        cpp_test
+
         SHARED
-        test/ThreadDemo.cpp
+
+        test/CppTest.cpp
         weplayer/JavaListener.cpp)
 
 add_library(avcodec SHARED IMPORTED)
@@ -112,7 +116,7 @@ target_link_libraries(
         ${log-lib})
 
 target_link_libraries(
-        thread_demo
+        cpp_test
 
         OpenSLES
 

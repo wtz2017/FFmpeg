@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/tv_play_url"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_gravity="center_horizontal"
+        android:lines="2" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_open_media"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="打开媒体" />
+
+        <Button
+            android:id="@+id/btn_next_media"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="切换媒体" />
+
+        <TextView
+            android:id="@+id/tv_error_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_play_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="00:00:00/00:00:00" />
+
+    <SeekBar
+        android:id="@+id/seek_bar_play"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxWidth="150dp"
+        android:minWidth="150dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/seekbar_style"
+        android:secondaryProgress="0"
+        android:thumb="@drawable/seekbar_thumb"
+        android:thumbOffset="0dp" />
+
+    <TextView
+        android:id="@+id/tv_decibels"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="分贝" />
+
+    <TextView
+        android:id="@+id/tv_volume"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="音量" />
+
+    <SeekBar
+        android:id="@+id/seek_bar_volume"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxWidth="150dp"
+        android:minWidth="150dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/seekbar_style"
+        android:secondaryProgress="0"
+        android:thumb="@drawable/seekbar_thumb"
+        android:thumbOffset="0dp" />
+
+    <TextView
+        android:id="@+id/tv_pitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="音调" />
+
+    <SeekBar
+        android:id="@+id/seek_bar_pitch"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxWidth="150dp"
+        android:minWidth="150dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/seekbar_style"
+        android:secondaryProgress="0"
+        android:thumb="@drawable/seekbar_thumb"
+        android:thumbOffset="0dp" />
+
+    <TextView
+        android:id="@+id/tv_tempo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="音速" />
+
+    <SeekBar
+        android:id="@+id/seek_bar_tempo"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxWidth="150dp"
+        android:minWidth="150dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/seekbar_style"
+        android:secondaryProgress="0"
+        android:thumb="@drawable/seekbar_thumb"
+        android:thumbOffset="0dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_left_channel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="左声道" />
+
+        <Button
+            android:id="@+id/btn_stero"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="立体声" />
+
+        <Button
+            android:id="@+id/btn_right_channel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="右声道" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_pause_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="暂停" />
+
+        <Button
+            android:id="@+id/btn_resume_play_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="恢复" />
+
+        <Button
+            android:id="@+id/btn_stop_play_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="停止" />
+
+        <Button
+            android:id="@+id/btn_destroy_audio_player"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="销毁" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:text="录制类型：" />
+
+        <RadioGroup
+            android:id="@+id/rg_record_type"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rb_wav"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WAV" />
+
+            <RadioButton
+                android:id="@+id/rb_aac"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="AAC" />
+
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="10dp"
+            android:text="录制时间：" />
+
+        <TextView
+            android:id="@+id/tv_record_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00:00" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_start_record_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="开始录音" />
+
+        <Button
+            android:id="@+id/btn_pause_record_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="暂停录音" />
+
+        <Button
+            android:id="@+id/btn_resume_record_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="恢复录音" />
+
+        <Button
+            android:id="@+id/btn_stop_record_audio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="停止录音" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -20,7 +20,7 @@ class AVPacketQueue {
 private:
     const char *LOG_TAG = "AVPacketQueue";
 
-    PlayStatus *status = NULL;
+    bool allowOperation = true;
     bool productDataComplete = false;
 
     std::queue<AVPacket *> queue;
@@ -31,9 +31,16 @@ public:
     static const int MAX_CACHE_NUM = 40;
 
 public:
-    AVPacketQueue(PlayStatus *status);
+    AVPacketQueue();
 
     ~AVPacketQueue();
+
+    /**
+     * 是否允许操作队列
+     *
+     * @param allow
+     */
+    void setAllowOperation(bool allow);
 
     /**
      * 生产者线程通知是否还有数据可以入队，防止最后消费者线程一直阻塞等待

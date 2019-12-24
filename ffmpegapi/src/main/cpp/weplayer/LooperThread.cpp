@@ -52,9 +52,6 @@ void LooperThread::loop() {
                 LOGD(LOG_TAG, "%s loop waiting...", threadName);
             }
             pthread_cond_wait(&condition, &mutex);
-            if (LOG_DEBUG) {
-                LOGD(LOG_TAG, "%s loop wait finish!", threadName);
-            }
             if (exit) {
                 LOGW(LOG_TAG, "%s exit after loop wait finish!", threadName);
                 pthread_mutex_unlock(&mutex);
@@ -67,9 +64,6 @@ void LooperThread::loop() {
         queue.pop();
         pthread_mutex_unlock(&mutex);
 
-        if (LOG_DEBUG) {
-            LOGD(LOG_TAG, "%s call messageHanler: msgType=%d", threadName, msgType);
-        }
         messageHanler(msgType, context);
     }
     threadTerminated = true;

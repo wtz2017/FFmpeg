@@ -7,7 +7,6 @@
 
 
 #include "JavaListener.h"
-#include "AndroidLog.h"
 
 class OnPlayLoadingListener : public JavaListener {
 
@@ -32,9 +31,6 @@ public:
 
     void reallyCallback(JNIEnv *env, jobject obj, jmethodID methodId, va_list args) {
         bool isLoading = va_arg(args, bool);
-        if (LOG_DEBUG) {
-            LOGD(LOG_TAG, "%s args=%d", getMethodName(), isLoading);
-        }
 
         env->CallVoidMethod(obj, methodId, isLoading);
     }
