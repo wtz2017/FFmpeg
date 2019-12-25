@@ -27,6 +27,10 @@ add_library(
         weplayer/JavaListener.cpp
         weplayer/WeUtils.cpp
 
+        weplayer/WeEditor.cpp
+        weplayer/WeAudioEditor.cpp
+        weplayer/EditStatus.cpp
+
         soundtouch/AAFilter.cpp
         soundtouch/FIFOSampleBuffer.cpp
         soundtouch/FIRFilter.cpp

@@ -18,6 +18,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         findViewById(R.id.btn_base_test).setOnClickListener(this);
         findViewById(R.id.btn_audio_play).setOnClickListener(this);
+        findViewById(R.id.btn_audio_edit).setOnClickListener(this);
     }
 
     @Override
@@ -34,6 +35,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.btn_audio_play:
                 startActivity(new Intent(MainActivity.this, AudioPlayActivity.class));
+                break;
+            case R.id.btn_audio_edit:
+                startActivity(new Intent(MainActivity.this, AudioEditorActivity.class));
                 break;
         }
     }

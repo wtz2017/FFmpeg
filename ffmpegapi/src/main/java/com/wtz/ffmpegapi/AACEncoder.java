@@ -78,10 +78,10 @@ public class AACEncoder implements PCMRecorder.Encoder {
             return;
         }
 
-        // 获取输入 buffer，不超时等待
-        int inputBufferIndex = mEncoder.dequeueInputBuffer(0);
+        // 获取输入 buffer，超时等待 100ms
+        int inputBufferIndex = mEncoder.dequeueInputBuffer(100 * 1000);
         if (inputBufferIndex < 0) {
-            LogUtils.e(TAG, "mEncoder.dequeueInputBuffer failed");
+            LogUtils.e(TAG, "dequeueInputBuffer failed inputBufferIndex=" + inputBufferIndex);
             return;
         }
 
@@ -93,8 +93,14 @@ public class AACEncoder implements PCMRecorder.Encoder {
         mEncoder.queueInputBuffer(
                 inputBufferIndex, 0, size, 0, 0);
 
-        // 获取输出 buffer，不超时等待
-        int ouputBufferIndex = mEncoder.dequeueOutputBuffer(mBufferInfo, 0);
+        // 获取输出 buffer，超时等待 100ms
+        int ouputBufferIndex = mEncoder.dequeueOutputBuffer(mBufferInfo, 100 * 1000);
+        if (ouputBufferIndex < 0) {
+            LogUtils.w(TAG, "dequeueOutputBuffer failed ouputBufferIndex=" + ouputBufferIndex);
+            // 头一次可能会失败，重试一次
+            ouputBufferIndex = mEncoder.dequeueOutputBuffer(mBufferInfo, 100 * 1000);
+            LogUtils.w(TAG, "retry dequeueOutputBuffer ouputBufferIndex=" + ouputBufferIndex);
+        }
         while (ouputBufferIndex >= 0) {// 可能一次获取不完，需要多次
             try {
                 // 初始化 AACFrameBuffer
@@ -121,7 +127,7 @@ public class AACEncoder implements PCMRecorder.Encoder {
 
                 // 释放输出 buffer，并尝试获取下一个输出 buffer
                 mEncoder.releaseOutputBuffer(ouputBufferIndex, false);
-                ouputBufferIndex = mEncoder.dequeueOutputBuffer(mBufferInfo, 0);
+                ouputBufferIndex = mEncoder.dequeueOutputBuffer(mBufferInfo, 0);// 这里用0正常，使用100ms不正常
             } catch (Exception e) {
                 e.printStackTrace();
             }

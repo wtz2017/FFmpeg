@@ -7,7 +7,7 @@
 
 
 #include "OnPreparedListener.h"
-#include "OnPlayLoadingListener.h"
+#include "OnNativeLoading.h"
 #include "OnErrorListener.h"
 #include "OnCompletionListener.h"
 #include "OnPCMDataCall.h"
@@ -16,7 +16,7 @@ class JavaListenerContainer {
 
 public:
     OnPreparedListener *onPreparedListener;
-    OnPlayLoadingListener *onPlayLoadingListener;
+    OnNativeLoading *onPlayLoadingListener;
     OnErrorListener *onErrorListener;
     OnCompletionListener *onCompletionListener;
     OnPCMDataCall *onPcmDataCall;

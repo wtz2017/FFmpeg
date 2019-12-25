@@ -109,7 +109,7 @@ private:
 
     void release();
 
-    void destroyConsumerThread();
+    void destroyAudioPlayerThread();
 
 };
 

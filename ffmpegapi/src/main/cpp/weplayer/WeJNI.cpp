@@ -2,12 +2,14 @@
 #include "JavaListenerContainer.h"
 #include "AndroidLog.h"
 #include "WePlayer.h"
+#include "WeEditor.h"
 
 
 #define LOG_TAG "WeJNI"
 
 JavaVM *jvm;
 WePlayer *pWePlayer;
+WeEditor *pWeEditor;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
@@ -19,6 +21,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_6;
 }
 
+// ------------------------------ WePlayer Start ------------------------------
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, jstring dataSource) {
@@ -33,7 +36,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
     if (pWePlayer == NULL) {
         JavaListenerContainer *javaListenerContainer = new JavaListenerContainer();
         javaListenerContainer->onPreparedListener = new OnPreparedListener(jvm, env, thiz);
-        javaListenerContainer->onPlayLoadingListener = new OnPlayLoadingListener(jvm, env, thiz);
+        javaListenerContainer->onPlayLoadingListener = new OnNativeLoading(jvm, env, thiz);
         javaListenerContainer->onErrorListener = new OnErrorListener(jvm, env, thiz);
         javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
         javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);
@@ -378,3 +381,211 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeRelease(JNIEnv *env, jobject thiz) {
     delete pWePlayer;
     pWePlayer = NULL;
 }
+// ------------------------------ WePlayer End ------------------------------
+
+// ------------------------------ WeEditor Start ------------------------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeSetEditDataSource(JNIEnv *env, jobject thiz,
+                                                        jstring dataSource) {
+    if (dataSource == NULL || env->GetStringUTFLength(dataSource) == 0) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass,
+                      "Can't set a 'null' string to data source!");
+        env->DeleteLocalRef(exceptionClass);
+        return;
+    }
+
+    if (pWeEditor == NULL) {
+        JavaListenerContainer *javaListenerContainer = new JavaListenerContainer();
+        javaListenerContainer->onPreparedListener = new OnPreparedListener(jvm, env, thiz);
+        javaListenerContainer->onPlayLoadingListener = new OnNativeLoading(jvm, env, thiz);
+        javaListenerContainer->onErrorListener = new OnErrorListener(jvm, env, thiz);
+        javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
+        javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);
+        pWeEditor = new WeEditor(javaListenerContainer);
+    }
+
+    int jstrUtf16Len = env->GetStringLength(dataSource);
+    int jstrUtf8Len = env->GetStringUTFLength(dataSource);
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "GetString UTF-16 Length: %d; UTF-8 Length: %d", jstrUtf16Len, jstrUtf8Len);
+    }
+
+    char *source = new char[jstrUtf8Len + 1];// 回收放在 WeEditor 中
+    env->GetStringUTFRegion(dataSource, 0, jstrUtf16Len, source);
+    source[jstrUtf8Len] = '\0';
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeSetEditDataSource: %s", source);
+    }
+    pWeEditor->setDataSource(source);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativePrepareEdit(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass,
+                      "Have you called setDataSource before calling the prepare function?");
+        env->DeleteLocalRef(exceptionClass);
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativePrepareEdit...");
+    }
+
+    pWeEditor->prepareAsync();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeStartEdit(JNIEnv *env, jobject thiz, jint startTimeMsec,
+                                                jint endTimeMsec) {
+    if (pWeEditor == NULL) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass, "Have you called prepare before calling the start function?");
+        env->DeleteLocalRef(exceptionClass);
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeStartEdit...range: %d ms ~ %d ms", startTimeMsec, endTimeMsec);
+    }
+
+    pWeEditor->start(startTimeMsec, endTimeMsec);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeSetStopEditFlag(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        // 允许直接停止，不抛异常
+        LOGE(LOG_TAG, "nativeSetStopEditFlag...but pWeEditor is NULL");
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeSetStopEditFlag...");
+    }
+
+    pWeEditor->setStopFlag();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeStopEdit(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeStopEdit...but pWeEditor is NULL");
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeStopEdit...");
+    }
+
+    pWeEditor->stop();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeResetEdit(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeResetEdit...but pWeEditor is NULL");
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeResetEdit...");
+    }
+
+    pWeEditor->reset();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeReleaseEdit(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        // 允许直接释放，不抛异常
+        LOGE(LOG_TAG, "nativeReleaseEdit...but pWeEditor is NULL");
+        return;
+    }
+
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "nativeReleaseEdit...");
+    }
+
+    delete pWeEditor;
+    pWeEditor = NULL;
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeGetEditDuration(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        // 不涉及到控制状态，不抛异常
+        LOGE(LOG_TAG, "nativeGetEditDuration...but pWeEditor is NULL");
+        return 0;
+    }
+
+    return pWeEditor->getDuration();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeGetEditPosition(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        // 不涉及到控制状态，不抛异常
+        LOGE(LOG_TAG, "nativeGetEditPosition...but pWeEditor is NULL");
+        return 0;
+    }
+
+    return pWeEditor->getCurrentPosition();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeGetEditAudioSampleRate(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeGetEditAudioSampleRate...but pWeEditor is NULL");
+        return 0;
+    }
+
+    return pWeEditor->getAudioSampleRate();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeGetEditAudioChannelNums(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeGetEditAudioChannelNums...but pWeEditor is NULL");
+        return 0;
+    }
+
+    return pWeEditor->getAudioChannelNums();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeGetEditAudioBitsPerSample(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeGetEditAudioBitsPerSample...but pWeEditor is NULL");
+        return 0;
+    }
+
+    return pWeEditor->getAudioBitsPerSample();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeGetEditPcmMaxBytesPerCallback(JNIEnv *env, jobject thiz) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeGetEditPcmMaxBytesPerCallback...but pWeEditor is NULL");
+        return 0;
+    }
+
+    return pWeEditor->getPcmMaxBytesPerCallback();
+}
+// ------------------------------ WeEditor End ------------------------------

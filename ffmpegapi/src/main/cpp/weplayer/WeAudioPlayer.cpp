@@ -210,6 +210,10 @@ void WeAudioPlayer::setSoundChannel(int channel) {
 }
 
 int WeAudioPlayer::getPcmMaxBytesPerCallback() {
+    if (decoder == NULL) {
+        LOGE(LOG_TAG, "getPcmMaxBytesPerCallback but decoder is NULL");
+        return 0;
+    }
     return decoder->getSampledSizePerSecond();
 }
 
@@ -292,7 +296,7 @@ void WeAudioPlayer::release() {
     delete decoder;
     decoder = NULL;
 
-    destroyConsumerThread();
+    destroyAudioPlayerThread();
 
     // 最顶层 WePlayer 负责回收 javaListenerContainer，这里只把本指针置空
     javaListenerContainer = NULL;
@@ -301,7 +305,7 @@ void WeAudioPlayer::release() {
     status == NULL;
 }
 
-void WeAudioPlayer::destroyConsumerThread() {
+void WeAudioPlayer::destroyAudioPlayerThread() {
     if (audioPlayerThread != NULL) {
         audioPlayerThread->shutdown();
         delete audioPlayerThread;

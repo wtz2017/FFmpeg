@@ -21,4 +21,11 @@
         android:layout_marginTop="20dp"
         android:text="音频播放" />
 
+    <Button
+        android:id="@+id/btn_audio_edit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="音频编辑" />
+
 </LinearLayout>

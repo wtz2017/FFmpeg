@@ -8,6 +8,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.wtz.ffmpegapi.CppTest;
+import com.wtz.ffmpegapi.utils.LogUtils;
 
 public class BaseTestActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "BaseTestActivity";
@@ -17,7 +18,7 @@ public class BaseTestActivity extends AppCompatActivity implements View.OnClickL
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "onCreate");
+        LogUtils.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_base_test);
 
@@ -36,13 +37,13 @@ public class BaseTestActivity extends AppCompatActivity implements View.OnClickL
 
     @Override
     protected void onStart() {
-        Log.d(TAG, "onStart");
+        LogUtils.d(TAG, "onStart");
         super.onStart();
     }
 
     @Override
     public void onClick(View view) {
-        Log.d(TAG, "onClick " + view);
+        LogUtils.d(TAG, "onClick " + view);
         switch (view.getId()) {
             case R.id.btn_simple_pthread:
                 mCppThreadDemo.testSimpleThread();
@@ -94,13 +95,13 @@ public class BaseTestActivity extends AppCompatActivity implements View.OnClickL
 
     @Override
     protected void onStop() {
-        Log.d(TAG, "onStop");
+        LogUtils.d(TAG, "onStop");
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
-        Log.d(TAG, "onDestroy");
+        LogUtils.d(TAG, "onDestroy");
         super.onDestroy();
     }
 

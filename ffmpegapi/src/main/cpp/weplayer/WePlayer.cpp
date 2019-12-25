@@ -35,8 +35,8 @@ void WePlayer::init() {
 }
 
 void demuxThreadHandler(int msgType, void *context) {
-    WePlayer *weFFmpeg = (WePlayer *) context;
-    weFFmpeg->_handleDemuxMessage(msgType);
+    WePlayer *wePlayer = (WePlayer *) context;
+    wePlayer->_handleDemuxMessage(msgType);
 }
 
 void WePlayer::createDemuxThread() {
@@ -345,7 +345,7 @@ void WePlayer::seekTo(int msec) {
     }
 
     if (weAudioPlayer == NULL) {
-        LOGE(LOG_TAG, "Can't seek because weAudio == NULL");
+        LOGE(LOG_TAG, "Can't seek because weAudioPlayer == NULL");
         return;
     }
 

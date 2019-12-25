@@ -22,6 +22,7 @@ import com.wtz.ffmpegapi.AACEncoder;
 import com.wtz.ffmpegapi.PCMRecorder;
 import com.wtz.ffmpegapi.WAVSaver;
 import com.wtz.ffmpegapi.WePlayer;
+import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
 import java.text.DecimalFormat;
@@ -94,11 +95,12 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     private static final String[] mSources = {
             // Local File
-            "file:///sdcard/test.mp3",
+            "file:///sdcard/但愿人长久 - 王菲.mp3",
+            "file:///sdcard/一千年以后 - 林俊杰.mp3",
+            "file:///sdcard/卡农 钢琴曲.wma",
             "file:///sdcard/test.ac3",
             "file:///sdcard/test.mp4",
             "file:///sdcard/王铮亮-真爱你的云.ape",
-            "file:///sdcard/邓超-电台情歌.ape",
             "file:///sdcard/邓紫棋-爱你.flac",
 
             // HLS(HTTP Live Streaming)
@@ -140,7 +142,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "onCreate ");
+        LogUtils.d(TAG, "onCreate ");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_audio_play);
 
@@ -149,7 +151,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     @Override
     protected void onStart() {
-        Log.d(TAG, "onStart");
+        LogUtils.d(TAG, "onStart");
         super.onStart();
     }
 
@@ -195,13 +197,13 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mPlaySeekBar onStartTrackingTouch");
+                LogUtils.d(TAG, "mPlaySeekBar onStartTrackingTouch");
                 isSeeking = true;
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mPlaySeekBar onStopTrackingTouch");
+                LogUtils.d(TAG, "mPlaySeekBar onStopTrackingTouch");
                 if (mWePlayer != null) {
                     mWePlayer.seekTo(seekBar.getProgress());
                 }
@@ -224,12 +226,12 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mVolumeSeekBar onStartTrackingTouch");
+                LogUtils.d(TAG, "mVolumeSeekBar onStartTrackingTouch");
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mVolumeSeekBar onStopTrackingTouch");
+                LogUtils.d(TAG, "mVolumeSeekBar onStopTrackingTouch");
             }
         });
 
@@ -248,12 +250,12 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mPitchSeekBar onStartTrackingTouch");
+                LogUtils.d(TAG, "mPitchSeekBar onStartTrackingTouch");
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mPitchSeekBar onStopTrackingTouch");
+                LogUtils.d(TAG, "mPitchSeekBar onStopTrackingTouch");
             }
         });
 
@@ -272,12 +274,12 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mTempoSeekBar onStartTrackingTouch");
+                LogUtils.d(TAG, "mTempoSeekBar onStartTrackingTouch");
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                Log.d(TAG, "mTempoSeekBar onStopTrackingTouch");
+                LogUtils.d(TAG, "mTempoSeekBar onStopTrackingTouch");
             }
         });
     }
@@ -293,7 +295,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     @Override
     public void onClick(View view) {
-        Log.d(TAG, "onClick " + view);
+        LogUtils.d(TAG, "onClick " + view);
         switch (view.getId()) {
             case R.id.btn_open_media:
                 openAudio(mSources[mIndex]);
@@ -421,7 +423,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared() {
-                    Log.d(TAG, "WePlayer onPrepared");
+                    LogUtils.d(TAG, "WePlayer onPrepared");
                     mWePlayer.start();
 
                     float volume = mWePlayer.getVolume();
@@ -437,7 +439,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                     mTempoSeekBar.setProgress((int) (tempo / MAX_TEMPO * mTempoSeekBar.getMax()));
 
                     mDuration = mWePlayer.getDuration();
-                    Log.d(TAG, "mDuration=" + mDuration);
+                    LogUtils.d(TAG, "mDuration=" + mDuration);
                     mPlaySeekBar.setMax(mDuration);
                     mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
                     startUpdateTime();
@@ -447,7 +449,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
                 @Override
                 public void onPlayLoading(boolean isLoading) {
-                    Log.d(TAG, "WePlayer onPlayLoading: " + isLoading);
+                    LogUtils.d(TAG, "WePlayer onPlayLoading: " + isLoading);
                     AudioPlayActivity.this.isLoading = isLoading;
                     if (isLoading) {
                         stopUpdateTime();
@@ -463,14 +465,14 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             mWePlayer.setOnErrorListener(new WePlayer.OnErrorListener() {
                 @Override
                 public void onError(int code, String msg) {
-                    Log.e(TAG, "WePlayer onError: " + code + "; " + msg);
+                    LogUtils.e(TAG, "WePlayer onError: " + code + "; " + msg);
                     mError.setText("Error " + code);
                 }
             });
             mWePlayer.setOnCompletionListener(new WePlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion() {
-                    Log.d(TAG, "WePlayer onCompletion");
+                    LogUtils.d(TAG, "WePlayer onCompletion");
                 }
             });
         } else {
@@ -563,13 +565,13 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     @Override
     protected void onStop() {
-        Log.d(TAG, "onStop");
+        LogUtils.d(TAG, "onStop");
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
-        Log.d(TAG, "onDestroy");
+        LogUtils.d(TAG, "onDestroy");
         if (mWePlayer != null) {
             mWePlayer.release();
             stopUpdateTime();

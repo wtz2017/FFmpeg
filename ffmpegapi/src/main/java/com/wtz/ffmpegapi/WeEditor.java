@@ -11,8 +11,8 @@ import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
 
-public class WePlayer {
-    private static final String TAG = "WePlayerJava";
+public class WeEditor {
+    private static final String TAG = "WeEditorJava";
 
     static {
         System.loadLibrary("weplayer");
@@ -26,111 +26,61 @@ public class WePlayer {
         System.loadLibrary("swscale");
     }
 
-    private native void nativeSetDataSource(String dataSource);
+    private native void nativeSetEditDataSource(String dataSource);
 
-    private native void nativePrepareAsync();
+    private native void nativePrepareEdit();
 
-    private native void nativeSetVolume(float percent);
+    private native void nativeStartEdit(int startTimeMsec, int endTimeMsec);
 
-    private native float nativeGetVolume();
+    private native void nativeSetStopEditFlag();
 
-    /**
-     * 设置声道
-     *
-     * @param channel CHANNEL_RIGHT = 0;
-     *                CHANNEL_LEFT = 1;
-     *                CHANNEL_STEREO = 2;
-     */
-    private native void nativeSetSoundChannel(int channel);
+    private native void nativeStopEdit();
 
-    private native void nativeSetPitch(float pitch);
+    private native void nativeResetEdit();
 
-    private native float nativeGetPitch();
+    private native void nativeReleaseEdit();
 
-    private native void nativeSetTempo(float tempo);
+    private native int nativeGetEditDuration();
 
-    private native float nativeGetTempo();
+    private native int nativeGetEditPosition();
 
-    private native double nativeGetSoundDecibels();
+    private native int nativeGetEditAudioSampleRate();
 
-    private native void nativeStart();
+    private native int nativeGetEditAudioChannelNums();
 
-    private native void nativePause();
+    private native int nativeGetEditAudioBitsPerSample();
 
-    private native void nativeSeekTo(int msec);
-
-    private native boolean nativeIsPlaying();
-
-    private native void nativeSetStopFlag();
-
-    private native void nativeStop();
-
-    private native void nativeReset();
-
-    private native void nativeRelease();
-
-    private native int nativeGetDuration();
-
-    private native int nativeGetCurrentPosition();
-
-    private native int nativeGetAudioSampleRate();
-
-    private native int nativeGetAudioChannelNums();
-
-    private native int nativeGetAudioBitsPerSample();
-
-    private native int nativeGetPcmMaxBytesPerCallback();
-
-    private native void nativeSetRecordPCMFlag(boolean record);
+    private native int nativeGetEditPcmMaxBytesPerCallback();
 
     private OnPreparedListener mOnPreparedListener;
-    private OnPlayLoadingListener mOnPlayLoadingListener;
+    private OnLoadingDataListener mOnLoadingDataListener;
     private OnErrorListener mOnErrorListener;
     private OnCompletionListener mOnCompletionListener;
 
     private String mDataSource;
-    private float mVolumePercent = -1;
     private boolean isPrepared;
+    private boolean isCompleted;
     private boolean isReleased;
 
     private PCMRecorder mPCMRecorder;
+    private int mEditRangeMsec;
 
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
     private HandlerThread mWorkThread;
     private static final int HANDLE_SET_DATA_SOURCE = 1;
     private static final int HANDLE_PREPARE_ASYNC = 2;
-    private static final int HANDLE_SET_VOLUME = 3;
-    private static final int HANDLE_SET_CHANNEL = 4;
-    private static final int HANDLE_SET_PITCH = 5;
-    private static final int HANDLE_SET_TEMPO = 6;
-    private static final int HANDLE_START = 7;
-    private static final int HANDLE_PAUSE = 8;
-    private static final int HANDLE_SEEK = 9;
-    private static final int HANDLE_STOP = 10;
-    private static final int HANDLE_RESET = 11;
-    private static final int HANDLE_RELEASE = 12;
-
-    public enum SoundChannel {
-        RIGHT_CHANNEL(0), LEFT_CHANNEL(1), STERO(2);
-
-        private int nativeValue;
-
-        SoundChannel(int nativeValue) {
-            this.nativeValue = nativeValue;
-        }
-
-        public int getNativeValue() {
-            return nativeValue;
-        }
-    }
+    private static final int HANDLE_START_EDIT = 3;
+    private static final int HANDLE_STOP = 4;
+    private static final int HANDLE_RESET = 5;
+    private static final int HANDLE_RELEASE = 6;
 
     public interface OnPreparedListener {
         void onPrepared();
     }
 
-    public interface OnPlayLoadingListener {
-        void onPlayLoading(boolean isLoading);
+    public interface OnLoadingDataListener {
+        void onLoading(boolean isLoading);
     }
 
     public interface OnErrorListener {
@@ -141,9 +91,9 @@ public class WePlayer {
         void onCompletion();
     }
 
-    public WePlayer() {
+    public WeEditor() {
         mUIHandler = new Handler(Looper.getMainLooper());
-        mWorkThread = new HandlerThread("WePlayer-dispatcher");
+        mWorkThread = new HandlerThread("WeEditor-dispatcher");
         mWorkThread.start();
         mWorkHandler = new Handler(mWorkThread.getLooper()) {
             @Override
@@ -163,32 +113,8 @@ public class WePlayer {
                         handlePrepareAsync();
                         break;
 
-                    case HANDLE_SET_VOLUME:
-                        handleSetVolume(msg);
-                        break;
-
-                    case HANDLE_SET_CHANNEL:
-                        handleSetChannel(msg);
-                        break;
-
-                    case HANDLE_SET_PITCH:
-                        handleSetPitch(msg);
-                        break;
-
-                    case HANDLE_SET_TEMPO:
-                        handleSetTempo(msg);
-                        break;
-
-                    case HANDLE_START:
-                        handleStart();
-                        break;
-
-                    case HANDLE_PAUSE:
-                        handlePause();
-                        break;
-
-                    case HANDLE_SEEK:
-                        handleSeek(msg);
+                    case HANDLE_START_EDIT:
+                        handleStartEdit(msg);
                         break;
 
                     case HANDLE_STOP:
@@ -214,7 +140,7 @@ public class WePlayer {
         // 首先置总的标志位，阻止消息队列的正常消费
         isReleased = true;
         isPrepared = false;
-        nativeSetStopFlag();
+        nativeSetStopEditFlag();
 
         if (mPCMRecorder != null) {
             mPCMRecorder.release();
@@ -231,7 +157,8 @@ public class WePlayer {
     }
 
     private void handleRelease() {
-        nativeRelease();
+        nativeReleaseEdit();
+        stopPCMRecorder();
 
         mWorkHandler.removeCallbacksAndMessages(null);
         try {
@@ -247,8 +174,8 @@ public class WePlayer {
         this.mOnPreparedListener = listener;
     }
 
-    public void setOnPlayLoadingListener(OnPlayLoadingListener listener) {
-        this.mOnPlayLoadingListener = listener;
+    public void setOnLoadingDataListener(OnLoadingDataListener listener) {
+        this.mOnLoadingDataListener = listener;
     }
 
     public void setOnErrorListener(OnErrorListener listener) {
@@ -269,7 +196,7 @@ public class WePlayer {
     private void handleSetDataSource(Message msg) {
         String dataSource = (String) msg.obj;
         this.mDataSource = dataSource;
-        nativeSetDataSource(mDataSource);
+        nativeSetEditDataSource(mDataSource);
     }
 
     public void prepareAsync() {
@@ -285,7 +212,7 @@ public class WePlayer {
         }
 
         isPrepared = false;
-        nativePrepareAsync();
+        nativePrepareEdit();
     }
 
     /**
@@ -300,7 +227,6 @@ public class WePlayer {
         }
 
         isPrepared = true;
-        setCacheVolume();
         if (mOnPreparedListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
@@ -311,129 +237,66 @@ public class WePlayer {
         }
     }
 
-    /**
-     * 设置音量
-     *
-     * @param percent 范围是：0 ~ 1.0
-     */
-    public void setVolume(float percent) {
-        // 1. 范围判断底层会处理；2. 准备前设置的先缓存，准备好后会自动设置缓存的值
-        mVolumePercent = percent;
-
-        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_VOLUME);
-        msg.obj = percent;
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void setCacheVolume() {
-        if (mVolumePercent < 0) {
-            return;
-        }
-        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_VOLUME);
-        msg.obj = mVolumePercent;
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handleSetVolume(Message msg) {
+    public void start(final int startTimeMsec, final int endTimeMsec, PCMRecorder.Encoder encoder, File saveFile) {
         if (!isPrepared) {
+            LogUtils.e(TAG, "start but audio is not prepared");
             return;
         }
 
-        float percent = (float) msg.obj;
-        nativeSetVolume(percent);
+        if (startTimeMsec < 0 || endTimeMsec > getDuration() || startTimeMsec >= endTimeMsec) {
+            LogUtils.e(TAG, "start but time range is invalid");
+            return;
+        }
+
+        if (encoder == null || saveFile == null) {
+            LogUtils.e(TAG, "start but encoder or saveFile is null");
+            return;
+        }
+
+        int sampleRate = getAudioSampleRate();
+        int channelNums = getAudioChannelNums();
+        int bitsPerSample = getAudioBitsPerSample();
+        if (sampleRate <= 0 || channelNums <= 0 || bitsPerSample <= 0) {
+            LogUtils.e(TAG, "start but sampleRate or channelNums or bitsPerSample <= 0");
+            return;
+        }
+
+        int maxBytesPerCallback = nativeGetEditPcmMaxBytesPerCallback();
+        LogUtils.d(TAG, "startEdit range=[" + startTimeMsec + "," + endTimeMsec + "]ms;"
+                + "sampleRate=" + sampleRate + ";channelNums=" + channelNums
+                + ";bitsPerSample=" + bitsPerSample + ";maxBytesPerCall=" + maxBytesPerCallback);
+
+        if (mPCMRecorder == null) {
+            mPCMRecorder = new PCMRecorder();
+        }
+        mPCMRecorder.start(encoder, sampleRate, channelNums, bitsPerSample, maxBytesPerCallback, saveFile,
+                new PCMRecorder.OnStartResultListener() {
+                    @Override
+                    public void onResult(boolean success) {
+                        if (success) {
+                            mEditRangeMsec = endTimeMsec - startTimeMsec;
+                            startEdit(startTimeMsec, endTimeMsec);
+                        } else {
+                            LogUtils.e(TAG, "PCMRecorder start failed！");
+                        }
+                    }
+                });
     }
 
-    /**
-     * 获取当前音量百分比
-     *
-     * @return 范围是：0 ~ 1.0
-     */
-    public float getVolume() {
-        return nativeGetVolume();
-    }
-
-    public void setSoundChannel(SoundChannel channel) {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_CHANNEL);
-        msg.obj = channel;
+    private void startEdit(int startTimeMsec, int endTimeMsec) {
+        Message msg = mWorkHandler.obtainMessage(HANDLE_START_EDIT);
+        msg.arg1 = startTimeMsec;
+        msg.arg2 = endTimeMsec;
         mWorkHandler.sendMessage(msg);
     }
 
-    private void handleSetChannel(Message msg) {
+    private void handleStartEdit(Message msg) {
         if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call startEdit method before prepare finished");
             return;
         }
 
-        SoundChannel channel = (SoundChannel) msg.obj;
-        nativeSetSoundChannel(channel.getNativeValue());
-    }
-
-    /**
-     * 设置音调
-     *
-     * @param pitch
-     */
-    public void setPitch(float pitch) {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_PITCH);
-        msg.obj = pitch;
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handleSetPitch(Message msg) {
-        if (!isPrepared) {
-            return;
-        }
-
-        float pitch = (float) msg.obj;
-        nativeSetPitch(pitch);
-    }
-
-    public float getPitch() {
-        return nativeGetPitch();
-    }
-
-    /**
-     * 设置音速
-     *
-     * @param tempo
-     */
-    public void setTempo(float tempo) {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_SET_TEMPO);
-        msg.obj = tempo;
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handleSetTempo(Message msg) {
-        if (!isPrepared) {
-            return;
-        }
-
-        float tempo = (float) msg.obj;
-        nativeSetTempo(tempo);
-    }
-
-    public float getTempo() {
-        return nativeGetTempo();
-    }
-
-    /**
-     * 获取当前播放声音分贝值，单位：dB
-     */
-    public double getSoundDecibels() {
-        return nativeGetSoundDecibels();
-    }
-
-    public void start() {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_START);
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handleStart() {
-        if (!isPrepared) {
-            LogUtils.e(TAG, "Can't call start method before prepare finished");
-            return;
-        }
-
-        nativeStart();
+        nativeStartEdit(msg.arg1, msg.arg2);
     }
 
     /**
@@ -441,55 +304,19 @@ public class WePlayer {
      */
     private void onNativeLoading(final boolean isLoading) {
         LogUtils.d(TAG, "onNativeLoading isLoading: " + isLoading + ", isReleased:" + isReleased);
-        if (mOnPlayLoadingListener != null && !isReleased) {
+        if (mOnLoadingDataListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    mOnPlayLoadingListener.onPlayLoading(isLoading);
+                    mOnLoadingDataListener.onLoading(isLoading);
                 }
             });
         }
     }
 
-    public void pause() {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_PAUSE);
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handlePause() {
-        if (!isPrepared) {
-            LogUtils.e(TAG, "Can't call pause method before prepare finished");
-            return;
-        }
-
-        nativePause();
-    }
-
-    /**
-     * Seeks to specified time position
-     *
-     * @param msec the offset in milliseconds from the start to seek to
-     */
-    public void seekTo(int msec) {
-        Message msg = mWorkHandler.obtainMessage(HANDLE_SEEK);
-        msg.arg1 = msec;
-        mWorkHandler.sendMessage(msg);
-    }
-
-    private void handleSeek(Message msg) {
-        if (!isPrepared) {
-            LogUtils.e(TAG, "Can't call seekTo method before prepare finished");
-            return;
-        }
-
-        int msec = msg.arg1;
-        nativeSeekTo(msec);
-    }
-
     public void stop() {
         isPrepared = false;
-        nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
-        stopRecord();
+        nativeSetStopEditFlag();// 设置停止标志位立即执行，不进消息队列
 
         // 先清除其它所有未执行消息，再执行具体释放动作
         mWorkHandler.removeCallbacksAndMessages(null);
@@ -498,18 +325,24 @@ public class WePlayer {
     }
 
     private void handleStop() {
-        nativeStop();
+        nativeStopEdit();
+        stopPCMRecorder();
+    }
+
+    private void stopPCMRecorder() {
+        if (mPCMRecorder != null) {
+            mPCMRecorder.stop();
+        }
     }
 
     /**
-     * Resets the MediaPlayer to its uninitialized state. After calling
+     * Resets to its uninitialized state. After calling
      * this method, you will have to initialize it again by setting the
      * data source and calling prepare().
      */
     public void reset() {
         isPrepared = false;
-        nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
-        stopRecord();
+        nativeSetStopEditFlag();// 设置停止标志位立即执行，不进消息队列
 
         // 先清除其它所有未执行消息，再执行具体重置动作
         mWorkHandler.removeCallbacksAndMessages(null);
@@ -518,11 +351,8 @@ public class WePlayer {
     }
 
     private void handleReset() {
-        nativeReset();
-    }
-
-    public boolean isPlaying() {
-        return nativeIsPlaying();
+        nativeResetEdit();
+        stopPCMRecorder();
     }
 
     /**
@@ -535,7 +365,7 @@ public class WePlayer {
             LogUtils.e(TAG, "Can't call getDuration method before prepare finished");
             return 0;
         }
-        return nativeGetDuration();
+        return nativeGetEditDuration();
     }
 
     /**
@@ -548,7 +378,7 @@ public class WePlayer {
             LogUtils.e(TAG, "Can't call getCurrentPosition method before prepare finished");
             return 0;
         }
-        return nativeGetCurrentPosition();
+        return nativeGetEditPosition();
     }
 
     public int getAudioSampleRate() {
@@ -557,7 +387,7 @@ public class WePlayer {
             return 0;
         }
 
-        return nativeGetAudioSampleRate();
+        return nativeGetEditAudioSampleRate();
     }
 
     public int getAudioChannelNums() {
@@ -566,7 +396,7 @@ public class WePlayer {
             return 0;
         }
 
-        return nativeGetAudioChannelNums();
+        return nativeGetEditAudioChannelNums();
     }
 
     public int getAudioBitsPerSample() {
@@ -575,7 +405,7 @@ public class WePlayer {
             return 0;
         }
 
-        return nativeGetAudioBitsPerSample();
+        return nativeGetEditAudioBitsPerSample();
     }
 
     /**
@@ -600,6 +430,7 @@ public class WePlayer {
      */
     private void onNativeCompletion() {
         LogUtils.d(TAG, "onNativeCompletion");
+        stopPCMRecorder();// 会抛到另一个线程操作，不会阻塞
         if (mOnCompletionListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
@@ -610,62 +441,18 @@ public class WePlayer {
         }
     }
 
-    public void startRecord(PCMRecorder.Encoder encoder, File saveFile) {
-        LogUtils.d(TAG, "PCM start...");
-        if (!isPrepared) {
-            LogUtils.e(TAG, "start but audio is not prepared");
-            return;
-        }
-
-        if (saveFile == null) {
-            LogUtils.e(TAG, "start but saveFile is null");
-            return;
-        }
-
-        int sampleRate = getAudioSampleRate();
-        int channelNums = getAudioChannelNums();
-        int bitsPerSample = getAudioBitsPerSample();
-        LogUtils.d(TAG, "start sampleRate=" + sampleRate + ";channelNums=" + channelNums);
-        if (sampleRate <= 0 || channelNums <= 0 || bitsPerSample <= 0) {
-            LogUtils.e(TAG, "start but sampleRate <= 0 or channelNums <= 0 or bitsPerSample <= 0");
-            return;
-        }
-
-        int maxBytesPerCallback = nativeGetPcmMaxBytesPerCallback();
-        LogUtils.d(TAG, "PCM maxBytesPerCallback: " + maxBytesPerCallback);
-        if (mPCMRecorder == null) {
-            mPCMRecorder = new PCMRecorder();
-        }
-        mPCMRecorder.start(encoder, sampleRate, channelNums, bitsPerSample, maxBytesPerCallback, saveFile,
-                new PCMRecorder.OnStartResultListener() {
-                    @Override
-                    public void onResult(boolean success) {
-                        LogUtils.d(TAG, "PCMRecorder start onResult: " + success);
-                        if (success) {
-                            nativeSetRecordPCMFlag(true);
-                        }
-                    }
-                });
+    /**
+     * @return 当前已录制时长，单位：毫秒
+     */
+    public int getCurrentRecordTimeMsecs() {
+        return mPCMRecorder != null ? (int) Math.round(mPCMRecorder.getRecordTimeSecs() * 1000) : 0;
     }
 
-    public void pauseRecord() {
-        nativeSetRecordPCMFlag(false);
-    }
-
-    public void resumeRecord() {
-        nativeSetRecordPCMFlag(true);
-    }
-
-    public void stopRecord() {
-        LogUtils.d(TAG, "PCM stopRecord...");
-        nativeSetRecordPCMFlag(false);
-        if (mPCMRecorder != null) {
-            mPCMRecorder.stop();
-        }
-    }
-
-    public double getRecordTimeSecs() {
-        return mPCMRecorder != null ? mPCMRecorder.getRecordTimeSecs() : 0;
+    /**
+     * @return 当前已录制时长占总时长比例
+     */
+    public float getCurrentRecordTimeRatio() {
+        return getCurrentRecordTimeMsecs() * 1.0f / mEditRangeMsec;
     }
 
     /**

@@ -34,4 +34,8 @@
 #define E_CODE_AUD_SETPROP_ENVRVB   10114    /* SetEnvironmentalReverbProperties exception */
 #define E_CODE_AUD_ILLEGAL_CALL     10115    /* Illegal call */
 
+#define E_NAME_AUDIO_EDIT           "Audio edit error"
+#define E_CODE_AUDE_ILLEGAL_CALL     10116    /* Illegal call */
+
+
 #endif //FFMPEG_WEERROR_H
