@@ -17,7 +17,7 @@ void WeDemux::init() {
     pthread_mutex_init(&demuxMutex, NULL);
 
     // 注册解码器并初始化网络
-    av_register_all();
+//    av_register_all();// ffmpeg 新版弃用了此函数
     avformat_network_init();
 }
 
