@@ -543,6 +543,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void updateRecordTime() {
+        if (mWePlayer == null) return;
         long recordTime = Math.round(mWePlayer.getRecordTimeSecs() * 1000);
         String recordTimeStr = DateTimeUtil.changeRemainTimeToHms(recordTime);
         mRecordTimeView.setText(recordTimeStr);

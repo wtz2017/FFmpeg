@@ -57,11 +57,6 @@ set_target_properties(avcodec
         PROPERTIES IMPORTED_LOCATION
         ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavcodec.so)
 
-add_library(avdevice SHARED IMPORTED)
-set_target_properties(avdevice
-        PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavdevice.so)
-
 add_library(avfilter SHARED IMPORTED)
 set_target_properties(avfilter
         PROPERTIES IMPORTED_LOCATION
@@ -106,7 +101,6 @@ target_link_libraries(
         weplayer
 
         avcodec
-        avdevice
         avfilter
         avformat
         avutil

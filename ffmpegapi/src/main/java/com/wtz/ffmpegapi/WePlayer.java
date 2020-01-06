@@ -17,7 +17,6 @@ public class WePlayer {
     static {
         System.loadLibrary("weplayer");
         System.loadLibrary("avcodec");
-        System.loadLibrary("avdevice");
         System.loadLibrary("avfilter");
         System.loadLibrary("avformat");
         System.loadLibrary("avutil");
