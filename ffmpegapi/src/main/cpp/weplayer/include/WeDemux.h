@@ -74,7 +74,7 @@ public:
      */
     double getDurationSecs();
 
-    void stop();
+    void setStopFlag();
 
     bool isStopped();
 

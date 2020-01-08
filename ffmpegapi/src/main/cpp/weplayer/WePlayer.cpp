@@ -533,6 +533,9 @@ void WePlayer::setStopFlag() {
         return;
     }
     status->setStatus(PlayStatus::STOPPED, LOG_TAG);
+    if (weDemux != NULL) {
+        weDemux->setStopFlag();
+    }
     pthread_mutex_unlock(&status->mutex);
 }
 
@@ -552,9 +555,6 @@ void WePlayer::stop() {
     }
     pthread_mutex_unlock(&status->mutex);
 
-    if (weDemux != NULL) {
-        weDemux->stop();
-    }
     if (weAudioPlayer != NULL) {
         weAudioPlayer->stopPlay();
     }

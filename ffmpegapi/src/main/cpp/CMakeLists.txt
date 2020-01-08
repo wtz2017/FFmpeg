@@ -72,11 +72,6 @@ set_target_properties(avutil
         PROPERTIES IMPORTED_LOCATION
         ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libavutil.so)
 
-add_library(postproc SHARED IMPORTED)
-set_target_properties(postproc
-        PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI}/libpostproc.so)
-
 add_library(swresample SHARED IMPORTED)
 set_target_properties(swresample
         PROPERTIES IMPORTED_LOCATION
@@ -104,7 +99,6 @@ target_link_libraries(
         avfilter
         avformat
         avutil
-        postproc
         swresample
         swscale
 

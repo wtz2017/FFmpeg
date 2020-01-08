@@ -209,7 +209,7 @@ double WeDemux::getDurationSecs() {
     return duration;
 }
 
-void WeDemux::stop() {
+void WeDemux::setStopFlag() {
     stopWork = true;
 }
 

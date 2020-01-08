@@ -114,18 +114,16 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             "http://123.56.16.201:1935/live/fm994/96K/tzwj_video.m3u8",//北京教学广播
             "http://123.56.16.201:1935/live/am603/96K/tzwj_video.m3u8",//北京故事广播
             "http://audiolive.rbc.cn:1935/live/fm1043/96K/tzwj_video.m3u8",//北京长书广播
-
-            // TODO 打不开 应该是当前库不支持 https
             "https://lhttp.qingting.fm/live/20462/64k.mp3",//经典调频北京FM969
 
             "http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3",
             "http://music.163.com/song/media/outer/url?id=29750099.mp3",
             "http://music.163.com/song/media/outer/url?id=566435178.mp3",
 
-            // 1080P // TODO 打不开 应该是当前库不支持 https
+            // 1080P
             "https://www.apple.com/105/media/us/iphone-x/2017/01df5b43-28e4-4848-bf20-490c34a926a7/films/feature/iphone-x-feature-tpl-cc-us-20170912_1920x1080h.mp4",
 
-            // 720P // TODO 打不开 应该是当前库不支持 https
+            // 720P
             "https://www.apple.com/105/media/cn/mac/family/2018/46c4b917_abfd_45a3_9b51_4e3054191797/films/bruce/mac-bruce-tpl-cn-2018_1280x720h.mp4",
 
             // RTSP(Real Time Streaming Protocol)
@@ -133,10 +131,10 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4",// 大熊兔
 
             // RTMP(Real Time Messaging Protocol)
-            "rtmp://live.hkstv.hk.lxdns.com/live/hks1",//香港卫视 // TODO 打不开
-            "rtmp://live.hkstv.hk.lxdns.com/live/hks2",//香港卫视 // TODO 打不开
-            "rtmp://202.69.69.180:443/webcast/bshdlive-pc",
-            "rtmp://media3.sinovision.net:1935/live/livestream"
+            "rtmp://live.hkstv.hk.lxdns.com/live/hks1",//香港卫视 打不开
+            "rtmp://live.hkstv.hk.lxdns.com/live/hks2",//香港卫视 打不开
+            "rtmp://202.69.69.180:443/webcast/bshdlive-pc",// 能打开，很卡
+            "rtmp://media3.sinovision.net:1935/live/livestream"// 能打开
     };
     private int mIndex = 0;
 

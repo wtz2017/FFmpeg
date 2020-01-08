@@ -371,6 +371,9 @@ void WeEditor::setStopFlag() {
         return;
     }
     status->setStatus(EditStatus::STOPPED, LOG_TAG);
+    if (weDemux != NULL) {
+        weDemux->setStopFlag();
+    }
     pthread_mutex_unlock(&status->mutex);
 }
 
@@ -387,9 +390,6 @@ void WeEditor::stop() {
     }
     pthread_mutex_unlock(&status->mutex);
 
-    if (weDemux != NULL) {
-        weDemux->stop();
-    }
     if (weAudioEditor != NULL) {
         weAudioEditor->stopEdit();
     }
