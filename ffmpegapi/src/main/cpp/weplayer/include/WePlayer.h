@@ -10,6 +10,7 @@
 #include "LooperThread.h"
 #include "JavaListenerContainer.h"
 #include "AndroidLog.h"
+#include "WeVideoPlayer.h"
 
 /**
  * 解包：单独开启线程；
@@ -31,6 +32,7 @@ private:
 
     WeDemux *weDemux = NULL;
     WeAudioPlayer *weAudioPlayer = NULL;
+    WeVideoPlayer *weVideoPlayer = NULL;
     AVPacket *avPacket = NULL;
 
     // 只针对解封装包数据单独用一个线程，其它走调度线程
@@ -159,6 +161,8 @@ private:
      * 初始化公共资源，例如：libavformat、音频播放器
      */
     void init();
+
+    void handleErrorOnInit(int errorCode, char *errorName);
 
     /**
      * 开启解封装线程

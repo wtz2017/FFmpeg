@@ -17,21 +17,30 @@ void WePlayer::init() {
     status = new PlayStatus();
     weDemux = new WeDemux();
     weAudioPlayer = new WeAudioPlayer(weDemux->getAudioQueue(), status, javaListenerContainer);
+    weVideoPlayer = new WeVideoPlayer(weDemux->getVideoQueue(), status, javaListenerContainer);
 
     int ret;
     if ((ret = weAudioPlayer->init()) != NO_ERROR) {
-        initSuccess = false;
-
-        pthread_mutex_lock(&status->mutex);
-        status->setStatus(PlayStatus::ERROR, LOG_TAG);
-        // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-        javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_AUDIO_PLAY);
-        pthread_mutex_unlock(&status->mutex);
+        handleErrorOnInit(ret, E_NAME_AUDIO_PLAY);
+        return;
+    }
+    if ((ret = weVideoPlayer->init()) != NO_ERROR) {
+        handleErrorOnInit(ret, E_NAME_VIDEO_PLAY);
         return;
     }
 
     createDemuxThread();// 开启解封装线程
     initSuccess = true;
+}
+
+void WePlayer::handleErrorOnInit(int errorCode, char *errorName) {
+    initSuccess = false;
+
+    pthread_mutex_lock(&status->mutex);
+    status->setStatus(PlayStatus::ERROR, LOG_TAG);
+    // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+    javaListenerContainer->onErrorListener->callback(2, errorCode, errorName);
+    pthread_mutex_unlock(&status->mutex);
 }
 
 void demuxThreadHandler(int msgType, void *context) {
@@ -122,6 +131,9 @@ void WePlayer::prepareAsync() {
     }
 
     weAudioPlayer->getDecoder()->initStream(weDemux->getAudioStream());
+    if (weDemux->getVideoStream() != NULL) {
+        weVideoPlayer->getDecoder()->initStream(weDemux->getVideoStream());
+    }
 
     // 为新数据流创建音频播放器
     if ((ret = weAudioPlayer->createPlayer()) != NO_ERROR) {
@@ -131,8 +143,21 @@ void WePlayer::prepareAsync() {
         return;
     }
 
+    if (weDemux->getVideoStream() != NULL) {
+        // 为新数据流创建视频播放器
+        if ((ret = weVideoPlayer->createPlayer()) != NO_ERROR) {
+            LOGE(LOG_TAG, "createVideoPlayer failed!");
+            handleErrorOnPreparing(ret);
+            prepareFinished = true;
+            return;
+        }
+    }
+
     // 设置数据生产未完成
     weDemux->getAudioQueue()->setProductDataComplete(false);
+    if (weDemux->getVideoStream() != NULL) {
+        weDemux->getVideoQueue()->setProductDataComplete(false);
+    }
 
     // 状态确认需要加锁同步，判断在准备期间是否已经被停止
     pthread_mutex_lock(&status->mutex);
@@ -160,6 +185,9 @@ void WePlayer::handleErrorOnPreparing(int errorCode) {
     // 出错先释放资源
     if (weAudioPlayer != NULL) {
         weAudioPlayer->getDecoder()->releaseStream();
+    }
+    if (weVideoPlayer != NULL) {
+        weVideoPlayer->getDecoder()->releaseStream();
     }
     if (weDemux != NULL) {
         weDemux->releaseStream();
@@ -196,6 +224,7 @@ void WePlayer::start() {
         if (weDemux->getAudioQueue()->isProductDataComplete()) {
             seekToBegin = true;// 在播放完成后，如果用户没有 seek，就从头开始播放
             weDemux->getAudioQueue()->setProductDataComplete(false);
+            weDemux->getVideoQueue()->setProductDataComplete(false);
         }
         int ret;
         if ((ret = weAudioPlayer->startPlay()) != NO_ERROR) {
@@ -206,9 +235,23 @@ void WePlayer::start() {
             pthread_mutex_unlock(&status->mutex);
             return;
         }
+        if (weDemux->getVideoStream() != NULL) {
+            // 有视频流再判断
+            if ((ret = weVideoPlayer->startPlay()) != NO_ERROR) {
+                LOGE(LOG_TAG, "startVideoPlayer failed!");
+                status->setStatus(PlayStatus::ERROR, LOG_TAG);
+                // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
+                javaListenerContainer->onErrorListener->callback(2, ret, E_NAME_VIDEO_PLAY);
+                pthread_mutex_unlock(&status->mutex);
+                return;
+            }
+        }
         demuxThread->sendMessage(MSG_DEMUX_START);
     } else {
         weAudioPlayer->resumePlay();// 要先设置播放状态，才能恢复播放
+        if (weDemux->getVideoStream() != NULL) {
+            weVideoPlayer->resumePlay();
+        }
     }
     pthread_mutex_unlock(&status->mutex);
 }
@@ -227,7 +270,8 @@ void WePlayer::demux() {
     // 本线程开始读 AVPacket 包并缓存入队
     int readRet = -1;
     while (status != NULL && !status->isStoped() && !status->isError() && !status->isReleased()) {
-        if (status->isSeeking || weDemux->getAudioQueue()->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
+        if (status->isSeeking ||
+            weDemux->getAudioQueue()->getQueueSize() >= AVPacketQueue::MAX_CACHE_NUM) {
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
@@ -239,13 +283,18 @@ void WePlayer::demux() {
             if (avPacket->stream_index == weDemux->getAudioStream()->streamIndex) {
                 // 当前包为音频包，缓存音频包到队列
                 weDemux->getAudioQueue()->putAVpacket(avPacket);
+            } else if (weDemux->getVideoStream() != NULL
+                       && avPacket->stream_index == weDemux->getVideoStream()->streamIndex) {
+                // 当前包为视频包，缓存视频包到队列
+                weDemux->getVideoQueue()->putAVpacket(avPacket);
             } else {
-                // 不是音频就释放内存
+                // 不是音视频就释放内存
                 releaseAvPacket();
             }
         } else {
             // 数据读取已经到末尾 或 出错了
             weDemux->getAudioQueue()->setProductDataComplete(true);
+            weDemux->getVideoQueue()->setProductDataComplete(true);
             releaseAvPacket();
 
             // 等待播放完成后退出，否则造成播放不完整
@@ -257,12 +306,16 @@ void WePlayer::demux() {
             } else if (ret == -1) {
                 LOGW(LOG_TAG, "Break to seek point while waiting play complete");
                 weAudioPlayer->resumePlay();// 可能播放器已经因取不到数据停止播放，需要重启播放
+                if (weDemux->getVideoStream() != NULL) {
+                    weVideoPlayer->resumePlay();
+                }
                 continue;// 回到读包大循环继续读数据
             }
         } // 读完分支
     } // 读包大循环
 
-    weDemux->getAudioQueue()->setProductDataComplete(true);// 提前中断解包
+    weDemux->getAudioQueue()->setProductDataComplete(true);
+    weDemux->getVideoQueue()->setProductDataComplete(true);
     demuxFinished = true;// 提前中断退出
 }
 
@@ -278,7 +331,9 @@ int WePlayer::waitPlayComplete() {
             return -1;
         }
 
-        if (!weAudioPlayer->isPlayComplete()) {// 还没有播放完成
+        if (!weAudioPlayer->isPlayComplete() ||
+            (weDemux->getVideoStream() != NULL && !weVideoPlayer->isPlayComplete())) {
+            // 还没有播放完成
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             continue;
         }
@@ -326,6 +381,9 @@ void WePlayer::pause() {
     pthread_mutex_unlock(&status->mutex);
 
     weAudioPlayer->pause();
+    if (weDemux->getVideoStream() != NULL) {
+        weVideoPlayer->pause();
+    }
 }
 
 /**
@@ -362,11 +420,20 @@ void WePlayer::seekTo(int msec) {
 
     status->isSeeking = true;
 
-    // reset
+    // set queue flag
     weDemux->getAudioQueue()->setProductDataComplete(false);
+    if (weDemux->getVideoStream() != NULL) {
+        weDemux->getVideoQueue()->setProductDataComplete(false);
+    }
+
+    // clear cache
     weDemux->getAudioQueue()->clearQueue();
     weAudioPlayer->getDecoder()->flushCodecBuffers();
     weAudioPlayer->getDecoder()->setSeekTime(targetSeconds);
+    if (weDemux->getVideoStream() != NULL) {
+        weDemux->getVideoQueue()->clearQueue();
+        weVideoPlayer->getDecoder()->flushCodecBuffers();
+    }
 
     // seek
     weDemux->seekTo(targetSeconds);
@@ -558,13 +625,19 @@ void WePlayer::stop() {
     if (weAudioPlayer != NULL) {
         weAudioPlayer->stopPlay();
     }
+    if (weDemux->getVideoStream() != NULL && weVideoPlayer != NULL) {
+        weVideoPlayer->stopPlay();
+    }
 
     if (LOG_DEBUG) {
         LOGD(LOG_TAG, "close stream wait other thread finished...");
     }
     // 等待工作线程结束
     int sleepCount = 0;
-    while (!prepareFinished || !demuxFinished || (weAudioPlayer != NULL && !weAudioPlayer->workFinished())) {
+    while (!prepareFinished || !demuxFinished ||
+           (weAudioPlayer != NULL && !weAudioPlayer->workFinished()) ||
+           (weDemux->getVideoStream() != NULL && weVideoPlayer != NULL &&
+            !weVideoPlayer->workFinished())) {
         if (sleepCount > 300) {
             break;
         }
@@ -575,12 +648,17 @@ void WePlayer::stop() {
         LOGD(LOG_TAG, "close stream wait end after sleep %d ms, start close...", sleepCount * 10);
     }
 
-    if (weDemux != NULL) {
-        weDemux->releaseStream();
-    }
     if (weAudioPlayer != NULL) {
         weAudioPlayer->destroyPlayer();// 不同采样参数数据流使用的 openSlPlayer 不一样，需要销毁新建
         weAudioPlayer->clearDataAfterStop();
+    }
+    if (weDemux->getVideoStream() != NULL && weVideoPlayer != NULL) {
+        weVideoPlayer->destroyPlayer();
+        weVideoPlayer->clearDataAfterStop();
+    }
+    // 放在后边，因为前边 weVideoPlayer 用到
+    if (weDemux != NULL) {
+        weDemux->releaseStream();
     }
 }
 
@@ -608,6 +686,9 @@ void WePlayer::release() {
     // 开始释放所有资源
     delete weAudioPlayer;
     weAudioPlayer = NULL;
+
+    delete weVideoPlayer;
+    weVideoPlayer = NULL;
 
     delete weDemux;
     weDemux = NULL;

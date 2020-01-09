@@ -18,8 +18,11 @@ add_library(
         weplayer/WeDemux.cpp
         weplayer/WePlayer.cpp
         weplayer/WeAudioDecoder.cpp
+        weplayer/WeVideoDecoder.cpp
         weplayer/WeAudioPlayer.cpp
+        weplayer/WeVideoPlayer.cpp
         weplayer/AudioStream.cpp
+        weplayer/VideoStream.cpp
         weplayer/LooperThread.cpp
         weplayer/AVPacketQueue.cpp
         weplayer/OpenSLPlayer.cpp

@@ -19,6 +19,7 @@ class AVPacketQueue {
 
 private:
     const char *LOG_TAG = "AVPacketQueue";
+    char *queueName = NULL;
 
     bool allowOperation = true;
     bool productDataComplete = false;
@@ -31,7 +32,7 @@ public:
     static const int MAX_CACHE_NUM = 40;
 
 public:
-    AVPacketQueue();
+    AVPacketQueue(char *queueName);
 
     ~AVPacketQueue();
 

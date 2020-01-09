@@ -13,7 +13,8 @@ WeDemux::~WeDemux() {
 }
 
 void WeDemux::init() {
-    audioQueue = new AVPacketQueue();
+    audioQueue = new AVPacketQueue("Audio");
+    videoQueue = new AVPacketQueue("Video");
     pthread_mutex_init(&demuxMutex, NULL);
 
     // 注册解码器并初始化网络
@@ -25,8 +26,16 @@ AVPacketQueue *WeDemux::getAudioQueue() {
     return audioQueue;
 }
 
+AVPacketQueue *WeDemux::getVideoQueue() {
+    return videoQueue;
+}
+
 AudioStream *WeDemux::getAudioStream() {
     return audioStream;
+}
+
+VideoStream *WeDemux::getVideoStream() {
+    return videoStream;
 }
 
 void WeDemux::setDataSource(char *dataSource) {
@@ -93,29 +102,53 @@ int WeDemux::prepare() {
         WeUtils::av_dump_format_for_android(pFormatCtx, 0, dataSource, 0);
     }
 
-    // 从流信息中遍历查找音频流
+    duration = pFormatCtx->duration * av_q2d(AV_TIME_BASE_Q);
+    if (duration < 0) {
+        duration = 0;
+    }
+    if (LOG_DEBUG) {
+        LOGD(LOG_TAG, "Duration is %lf", duration);
+    }
+
+    AVMediaType mediaType;
     for (int i = 0; i < pFormatCtx->nb_streams; i++) {
-        if (pFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            duration = pFormatCtx->duration * av_q2d(AV_TIME_BASE_Q);
-            if (duration < 0) {
-                duration = 0;
+        mediaType = pFormatCtx->streams[i]->codecpar->codec_type;
+        if (LOG_DEBUG) {
+            LOGD(LOG_TAG, "Find stream %d is %s", i, av_get_media_type_string(mediaType));
+        }
+        if (mediaType == AVMEDIA_TYPE_AUDIO) {
+            if (audioStream == NULL) {
+                // TODO 一个视频可能带有多个音频流，暂时只取第一个音频流
+                audioStream = new AudioStream(i, pFormatCtx->streams[i]->codecpar,
+                                              pFormatCtx->streams[i]->time_base, duration);
             }
-            if (LOG_DEBUG) {
-                LOGD(LOG_TAG, "Find audio stream info index=%d, duration=%lf", i, duration);
-            }
-            // 保存音频流信息
-            audioStream = new AudioStream(i, pFormatCtx->streams[i]->codecpar,
+        } else if (mediaType == AVMEDIA_TYPE_VIDEO) {
+            videoStream = new VideoStream(i, pFormatCtx->streams[i]->codecpar,
                                           pFormatCtx->streams[i]->time_base, duration);
-            break;
         }
     }
+    // 可以没有视频流，但音频流一定得有
     if (audioStream == NULL) {
         LOGE(LOG_TAG, "Can't find audio stream from: %s", dataSource);
         return E_CODE_PRP_FIND_AUDIO;
     }
 
+    if ((ret = initDecoder(audioStream->codecParams, &audioStream->codecContext)) != NO_ERROR) {
+        return ret;
+    }
+
+    if (videoStream != NULL) {
+        if ((ret = initDecoder(videoStream->codecParams, &videoStream->codecContext)) != NO_ERROR) {
+            return ret;
+        }
+    }
+
+    return NO_ERROR;
+}
+
+int WeDemux::initDecoder(AVCodecParameters *codecParams, AVCodecContext **codecContext) {
     // 根据 AVCodecID 查找解码器
-    AVCodecID codecId = audioStream->codecParams->codec_id;
+    AVCodecID codecId = codecParams->codec_id;
     AVCodec *decoder = avcodec_find_decoder(codecId);
     if (!decoder) {
         LOGE(LOG_TAG, "Can't find decoder for codec id %d", codecId);
@@ -123,15 +156,16 @@ int WeDemux::prepare() {
     }
 
     // 利用解码器创建解码器上下文 AVCodecContext，并初始化默认值
-    audioStream->codecContext = avcodec_alloc_context3(decoder);
-    if (!audioStream->codecContext) {
+    *codecContext = avcodec_alloc_context3(decoder);
+    if (!*codecContext) {
         LOGE(LOG_TAG, "Can't allocate an AVCodecContext for codec id %d", codecId);
         return E_CODE_PRP_ALC_CODEC_CTX;
     }
 
     // 把前边获取的音频流编解码参数填充到 AVCodecContext
+    int ret;
     if ((ret = avcodec_parameters_to_context(
-            audioStream->codecContext, audioStream->codecParams)) < 0) {
+            *codecContext, codecParams)) < 0) {
         LOGE(LOG_TAG,
              "Can't fill the AVCodecContext by AVCodecParameters for codec id %d. \n AVERROR=%d %s",
              codecId, ret, WeUtils::getAVErrorName(ret));
@@ -139,7 +173,7 @@ int WeDemux::prepare() {
     }
 
     // 使用给定的 AVCodec 初始化 AVCodecContext
-    if ((ret = avcodec_open2(audioStream->codecContext, decoder, 0)) != 0) {
+    if ((ret = avcodec_open2(*codecContext, decoder, 0)) != 0) {
         LOGE(LOG_TAG,
              "Can't initialize the AVCodecContext to use the given AVCodec for codec id %d. \n AVERROR=%d %s",
              codecId, ret, WeUtils::getAVErrorName(ret));
@@ -221,6 +255,9 @@ void WeDemux::releaseStream() {
     delete audioStream;
     audioStream = NULL;
 
+    delete videoStream;
+    videoStream = NULL;
+
     if (pFormatCtx != NULL) {
         avformat_close_input(&pFormatCtx);
         avformat_free_context(pFormatCtx);
@@ -236,6 +273,9 @@ void WeDemux::release() {
 
     delete audioQueue;
     audioQueue = NULL;
+
+    delete videoQueue;
+    videoQueue = NULL;
 
     pthread_mutex_destroy(&demuxMutex);
 }

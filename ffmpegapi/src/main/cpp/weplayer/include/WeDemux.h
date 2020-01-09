@@ -9,6 +9,7 @@
 #include "WeUtils.h"
 #include "AudioStream.h"
 #include "AVPacketQueue.h"
+#include "VideoStream.h"
 
 extern "C"
 {
@@ -28,7 +29,9 @@ private:
     double duration = 0;// Duration of the stream in seconds
 
     AVPacketQueue *audioQueue = NULL;
+    AVPacketQueue *videoQueue = NULL;
     AudioStream *audioStream = NULL;
+    VideoStream *videoStream = NULL;
 
 public:
     const char *LOG_TAG = "WeDemux";
@@ -40,7 +43,11 @@ public:
 
     AVPacketQueue *getAudioQueue();
 
+    AVPacketQueue *getVideoQueue();
+
     AudioStream *getAudioStream();
+
+    VideoStream *getVideoStream();
 
     void setDataSource(char *dataSource);
 
@@ -82,6 +89,13 @@ public:
 
 private:
     void init();
+
+    /**
+     * 初始化解码器
+     *
+     * @return NO_ERROR 成功；否则失败
+     */
+    int initDecoder(AVCodecParameters *codecParams, AVCodecContext **codecContext);
 
     void release();
 

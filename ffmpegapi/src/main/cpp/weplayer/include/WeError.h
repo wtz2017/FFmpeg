@@ -35,7 +35,9 @@
 #define E_CODE_AUD_ILLEGAL_CALL     10115    /* Illegal call */
 
 #define E_NAME_AUDIO_EDIT           "Audio edit error"
-#define E_CODE_AUDE_ILLEGAL_CALL     10116    /* Illegal call */
+#define E_CODE_AUDE_ILLEGAL_CALL    10200    /* Illegal call */
 
+#define E_NAME_VIDEO_PLAY           "Video playback error"
+#define E_CODE_VID_ILLEGAL_CALL     10300    /* Illegal call */
 
 #endif //FFMPEG_WEERROR_H

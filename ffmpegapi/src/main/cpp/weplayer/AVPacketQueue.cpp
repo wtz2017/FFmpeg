@@ -4,7 +4,8 @@
 
 #include "AVPacketQueue.h"
 
-AVPacketQueue::AVPacketQueue() {
+AVPacketQueue::AVPacketQueue(char *queueName) {
+    this->queueName = queueName;
     allowOperation = true;
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&condition, NULL);
@@ -13,6 +14,7 @@ AVPacketQueue::AVPacketQueue() {
 AVPacketQueue::~AVPacketQueue() {
     allowOperation = false;
     releaseQueue();
+    queueName = NULL;
     pthread_cond_destroy(&condition);
     pthread_mutex_destroy(&mutex);
 }
@@ -25,7 +27,7 @@ void AVPacketQueue::setProductDataComplete(bool complete) {
     pthread_mutex_lock(&mutex);
 
     if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "setProductDataComplete: %d", complete);
+        LOGD(LOG_TAG, "%s setProductDataComplete: %d", queueName, complete);
     }
     productDataComplete = complete;// 作用：当完成标志位设置早于消费者读数据时，消费者不会再 wait
     if (complete) {// 作用：当完成标志位设置晚于消费者 wait 时，可以通知消费者退出
@@ -48,7 +50,7 @@ void AVPacketQueue::putAVpacket(AVPacket *packet) {
 
     queue.push(packet);
     if (LOG_REPEAT_DEBUG) {
-        LOGD(LOG_TAG, "putAVpacket current size：%d", queue.size());
+        LOGD(LOG_TAG, "%s putAVpacket current size：%d", queueName, queue.size());
     }
     pthread_cond_signal(&condition);
 
@@ -70,7 +72,8 @@ bool AVPacketQueue::getAVpacket(AVPacket *packet) {
                 // 弹出队首 AVPacket
                 queue.pop();
                 if (LOG_REPEAT_DEBUG) {
-                    LOGD(LOG_TAG, "Pop an avpacket from the queue, %d remaining.", queue.size());
+                    LOGD(LOG_TAG, "%s pop an avpacket from the queue, %d remaining.", queueName,
+                         queue.size());
                 }
             }
             // 释放已经出队的 AVPacket
@@ -98,7 +101,7 @@ int AVPacketQueue::getQueueSize() {
 
 void AVPacketQueue::clearQueue() {
     if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "clearQueue...");
+        LOGD(LOG_TAG, "%s clearQueue...", queueName);
     }
     pthread_cond_signal(&condition);
     pthread_mutex_lock(&mutex);
@@ -115,7 +118,7 @@ void AVPacketQueue::clearQueue() {
 
     pthread_mutex_unlock(&mutex);
     if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "clearQueue finished");
+        LOGD(LOG_TAG, "%s clearQueue finished", queueName);
     }
 }
 
