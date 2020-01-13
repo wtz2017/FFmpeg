@@ -15,6 +15,13 @@
         android:text="基本测试" />
 
     <Button
+        android:id="@+id/btn_opengl_test"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="OpenGL测试" />
+
+    <Button
         android:id="@+id/btn_audio_play"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -27,5 +34,12 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:text="音频编辑" />
+
+    <Button
+        android:id="@+id/btn_video_play"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="视频播放" />
 
 </LinearLayout>

@@ -17,6 +17,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
 
         findViewById(R.id.btn_base_test).setOnClickListener(this);
+        findViewById(R.id.btn_opengl_test).setOnClickListener(this);
         findViewById(R.id.btn_audio_play).setOnClickListener(this);
         findViewById(R.id.btn_audio_edit).setOnClickListener(this);
     }
@@ -32,6 +33,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         switch (view.getId()) {
             case R.id.btn_base_test:
                 startActivity(new Intent(MainActivity.this, BaseTestActivity.class));
+                break;
+            case R.id.btn_opengl_test:
+                startActivity(new Intent(MainActivity.this, OpenGLTestActivity.class));
                 break;
             case R.id.btn_audio_play:
                 startActivity(new Intent(MainActivity.this, AudioPlayActivity.class));
