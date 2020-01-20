@@ -1,5 +1,8 @@
 package com.wtz.ffmpeg;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.Bundle;
@@ -8,36 +11,27 @@ import android.os.Looper;
 import android.os.Message;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.wtz.ffmpeg.utils.DateTimeUtil;
 import com.wtz.ffmpeg.utils.ScreenUtils;
-import com.wtz.ffmpegapi.AACEncoder;
-import com.wtz.ffmpegapi.PCMRecorder;
-import com.wtz.ffmpegapi.WAVSaver;
 import com.wtz.ffmpegapi.WePlayer;
+import com.wtz.ffmpegapi.opengl.WeSurfaceView;
 import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
 import java.text.DecimalFormat;
 
-public class AudioPlayActivity extends AppCompatActivity implements View.OnClickListener, RadioGroup.OnCheckedChangeListener {
-    private static final String TAG = "AudioPlayActivity";
+public class VideoPlayActivity extends AppCompatActivity implements View.OnClickListener {
+    private static final String TAG = "VideoPlayActivity";
+
+    private WeSurfaceView mWeSurfaceView;
 
     private WePlayer mWePlayer;
     private int mDuration;
     private boolean isSeeking;
     private boolean isLoading;
-
-    private PCMRecorder.Encoder mPCMEncoder;
-    private File mAACFile;
-    private File mWAVFile;
-    private File mRecordAudioFile;
 
     private ProgressDialog mProgressDialog;
     private TextView mPlayUrl;
@@ -45,30 +39,13 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     private TextView mPlayTimeView;
     private String mDurationText;
     private SeekBar mPlaySeekBar;
-    private TextView mRecordTimeView;
 
-    private TextView mDecibels;
     private TextView mVolume;
     private SeekBar mVolumeSeekBar;
-    private TextView mPitch;
-    private SeekBar mPitchSeekBar;
-    private TextView mTempo;
-    private SeekBar mTempoSeekBar;
-    private static final DecimalFormat DECIBELS_FORMAT = new DecimalFormat("0.00dB");
     private static final DecimalFormat VOLUME_FORMAT = new DecimalFormat("0%");
-    private static final DecimalFormat PITCH_FORMAT = new DecimalFormat("0.0");
-    private static final float MAX_PITCH = 3.0f;
-    private static final float PITCH_ACCURACY = 0.1f;
-    private static final DecimalFormat TEMPO_FORMAT = new DecimalFormat("0.0");
-    private static final float MAX_TEMPO = 3.0f;
-    private static final float TEMPO_ACCURACY = 0.1f;
 
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
-    private static final int UPDATE_SOUND_DECIBELS_INTERVAL = 200;
-    private static final int UPDATE_RECORD_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
-    private static final int MSG_UPDATE_SOUND_DECIBELS = 2;
-    private static final int MSG_UPDATE_RECORD_TIME = 3;
     private Handler mHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(@NonNull Message msg) {
@@ -78,46 +55,17 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                     removeMessages(MSG_UPDATE_PLAY_TIME);
                     sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME, UPDATE_PLAY_TIME_INTERVAL);
                     break;
-                case MSG_UPDATE_SOUND_DECIBELS:
-                    updateSoundDecibels();
-                    removeMessages(MSG_UPDATE_SOUND_DECIBELS);
-                    sendEmptyMessageDelayed(MSG_UPDATE_SOUND_DECIBELS, UPDATE_SOUND_DECIBELS_INTERVAL);
-                    break;
-                case MSG_UPDATE_RECORD_TIME:
-                    updateRecordTime();
-                    removeMessages(MSG_UPDATE_RECORD_TIME);
-                    sendEmptyMessageDelayed(MSG_UPDATE_RECORD_TIME, UPDATE_RECORD_TIME_INTERVAL);
-                    break;
             }
         }
     };
 
     private static final String[] mSources = {
             // Local File
-            "file:///sdcard/但愿人长久 - 王菲.mp3",
-            "file:///sdcard/一千年以后 - 林俊杰.mp3",
-            "file:///sdcard/卡农 钢琴曲.wma",
-            "file:///sdcard/test.ac3",
             "file:///sdcard/test.mp4",
-            "file:///sdcard/王铮亮-真爱你的云.ape",
-            "file:///sdcard/邓紫棋-爱你.flac",
 
             // HLS(HTTP Live Streaming)
             "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清
             "http://ivi.bupt.edu.cn/hls/cctv6hd.m3u8",//CCTV6高清
-            "http://rtmpcnr001.cnr.cn/live/zgzs/playlist.m3u8",//中国之声
-            "http://rtmpcnr003.cnr.cn/live/yyzs/playlist.m3u8",//音乐之声
-            "http://rtmpcnr004.cnr.cn/live/dszs/playlist.m3u8",//经典音乐广播
-            "http://ngcdn004.cnr.cn/live/dszs/index.m3u8",//中央广播电台音乐频道
-            "http://123.56.16.201:1935/live/fm1006/96K/tzwj_video.m3u8",//北京新闻广播
-            "http://123.56.16.201:1935/live/fm994/96K/tzwj_video.m3u8",//北京教学广播
-            "http://123.56.16.201:1935/live/am603/96K/tzwj_video.m3u8",//北京故事广播
-            "http://audiolive.rbc.cn:1935/live/fm1043/96K/tzwj_video.m3u8",//北京长书广播
-            "https://lhttp.qingting.fm/live/20462/64k.mp3",//经典调频北京FM969
-
-            "http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3",
-            "http://music.163.com/song/media/outer/url?id=29750099.mp3",
-            "http://music.163.com/song/media/outer/url?id=566435178.mp3",
 
             // 1080P
             "https://www.apple.com/105/media/us/iphone-x/2017/01df5b43-28e4-4848-bf20-490c34a926a7/films/feature/iphone-x-feature-tpl-cc-us-20170912_1920x1080h.mp4",
@@ -125,8 +73,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             // 720P
             "https://www.apple.com/105/media/cn/mac/family/2018/46c4b917_abfd_45a3_9b51_4e3054191797/films/bruce/mac-bruce-tpl-cn-2018_1280x720h.mp4",
 
-            // RTSP(Real Time Streaming Protocol)
-            "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov",// 大熊兔 // TODO 打不开
             "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4",// 大熊兔
 
             // RTMP(Real Time Messaging Protocol)
@@ -141,7 +87,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     protected void onCreate(Bundle savedInstanceState) {
         LogUtils.d(TAG, "onCreate ");
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_audio_play);
+        setContentView(R.layout.activity_video_play);
 
         initViews();
     }
@@ -159,25 +105,14 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_destroy_audio_player).setOnClickListener(this);
-        findViewById(R.id.btn_left_channel).setOnClickListener(this);
-        findViewById(R.id.btn_right_channel).setOnClickListener(this);
-        findViewById(R.id.btn_stero).setOnClickListener(this);
 
-        findViewById(R.id.btn_start_record_audio).setOnClickListener(this);
-        findViewById(R.id.btn_pause_record_audio).setOnClickListener(this);
-        findViewById(R.id.btn_resume_record_audio).setOnClickListener(this);
-        findViewById(R.id.btn_stop_record_audio).setOnClickListener(this);
-        ((RadioGroup) findViewById(R.id.rg_record_type)).setOnCheckedChangeListener(this);
+        mWeSurfaceView = findViewById(R.id.we_surface_view);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
         mPlayUrl.setText(mSources[mIndex]);
         mError = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
-        mDecibels = findViewById(R.id.tv_decibels);
         mVolume = findViewById(R.id.tv_volume);
-        mPitch = findViewById(R.id.tv_pitch);
-        mTempo = findViewById(R.id.tv_tempo);
-        mRecordTimeView = findViewById(R.id.tv_record_time);
 
         mPlaySeekBar = findViewById(R.id.seek_bar_play);
         setSeekbarWith(mPlaySeekBar);
@@ -231,54 +166,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                 LogUtils.d(TAG, "mVolumeSeekBar onStopTrackingTouch");
             }
         });
-
-        mPitchSeekBar = findViewById(R.id.seek_bar_pitch);
-        mPitchSeekBar.setMax((int) (MAX_PITCH / PITCH_ACCURACY));
-        setSeekbarWith(mPitchSeekBar);
-        mPitchSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                if (mWePlayer != null) {
-                    float pitch = seekBar.getProgress() / (float) seekBar.getMax() * MAX_PITCH;
-                    mPitch.setText("音调：" + PITCH_FORMAT.format(pitch));
-                    mWePlayer.setPitch(pitch);
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                LogUtils.d(TAG, "mPitchSeekBar onStartTrackingTouch");
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                LogUtils.d(TAG, "mPitchSeekBar onStopTrackingTouch");
-            }
-        });
-
-        mTempoSeekBar = findViewById(R.id.seek_bar_tempo);
-        mTempoSeekBar.setMax((int) (MAX_TEMPO / TEMPO_ACCURACY));
-        setSeekbarWith(mTempoSeekBar);
-        mTempoSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                if (mWePlayer != null) {
-                    float tempo = seekBar.getProgress() / (float) seekBar.getMax() * MAX_TEMPO;
-                    mTempo.setText("音速：" + TEMPO_FORMAT.format(tempo));
-                    mWePlayer.setTempo(tempo);
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                LogUtils.d(TAG, "mTempoSeekBar onStartTrackingTouch");
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                LogUtils.d(TAG, "mTempoSeekBar onStopTrackingTouch");
-            }
-        });
     }
 
     private void setSeekbarWith(SeekBar seekbar) {
@@ -318,7 +205,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                 }
                 mWePlayer.start();
                 startUpdateTime();
-                startUpdateDecibels();
                 break;
             case R.id.btn_stop_play_audio:
                 if (mWePlayer == null) {
@@ -326,7 +212,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                 }
                 mWePlayer.stop();
                 stopUpdateTime();
-                stopUpdateDecibels();
                 resetUI();
                 break;
             case R.id.btn_destroy_audio_player:
@@ -335,81 +220,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                 }
                 mWePlayer.release();
                 stopUpdateTime();
-                stopUpdateDecibels();
                 resetUI();
                 mWePlayer = null;
-                break;
-            case R.id.btn_left_channel:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.setSoundChannel(WePlayer.SoundChannel.LEFT_CHANNEL);
-                break;
-            case R.id.btn_right_channel:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.setSoundChannel(WePlayer.SoundChannel.RIGHT_CHANNEL);
-                break;
-            case R.id.btn_stero:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.setSoundChannel(WePlayer.SoundChannel.STERO);
-                break;
-            case R.id.btn_start_record_audio:
-                if (mWePlayer == null) {
-                    return;
-                }
-                if (mRecordAudioFile == null) {
-                    mRecordAudioFile = new File("/sdcard/pcm_record.aac");
-                }
-                if (mPCMEncoder == null) {
-                    mPCMEncoder = new AACEncoder();
-                }
-                mWePlayer.startRecord(mPCMEncoder, mRecordAudioFile);
-                startUpdateRecordTime();
-                break;
-            case R.id.btn_pause_record_audio:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.pauseRecord();
-                stopUpdateRecordTime();
-                break;
-            case R.id.btn_resume_record_audio:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.resumeRecord();
-                startUpdateRecordTime();
-                break;
-            case R.id.btn_stop_record_audio:
-                stopUpdateRecordTime();
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.stopRecord();
-                break;
-        }
-    }
-
-    @Override
-    public void onCheckedChanged(RadioGroup radioGroup, int checkedId) {
-        switch (checkedId) {
-            case R.id.rb_wav:
-                mPCMEncoder = new WAVSaver();
-                if (mWAVFile == null) {
-                    mWAVFile = new File("/sdcard/pcm_record.wav");
-                }
-                mRecordAudioFile = mWAVFile;
-                break;
-            case R.id.rb_aac:
-                mPCMEncoder = new AACEncoder();
-                if (mAACFile == null) {
-                    mAACFile = new File("/sdcard/pcm_record.aac");
-                }
-                mRecordAudioFile = mAACFile;
                 break;
         }
     }
@@ -417,6 +229,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     private void openAudio(String url) {
         if (mWePlayer == null) {
             mWePlayer = new WePlayer();
+            mWePlayer.setSurfaceView(mWeSurfaceView);
             mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared() {
@@ -427,34 +240,23 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                     mVolume.setText("音量：" + VOLUME_FORMAT.format(volume));
                     mVolumeSeekBar.setProgress((int) (mVolumeSeekBar.getMax() * volume));
 
-                    float pitch = mWePlayer.getPitch();
-                    mPitch.setText("音调：" + PITCH_FORMAT.format(pitch));
-                    mPitchSeekBar.setProgress((int) (pitch / MAX_PITCH * mPitchSeekBar.getMax()));
-
-                    float tempo = mWePlayer.getTempo();
-                    mTempo.setText("音速：" + TEMPO_FORMAT.format(tempo));
-                    mTempoSeekBar.setProgress((int) (tempo / MAX_TEMPO * mTempoSeekBar.getMax()));
-
                     mDuration = mWePlayer.getDuration();
                     LogUtils.d(TAG, "mDuration=" + mDuration);
                     mPlaySeekBar.setMax(mDuration);
                     mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
                     startUpdateTime();
-                    startUpdateDecibels();
                 }
             });
             mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
                 @Override
                 public void onPlayLoading(boolean isLoading) {
                     LogUtils.d(TAG, "WePlayer onPlayLoading: " + isLoading);
-                    AudioPlayActivity.this.isLoading = isLoading;
+                    VideoPlayActivity.this.isLoading = isLoading;
                     if (isLoading) {
                         stopUpdateTime();
-                        stopUpdateDecibels();
-                        showProgressDialog(AudioPlayActivity.this);
+                        showProgressDialog(VideoPlayActivity.this);
                     } else {
                         startUpdateTime();
-                        startUpdateDecibels();
                         hideProgressDialog();
                     }
                 }
@@ -488,22 +290,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
     }
 
-    private void startUpdateDecibels() {
-        mHandler.sendEmptyMessage(MSG_UPDATE_SOUND_DECIBELS);
-    }
-
-    private void stopUpdateDecibels() {
-        mHandler.removeMessages(MSG_UPDATE_SOUND_DECIBELS);
-    }
-
-    private void startUpdateRecordTime() {
-        mHandler.sendEmptyMessage(MSG_UPDATE_RECORD_TIME);
-    }
-
-    private void stopUpdateRecordTime() {
-        mHandler.removeMessages(MSG_UPDATE_RECORD_TIME);
-    }
-
     private void resetUI() {
         mPlayUrl.setText("");
         mError.setText("");
@@ -533,19 +319,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         }
     }
 
-    private void updateSoundDecibels() {
-        if (mWePlayer == null || isLoading || !mWePlayer.isPlaying()) return;
-
-        mDecibels.setText("分贝：" + DECIBELS_FORMAT.format(mWePlayer.getSoundDecibels()));
-    }
-
-    private void updateRecordTime() {
-        if (mWePlayer == null) return;
-        long recordTime = Math.round(mWePlayer.getRecordTimeSecs() * 1000);
-        String recordTimeStr = DateTimeUtil.changeRemainTimeToHms(recordTime);
-        mRecordTimeView.setText(recordTimeStr);
-    }
-
     private void showProgressDialog(Context context) {
         if (mProgressDialog == null) {
             mProgressDialog = new ProgressDialog(context);
@@ -573,7 +346,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         if (mWePlayer != null) {
             mWePlayer.release();
             stopUpdateTime();
-            stopUpdateDecibels();
             mWePlayer = null;
         }
 

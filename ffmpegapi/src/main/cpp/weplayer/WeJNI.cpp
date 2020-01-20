@@ -40,6 +40,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
         javaListenerContainer->onErrorListener = new OnErrorListener(jvm, env, thiz);
         javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
         javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);
+        javaListenerContainer->onYuvDataCall = new OnYUVDataCall(jvm, env, thiz);
         pWePlayer = new WePlayer(javaListenerContainer);
     }
 

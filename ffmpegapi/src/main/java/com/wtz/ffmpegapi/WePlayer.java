@@ -7,6 +7,7 @@ import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.wtz.ffmpegapi.opengl.WeSurfaceView;
 import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
@@ -92,6 +93,7 @@ public class WePlayer {
     private boolean isReleased;
 
     private PCMRecorder mPCMRecorder;
+    private WeSurfaceView mWeSurfaceView;
 
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
@@ -684,6 +686,16 @@ public class WePlayer {
         }
 
         mPCMRecorder.encode(pcmData, size);
+    }
+
+    public void setSurfaceView(WeSurfaceView surfaceView) {
+        mWeSurfaceView = surfaceView;
+    }
+
+    private void onNativeYUVDataCall(int width, int height, byte[] y, byte[] u, byte[] v) {
+        if (mWeSurfaceView != null) {
+            mWeSurfaceView.setYUVData(width, height, y, u, v);
+        }
     }
 
 }

@@ -22,10 +22,6 @@ void WeVideoDecoder::initStream(VideoStream *videoStream) {
         return;
     }
     this->videoStream = videoStream;
-
-    //TODO FOR VIDEO BUFFER
-    // 使用 1 秒的采样字节数作为缓冲区大小，音频流采样参数不一样，缓冲区大小也不一样，就需要新建 buffer
-//    sampleBuffer = static_cast<uint8_t *>(av_malloc(audioStream->sampledSizePerSecond));
 }
 
 void WeVideoDecoder::releaseStream() {
@@ -33,13 +29,7 @@ void WeVideoDecoder::releaseStream() {
         queue->clearQueue();
     }
 
-    //TODO FOR VIDEO BUFFER
-//    if (sampleBuffer != NULL) {// 不同数据流使用的采样 buffer 不一样，需要销毁新建
-////        av_free(sampledBuffer);
-//        av_freep(&sampleBuffer);// 使用 av_freep(&buf) 代替 av_free(buf)
-//        sampleBuffer = NULL;
-//    }
-
+    releaseFormatConverter();
     releaseAvPacket();
     releaseAvFrame();
 
@@ -60,7 +50,13 @@ void WeVideoDecoder::flushCodecBuffers() {
     pthread_mutex_unlock(&decodeMutex);
 }
 
-int WeVideoDecoder::getData(void **buf) {
+/**
+ * 从队列中取 AVPacket 解码生成 YUV 数据
+ *
+ * @return >0：成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
+ * -4：发送解码失败；-5：接收解码数据帧失败；-6：解析 YUV 失败；
+ */
+int WeVideoDecoder::getYUVData(OnYUVDataCall *onYuvDataCall) {
     int ret = 0;
 
     if (readAllFramesComplete) {
@@ -86,21 +82,15 @@ int WeVideoDecoder::getData(void **buf) {
         readAllFramesComplete = false;
     }
 
-    // TODO VIDEO 处理
-    // 对解出来的 AVFrame 重采样
-//    ret = resample(&sampleBuffer);
-//    if (ret < 0) {
-//        return -6;
-//    }
-
-    // TODO VIDEO BUFFER 赋值
-//    *buf = sampleBuffer;
+    if (!parseYUV(onYuvDataCall)) {
+        ret = -6;
+    }
 
     return ret;
 }
 
 bool WeVideoDecoder::readAllDataComplete() {
-    return readAllPacketComplete && readAllFramesComplete;
+    return readAllPacketComplete && readAllFramesComplete && parseYUVComplete;
 }
 
 /**
@@ -168,13 +158,107 @@ bool WeVideoDecoder::receiveFrame() {
     return true;
 }
 
+bool WeVideoDecoder::parseYUV(OnYUVDataCall *onYuvDataCall) {
+    int ret = true;
+    parseYUVComplete = false;
+    if (avFrame->format == TARGET_AV_PIXEL_FORMAT) {
+        onYuvDataCall->callback(5, videoStream->width, videoStream->height,
+                                avFrame->data[0], avFrame->data[1], avFrame->data[2]);
+    } else {
+        // need convert
+        if (swsContext == NULL) {
+            initFormatConverter();
+        }
+        if (swsContext != NULL) {
+            sws_scale(
+                    swsContext,
+                    avFrame->data,// srcSlice[]
+                    avFrame->linesize,// srcStride[]
+                    0,// srcSliceY 从 slice 第几行开始处理
+                    avFrame->height,// srcSliceH 即 slice 的总行数
+                    convertFrame->data,// dst[]
+                    convertFrame->linesize// dstStride[]
+            );
+            onYuvDataCall->callback(5,
+                                    videoStream->width,
+                                    videoStream->height,
+                                    convertFrame->data[0],
+                                    convertFrame->data[1],
+                                    convertFrame->data[2]);
+        } else {
+            ret = false;
+        }
+    }
+
+    releaseAvFrame();
+    parseYUVComplete = true;
+    return ret;
+}
+
+bool WeVideoDecoder::initFormatConverter() {
+    convertFrame = av_frame_alloc();
+    int pixelBufSize = av_image_get_buffer_size(
+            TARGET_AV_PIXEL_FORMAT,
+            videoStream->width,
+            videoStream->height,
+            LINE_SIZE_ALIGN);
+    convertBuffer = static_cast<uint8_t *>(av_malloc(pixelBufSize * sizeof(uint8_t)));
+    // Setup the data pointers and linesizes based on the specified image parameters
+    // and the provided array.
+    int ret = av_image_fill_arrays(
+            convertFrame->data,
+            convertFrame->linesize,
+            convertBuffer,
+            TARGET_AV_PIXEL_FORMAT,
+            videoStream->width,
+            videoStream->height,
+            LINE_SIZE_ALIGN);
+    if (ret < 0) {
+        LOGE(LOG_TAG, "av_image_fill_arrays failed return code %d", ret);
+        releaseFormatConverter();
+        return false;
+    }
+
+    swsContext = sws_getContext(
+            videoStream->width,
+            videoStream->height,
+            videoStream->codecContext->pix_fmt,// 视频原始格式
+            videoStream->width,
+            videoStream->height,
+            TARGET_AV_PIXEL_FORMAT,// 视频目标转换格式
+            SWS_BICUBIC,// 双三次插值算法
+            NULL, NULL, NULL);
+    if (swsContext == NULL) {
+        LOGE(LOG_TAG, "sws_getContext failed", ret);
+        releaseFormatConverter();
+        return false;
+    }
+
+    return true;
+}
+
+void WeVideoDecoder::releaseFormatConverter() {
+    if (convertFrame != NULL) {
+        av_frame_free(&convertFrame);
+        av_freep(&convertFrame);
+        convertFrame = NULL;
+    }
+    if (convertBuffer != NULL) {
+        av_freep(&convertBuffer);
+        convertBuffer = NULL;
+    }
+    if (swsContext != NULL) {
+        sws_freeContext(swsContext);
+        swsContext = NULL;
+    }
+}
+
 void WeVideoDecoder::releaseAvPacket() {
     if (avPacket == NULL) {
         return;
     }
     av_packet_free(&avPacket);
-//    av_free(avPacket);
-    av_freep(&avPacket);// 使用 av_freep(&buf) 代替 av_free(buf)
+    av_freep(&avPacket);
     avPacket = NULL;
 }
 
@@ -183,7 +267,6 @@ void WeVideoDecoder::releaseAvFrame() {
         return;
     }
     av_frame_free(&avFrame);
-//    av_free(avFrame);
-    av_freep(&avFrame);// 使用 av_freep(&buf) 代替 av_free(buf)
+    av_freep(&avFrame);
     avFrame = NULL;
 }

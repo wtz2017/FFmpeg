@@ -141,6 +141,11 @@ int WeDemux::prepare() {
         if ((ret = initDecoder(videoStream->codecParams, &videoStream->codecContext)) != NO_ERROR) {
             return ret;
         }
+        videoStream->width = videoStream->codecContext->width;
+        videoStream->height = videoStream->codecContext->height;
+        if (LOG_DEBUG) {
+            LOGD(LOG_TAG, "Video: width=%d, height=%d", videoStream->width, videoStream->height);
+        }
     }
 
     return NO_ERROR;

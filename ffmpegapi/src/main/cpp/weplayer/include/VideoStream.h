@@ -19,6 +19,8 @@ public:
     int streamIndex = -1;
     AVCodecParameters *codecParams = NULL;
     AVCodecContext *codecContext = NULL;
+    int width = 0;
+    int height = 0;
     AVRational streamTimeBase;
     double duration = 0;// Duration of the stream in seconds
 

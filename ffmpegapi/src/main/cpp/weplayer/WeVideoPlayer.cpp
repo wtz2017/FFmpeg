@@ -20,18 +20,6 @@ WeVideoDecoder *WeVideoPlayer::getDecoder() {
 }
 
 int WeVideoPlayer::init() {
-    //TODO OpenGL player
-//    if (openSlPlayer == NULL) {
-//        openSlPlayer = new OpenSLPlayer(this, AudioStream::SAMPLE_OUT_CHANNEL_LAYOUT);
-//    }
-//    int ret;
-//    if ((ret = openSlPlayer->init()) != NO_ERROR) {
-//        LOGE(LOG_TAG, "OpenSLPlayer init failed!");
-//        delete openSlPlayer;
-//        openSlPlayer = NULL;
-//        return ret;
-//    }
-
     createVideoPlayerThread();
     return NO_ERROR;
 }
@@ -67,24 +55,7 @@ void WeVideoPlayer::_handleVideoPlayMessage(int msgType) {
 }
 
 int WeVideoPlayer::createPlayer() {
-    //TODO OpenGL player
-//    if (openSlPlayer == NULL) {
-//        LOGE(LOG_TAG, "Invoke createPlayer but openSlPlayer is NULL!");
-//        return E_CODE_AUD_ILLEGAL_CALL;
-//    }
-//
-//    if (!openSlPlayer->isInitSuccess()) {
-//        LOGE(LOG_TAG, "Invoke createPlayer but openSlPlayer did not initialize successfully!");
-//        return E_CODE_AUD_ILLEGAL_CALL;
-//    }
-//
-//    // 音频流采样率等参数不一样，就需要重新创建 player
-//    int ret;
-//    if ((ret = openSlPlayer->createPlayer()) != NO_ERROR) {
-//        LOGE(LOG_TAG, "OpenSLPlayer createPlayer failed!");
-//        return ret;
-//    }
-
+    // do nothing
     return NO_ERROR;
 }
 
@@ -100,33 +71,11 @@ int WeVideoPlayer::startPlay() {
 }
 
 void WeVideoPlayer::handleStartPlay() {
-    //TODO OpenGL player
-//    if (openSlPlayer == NULL) {
-//        LOGE(LOG_TAG, "handleStartPlay but openSlPlayer is NULL!");
-//        return;
-//    }
-//
-//    if (!openSlPlayer->isInitSuccess()) {
-//        LOGE(LOG_TAG, "handleStartPlay but openSlPlayer did not initialize successfully!");
-//        return;
-//    }
-//
-//    openSlPlayer->startPlay();
+    play();
 }
 
 void WeVideoPlayer::pause() {
-    //TODO OpenGL player
-//    if (openSlPlayer == NULL) {
-//        LOGE(LOG_TAG, "Invoke pause but openSlPlayer is NULL!");
-//        return;
-//    }
-//
-//    if (!openSlPlayer->isInitSuccess()) {
-//        LOGE(LOG_TAG, "Invoke pause but openSlPlayer did not initialize successfully!");
-//        return;
-//    }
-//
-//    openSlPlayer->pause();
+    // do nothing, 直接靠设置 PlayStatus 即可
 }
 
 void WeVideoPlayer::resumePlay() {
@@ -139,35 +88,59 @@ void WeVideoPlayer::resumePlay() {
 }
 
 void WeVideoPlayer::handleResumePlay() {
-    //TODO OpenGL player
-//    if (openSlPlayer == NULL) {
-//        LOGE(LOG_TAG, "handleResumePlay but openSlPlayer is NULL!");
-//        return;
-//    }
-//
-//    if (!openSlPlayer->isInitSuccess()) {
-//        LOGE(LOG_TAG, "handleResumePlay but openSlPlayer did not initialize successfully!");
-//        return;
-//    }
-//
-//    openSlPlayer->resumePlay();
+    play();
+}
+
+void WeVideoPlayer::play() {
+    playFinished = false;
+    int ret;
+    while (status != NULL && status->isPlaying()) {
+        if (status->isSeeking) {
+            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
+            continue;
+        }
+
+        ret = decoder->getYUVData(javaListenerContainer->onYuvDataCall);
+        if (ret == 0) {
+            // 成功获取数据
+            if (status->isPlayLoading) {
+                status->isPlayLoading = false;
+                javaListenerContainer->onPlayLoadingListener->callback(1, false);
+            }
+            continue;
+        } else if (ret == -1) {
+            // 数据加载中，等一会儿再来取
+            if (!status->isPlayLoading) {
+                status->isPlayLoading = true;
+                javaListenerContainer->onPlayLoadingListener->callback(1, true);
+            }
+            av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
+            continue;
+        } else if (ret == -2) {
+            // 已经播放到末尾，直接退出循环
+            break;
+        } else {
+            // 各种原因失败，直接取下一个包，不用等待
+            if (status->isPlayLoading) {
+                status->isPlayLoading = false;
+                javaListenerContainer->onPlayLoadingListener->callback(1, false);
+            }
+            continue;
+        }
+    }
+    // 这里加一条判断 loading 是为了补充非播放状态时退出 while 循环的场景，同时适用于正常取到数据场景
+    if (status->isPlayLoading) {
+        status->isPlayLoading = false;
+        javaListenerContainer->onPlayLoadingListener->callback(1, false);
+    }
+    playFinished = true;
 }
 
 bool WeVideoPlayer::isPlayComplete() {
-    //TODO OpenGL player
-//    return (decoder == NULL || decoder->readAllDataComplete()) &&
-//           (openSlPlayer == NULL || openSlPlayer->enqueueFinished);
-    return (decoder == NULL || decoder->readAllDataComplete());
+    return (decoder == NULL || decoder->readAllDataComplete()) && playFinished;
 }
 
 void WeVideoPlayer::stopPlay() {
-    //TODO OpenGL player
-//    if (openSlPlayer != NULL) {
-//        openSlPlayer->stopPlay();// 停止播放回调
-//    } else {
-//        LOGE(LOG_TAG, "Invoke stopPlay but openSlPlayer is NULL!");
-//    }
-
     decoder->stop();
 
     if (videoPlayerThread != NULL) {
@@ -176,12 +149,7 @@ void WeVideoPlayer::stopPlay() {
 }
 
 void WeVideoPlayer::destroyPlayer() {
-    //TODO OpenGL player
-//    if (openSlPlayer != NULL) {
-//        openSlPlayer->destroyPlayer();
-//    } else {
-//        LOGE(LOG_TAG, "Invoke destroyPlayer but openSlPlayer is NULL!");
-//    }
+    // do nothing
 }
 
 void WeVideoPlayer::clearDataAfterStop() {
@@ -189,11 +157,7 @@ void WeVideoPlayer::clearDataAfterStop() {
 }
 
 bool WeVideoPlayer::workFinished() {
-    //TODO OpenGL player
-//    if (openSlPlayer != NULL) {
-//        return openSlPlayer->enqueueFinished;
-//    }
-    return true;
+    return playFinished;
 }
 
 void WeVideoPlayer::release() {
@@ -201,12 +165,6 @@ void WeVideoPlayer::release() {
         LOGD(LOG_TAG, "release...");
     }
     stopPlay();// 首先停止播放，也就停止了消费者从队列里取数据
-
-    //TODO OpenGL player
-//    if (openSlPlayer != NULL) {
-//        delete openSlPlayer;
-//        openSlPlayer = NULL;
-//    }
 
     delete decoder;
     decoder = NULL;

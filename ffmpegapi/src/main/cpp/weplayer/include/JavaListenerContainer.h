@@ -11,6 +11,7 @@
 #include "OnErrorListener.h"
 #include "OnCompletionListener.h"
 #include "OnPCMDataCall.h"
+#include "OnYUVDataCall.h"
 
 class JavaListenerContainer {
 
@@ -20,6 +21,7 @@ public:
     OnErrorListener *onErrorListener;
     OnCompletionListener *onCompletionListener;
     OnPCMDataCall *onPcmDataCall;
+    OnYUVDataCall *onYuvDataCall;
 
 public:
     JavaListenerContainer() {

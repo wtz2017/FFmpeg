@@ -17,7 +17,7 @@ private:
     JavaListenerContainer *javaListenerContainer = NULL;
 
     WeVideoDecoder *decoder = NULL;
-//    OpenSLPlayer *openSlPlayer = NULL;//TODO OpenGL player
+    bool playFinished = true;
 
     // 播放器只针对取数据单独用一个线程，其它播放控制走调度线程
     LooperThread *videoPlayerThread = NULL;
@@ -69,6 +69,8 @@ private:
     void handleStartPlay();
 
     void handleResumePlay();
+
+    void play();
 
     void release();
 
