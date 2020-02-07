@@ -61,7 +61,12 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
 
     private static final String[] mSources = {
             // Local File
-            "file:///sdcard/test.mp4",
+            "file:///sdcard/视频/0001.优酷网-28 黄石天书-0001-joined.flv",
+            "file:///sdcard/BINGO  Super Simple Songs.mp4",
+            "file:///sdcard/Open Shut Them  Super Simple Songs.mp4",
+            "file:///sdcard/冰河世纪4：大陆漂移.mp4",
+            "file:///sdcard/掰手腕.wmv",
+            "file:///sdcard/机器人总动员.rmvb",
 
             // HLS(HTTP Live Streaming)
             "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清

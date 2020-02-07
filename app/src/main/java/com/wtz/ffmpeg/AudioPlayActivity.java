@@ -126,7 +126,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             "https://www.apple.com/105/media/cn/mac/family/2018/46c4b917_abfd_45a3_9b51_4e3054191797/films/bruce/mac-bruce-tpl-cn-2018_1280x720h.mp4",
 
             // RTSP(Real Time Streaming Protocol)
-            "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov",// 大熊兔 // TODO 打不开
+            "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov",// 大熊兔
             "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4",// 大熊兔
 
             // RTMP(Real Time Messaging Protocol)

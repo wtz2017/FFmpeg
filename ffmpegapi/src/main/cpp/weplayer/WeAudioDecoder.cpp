@@ -270,9 +270,6 @@ int WeAudioDecoder::resample(uint8_t **out) {
 }
 
 void WeAudioDecoder::updateTime(int64_t pts, int sampleDataBytes) {
-    if (audioStream->duration <= 0) {
-        return;
-    }
     currentFrameTime = pts * av_q2d(audioStream->streamTimeBase);
     if (currentFrameTime < sampleTimeSecs) {
         // avFrame->pts maybe 0
@@ -281,7 +278,7 @@ void WeAudioDecoder::updateTime(int64_t pts, int sampleDataBytes) {
     // 实际采样时间 = 当前帧时间 + 本帧实际采样字节数占 1 秒理论采样总字节数的比例
     sampleTimeSecs =
             currentFrameTime + (sampleDataBytes / (double) audioStream->sampledSizePerSecond);
-    if (sampleTimeSecs > audioStream->duration) {
+    if (audioStream->duration > 0 && sampleTimeSecs > audioStream->duration) {
         // 测试发现 ape 音频文件 seek 到末尾后再播放时计算会大于总时长 1s 左右
         sampleTimeSecs = audioStream->duration;
     }

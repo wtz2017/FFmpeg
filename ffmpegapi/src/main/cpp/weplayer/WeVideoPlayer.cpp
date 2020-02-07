@@ -88,6 +88,7 @@ void WeVideoPlayer::resumePlay() {
 }
 
 void WeVideoPlayer::handleResumePlay() {
+    decoder->enableFirstFrame();
     play();
 }
 
@@ -97,10 +98,21 @@ void WeVideoPlayer::play() {
     while (status != NULL && status->isPlaying()) {
         if (status->isSeeking) {
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
+            decoder->enableFirstFrame();
             continue;
         }
 
+        if (LOG_TIME_SYNC) {
+            decoder->t1 = decoder->t2 = decoder->t3 = decoder->t4 = decoder->t5 = 0;
+        }
         ret = decoder->getYUVData(javaListenerContainer->onYuvDataCall);
+        if (LOG_TIME_SYNC) {
+            LOGE(LOG_TAG,
+                 "getYUVData ret=%d; getPacket=%d; sendPacket=%d; receiveFrame=%d; parseYUV=%d",
+                 ret, decoder->t2 - decoder->t1, decoder->t3 - decoder->t2,
+                 decoder->t4 - decoder->t3,
+                 decoder->t5 - decoder->t4);
+        }
         if (ret == 0) {
             // 成功获取数据
             if (status->isPlayLoading) {
@@ -115,6 +127,7 @@ void WeVideoPlayer::play() {
                 javaListenerContainer->onPlayLoadingListener->callback(1, true);
             }
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
+            decoder->enableFirstFrame();
             continue;
         } else if (ret == -2) {
             // 已经播放到末尾，直接退出循环

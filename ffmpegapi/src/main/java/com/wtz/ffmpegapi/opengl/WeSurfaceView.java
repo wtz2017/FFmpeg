@@ -183,6 +183,9 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
     private void renderYUV() {
         if (yuvWidth <= 0 || yuvHeight <= 0 || yBuffer == null || uBuffer == null || vBuffer == null) {
+            // 播放中可能部分画面数据不满足条件时走到这里
+            // 返回函数前再画一次矩形，是为了解决之前已经清屏而这里又不绘制导致闪屏的问题
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
             return;
         }
 
@@ -213,7 +216,6 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         // 将 3 个纹理单元分别激活，并绑定到 YUV 数据
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureYUVDataIds[0]);
-        // TODO 函数解释？
         GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE,
                 yuvWidth, yuvHeight, 0, GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_BYTE, yBuffer);
 

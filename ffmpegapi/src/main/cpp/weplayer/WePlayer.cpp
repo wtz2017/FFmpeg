@@ -132,7 +132,7 @@ void WePlayer::prepareAsync() {
 
     weAudioPlayer->getDecoder()->initStream(weDemux->getAudioStream());
     if (weDemux->getVideoStream() != NULL) {
-        weVideoPlayer->getDecoder()->initStream(weDemux->getVideoStream());
+        weVideoPlayer->getDecoder()->initStream(weDemux->getVideoStream(), weAudioPlayer->getDecoder());
     }
 
     // 为新数据流创建音频播放器
@@ -426,19 +426,29 @@ void WePlayer::seekTo(int msec) {
         weDemux->getVideoQueue()->setProductDataComplete(false);
     }
 
-    // clear cache
+    // clear cache first
+    clearCache();
+
+    // seek
+    weDemux->seekTo(targetSeconds);
+    weAudioPlayer->getDecoder()->setSeekTime(targetSeconds);
+    if (weDemux->getVideoStream() != NULL) {
+        weVideoPlayer->getDecoder()->setSeekTime(targetSeconds);
+    }
+
+    // clear cache again
+    clearCache();
+
+    status->isSeeking = false;
+}
+
+void WePlayer::clearCache() {
     weDemux->getAudioQueue()->clearQueue();
     weAudioPlayer->getDecoder()->flushCodecBuffers();
-    weAudioPlayer->getDecoder()->setSeekTime(targetSeconds);
     if (weDemux->getVideoStream() != NULL) {
         weDemux->getVideoQueue()->clearQueue();
         weVideoPlayer->getDecoder()->flushCodecBuffers();
     }
-
-    // seek
-    weDemux->seekTo(targetSeconds);
-
-    status->isSeeking = false;
 }
 
 void WePlayer::setVolume(float percent) {

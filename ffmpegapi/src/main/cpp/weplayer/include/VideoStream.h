@@ -22,11 +22,11 @@ public:
     int width = 0;
     int height = 0;
     AVRational streamTimeBase;
-    double duration = 0;// Duration of the stream in seconds
+    AVRational avgFrameRate;
 
 public:
     VideoStream(int streamIndex, AVCodecParameters *codecParams, AVRational streamTimeBase,
-                double duration);
+                AVRational avgFrameRate);
 
     ~VideoStream();
 

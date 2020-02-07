@@ -5,11 +5,11 @@
 #include "VideoStream.h"
 
 VideoStream::VideoStream(int streamIndex, AVCodecParameters *codecParams, AVRational streamTimeBase,
-                         double duration) {
+                         AVRational avgFrameRate) {
     this->streamIndex = streamIndex;
     this->codecParams = codecParams;
     this->streamTimeBase = streamTimeBase;
-    this->duration = duration;
+    this->avgFrameRate = avgFrameRate;
 }
 
 VideoStream::~VideoStream() {

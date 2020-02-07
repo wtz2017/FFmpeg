@@ -124,7 +124,8 @@ int WeDemux::prepare() {
             }
         } else if (mediaType == AVMEDIA_TYPE_VIDEO) {
             videoStream = new VideoStream(i, pFormatCtx->streams[i]->codecpar,
-                                          pFormatCtx->streams[i]->time_base, duration);
+                                          pFormatCtx->streams[i]->time_base,
+                                          pFormatCtx->streams[i]->avg_frame_rate);
         }
     }
     // 可以没有视频流，但音频流一定得有

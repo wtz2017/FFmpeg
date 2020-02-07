@@ -185,6 +185,11 @@ private:
 
     void releaseAvPacket();
 
+    /**
+     * 清除队列和解码器中的缓存数据
+     */
+    void clearCache();
+
 };
 
 
