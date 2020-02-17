@@ -132,7 +132,8 @@ void WePlayer::prepareAsync() {
 
     weAudioPlayer->getDecoder()->initStream(weDemux->getAudioStream());
     if (weDemux->getVideoStream() != NULL) {
-        weVideoPlayer->getDecoder()->initStream(weDemux->getVideoStream(), weAudioPlayer->getDecoder());
+        weVideoPlayer->getDecoder()->initStream(weDemux->getVideoStream(),
+                                                weAudioPlayer->getDecoder());
     }
 
     // 为新数据流创建音频播放器
@@ -426,7 +427,7 @@ void WePlayer::seekTo(int msec) {
         weDemux->getVideoQueue()->setProductDataComplete(false);
     }
 
-    // clear cache first
+    // clearScreen cache first
     clearCache();
 
     // seek
@@ -436,7 +437,7 @@ void WePlayer::seekTo(int msec) {
         weVideoPlayer->getDecoder()->setSeekTime(targetSeconds);
     }
 
-    // clear cache again
+    // clearScreen cache again
     clearCache();
 
     status->isSeeking = false;
@@ -637,6 +638,10 @@ void WePlayer::stop() {
     }
     if (weDemux->getVideoStream() != NULL && weVideoPlayer != NULL) {
         weVideoPlayer->stopPlay();
+    }
+    if (status->isPlayLoading) {
+        status->isPlayLoading = false;
+        javaListenerContainer->onPlayLoadingListener->callback(1, false);
     }
 
     if (LOG_DEBUG) {

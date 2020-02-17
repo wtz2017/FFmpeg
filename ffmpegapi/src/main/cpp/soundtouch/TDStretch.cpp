@@ -348,7 +348,7 @@ int TDStretch::seekBestOverlapPositionFull(const SAMPLETYPE *refPos)
     adaptNormalizer();
 #endif
 
-    // clear cross correlation routine state if necessary (is so e.g. in MMX routines).
+    // clearScreen cross correlation routine state if necessary (is so e.g. in MMX routines).
     clearCrossCorrState();
 
     return bestOffs;
@@ -464,7 +464,7 @@ int TDStretch::seekBestOverlapPositionQuick(const SAMPLETYPE *refPos)
         }
     }
 
-    // clear cross correlation routine state if necessary (is so e.g. in MMX routines).
+    // clearScreen cross correlation routine state if necessary (is so e.g. in MMX routines).
     clearCrossCorrState();
 
 #ifdef SOUNDTOUCH_INTEGER_SAMPLES

@@ -1,4 +1,4 @@
-package com.wtz.ffmpegapi.opengl;
+package com.wtz.ffmpegapi.utils;
 
 import android.content.Context;
 import android.opengl.GLES20;

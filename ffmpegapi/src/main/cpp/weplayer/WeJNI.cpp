@@ -41,6 +41,11 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
         javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
         javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);
         javaListenerContainer->onYuvDataCall = new OnYUVDataCall(jvm, env, thiz);
+        javaListenerContainer->onCheckHardCodec = new OnCheckVideoHardCodec(jvm, env, thiz);
+        javaListenerContainer->onInitVideoHardCodec = new OnInitVideoHardCodec(jvm, env, thiz);
+        javaListenerContainer->onSetVideoHardCodec = new OnSetVideoHardCodec(jvm, env, thiz);
+        javaListenerContainer->onVideoPacketCall = new OnVideoPacketCall(jvm, env, thiz);
+        javaListenerContainer->onStopVideoHardCodec = new OnStopVideoHardCodec(jvm, env, thiz);
         pWePlayer = new WePlayer(javaListenerContainer);
     }
 

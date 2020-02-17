@@ -1,16 +1,21 @@
 package com.wtz.ffmpegapi;
 
+import android.media.MediaCodec;
+import android.media.MediaFormat;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Surface;
 
-import com.wtz.ffmpegapi.opengl.WeSurfaceView;
 import com.wtz.ffmpegapi.utils.LogUtils;
+import com.wtz.ffmpegapi.utils.VideoUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class WePlayer {
     private static final String TAG = "WePlayerJava";
@@ -93,7 +98,15 @@ public class WePlayer {
     private boolean isReleased;
 
     private PCMRecorder mPCMRecorder;
+
+    // for video
+    private String mFFmpegVideoCodecType;
+    private boolean beVideoHardCodec;
     private WeSurfaceView mWeSurfaceView;
+    private Surface mSurface;
+    private MediaCodec mVideoDecoder;
+    private MediaFormat mVideoFormat;
+    private MediaCodec.BufferInfo mVideoBufferInfo;
 
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
@@ -241,6 +254,10 @@ public class WePlayer {
         }
 
         mUIHandler.removeCallbacksAndMessages(null);
+
+        if (mWeSurfaceView != null) {
+            mWeSurfaceView.onPlayerReleased();
+        }
     }
 
     public void setOnPreparedListener(OnPreparedListener listener) {
@@ -300,6 +317,9 @@ public class WePlayer {
         }
 
         isPrepared = true;
+        if (mWeSurfaceView != null) {
+            mWeSurfaceView.onPlayerPrepared();
+        }
         setCacheVolume();
         if (mOnPreparedListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
@@ -499,6 +519,9 @@ public class WePlayer {
 
     private void handleStop() {
         nativeStop();
+        if (mWeSurfaceView != null) {
+            mWeSurfaceView.onPlayerStopped();
+        }
     }
 
     /**
@@ -519,6 +542,10 @@ public class WePlayer {
 
     private void handleReset() {
         nativeReset();
+        // 在彻底停止数据回调后调用一次清屏
+        if (mWeSurfaceView != null) {
+            mWeSurfaceView.onPlayerReset();
+        }
     }
 
     public boolean isPlaying() {
@@ -696,6 +723,145 @@ public class WePlayer {
         if (mWeSurfaceView != null) {
             mWeSurfaceView.setYUVData(width, height, y, u, v);
         }
+    }
+
+    /**
+     * 供 Native 层判断是否支持硬解码
+     *
+     * @param ffmpegCodecType ffmpeg 层的解码器类型
+     * @return true 支持硬解
+     */
+    private boolean onNativeCheckVideoHardCodec(String ffmpegCodecType) {
+        this.mFFmpegVideoCodecType = ffmpegCodecType;
+        return VideoUtils.isSupportHardCodec(ffmpegCodecType);
+    }
+
+    /**
+     * Native 通知 Java 层初始化硬解码器
+     *
+     * @param ffmpegCodecType ffmpeg 层的解码器类型
+     * @param width           视频宽度
+     * @param height          视频高度
+     * @param csd0
+     * @param csd1
+     * @return true 初始化成功
+     */
+    private boolean onNativeInitVideoHardCodec(String ffmpegCodecType, int width, int height,
+                                               byte[] csd0, byte[] csd1) {
+        if (mWeSurfaceView == null) {
+            LogUtils.e(TAG, "onNativeInitVideoHardCodec mWeSurfaceView is null!");
+            return false;
+        }
+        mSurface = mWeSurfaceView.getMediaCodecSurface();
+        if (mSurface == null) {
+            LogUtils.e(TAG, "onNativeInitVideoHardCodec mSurface is null!");
+            return false;
+        }
+
+        String mime = VideoUtils.findHardCodecType(ffmpegCodecType);
+        try {
+            mVideoDecoder = MediaCodec.createDecoderByType(mime);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+        if (mVideoDecoder == null) {
+            LogUtils.e(TAG, "MediaCodec create VideoDecoder failed!");
+            return false;
+        }
+
+        mVideoFormat = MediaFormat.createVideoFormat(mime, width, height);
+        mVideoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
+        mVideoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd0));
+        mVideoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(csd1));
+
+        try {
+            mVideoDecoder.configure(mVideoFormat, mSurface, null, 0);
+        } catch (Exception e) {
+            e.printStackTrace();
+            mVideoDecoder.release();
+            mVideoDecoder = null;
+            mVideoFormat = null;
+            return false;
+        }
+
+        mVideoBufferInfo = new MediaCodec.BufferInfo();
+        mVideoDecoder.start();
+        return true;
+    }
+
+    /**
+     * 最终由 Native 层判定是否可以硬解码
+     *
+     * @param hardCodec true 可以硬解码
+     */
+    private void onNativeSetVideoHardCodec(boolean hardCodec) {
+        this.beVideoHardCodec = hardCodec;
+        if (mWeSurfaceView != null) {
+            mWeSurfaceView.setHardCodec(hardCodec);
+        }
+    }
+
+    private void onNativeVideoPacketCall(int packetSize, byte[] packet) {
+        if (mVideoDecoder == null) {
+            LogUtils.e(TAG, "onNativeVideoPacketCall mVideoDecoder == null");
+            return;
+        }
+        if (packetSize <= 0 || packet == null || packet.length < packetSize) {
+            LogUtils.e(TAG, "onNativeVideoPacketCall but params is invalid: packetSize="
+                    + packetSize + ", packet=" + packet);
+            return;
+        }
+
+        // 获取输入 buffer，超时等待
+        int inputBufferIndex = mVideoDecoder.dequeueInputBuffer(10);
+        if (inputBufferIndex < 0) {
+            LogUtils.e(TAG, "mVideoDecoder dequeueInputBuffer failed inputBufferIndex=" + inputBufferIndex);
+            return;
+        }
+
+        // 成功获取输入 buffer后，填入要处理的数据
+        ByteBuffer inputBuffer = mVideoDecoder.getInputBuffers()[inputBufferIndex];
+        inputBuffer.clear();
+        inputBuffer.put(packet);
+        // 填完输入数据后，释放输入 buffer
+        mVideoDecoder.queueInputBuffer(
+                inputBufferIndex, 0, packetSize, 0, 0);
+
+        // 获取输出 buffer，超时等待
+        int ouputBufferIndex = mVideoDecoder.dequeueOutputBuffer(mVideoBufferInfo, 10);
+        while (ouputBufferIndex >= 0) {// 可能一次获取不完，需要多次
+//            ByteBuffer outputBuffer = mVideoDecoder.getOutputBuffers()[ouputBufferIndex];
+            // do nothing?
+            // releaseOutputBuffer
+            // * @param render If a valid surface was specified when configuring the codec,
+            // *               passing true renders this output buffer to the surface.
+            mVideoDecoder.releaseOutputBuffer(ouputBufferIndex, true);
+            ouputBufferIndex = mVideoDecoder.dequeueOutputBuffer(mVideoBufferInfo, 10);
+        }
+    }
+
+    /**
+     * 涉及多线程操作，由 Native 层统一调用停止时的资源释放
+     */
+    private void onNativeStopVideoHardCodec() {
+        LogUtils.w(TAG, "onNativeStopVideoHardCodec...");
+        if (mVideoDecoder != null) {
+            mVideoDecoder.flush();
+            mVideoDecoder.stop();
+            mVideoDecoder.release();
+            mVideoDecoder = null;
+        }
+        mVideoFormat = null;
+        mVideoBufferInfo = null;
+    }
+
+    public boolean isVideoHardCodec() {
+        return beVideoHardCodec;
+    }
+
+    public String getVideoCodecType() {
+        return mFFmpegVideoCodecType;
     }
 
 }

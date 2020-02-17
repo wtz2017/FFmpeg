@@ -4,8 +4,9 @@
 
 #include "WeVideoDecoder.h"
 
-WeVideoDecoder::WeVideoDecoder(AVPacketQueue *queue) {
+WeVideoDecoder::WeVideoDecoder(AVPacketQueue *queue, JavaListenerContainer *javaListenerContainer) {
     this->queue = queue;
+    this->javaListenerContainer = javaListenerContainer;
     pthread_mutex_init(&decodeMutex, NULL);
 }
 
@@ -14,6 +15,8 @@ WeVideoDecoder::~WeVideoDecoder() {
     releaseStream();
 
     queue = NULL;
+    // 最顶层 WePlayer 负责回收 javaListenerContainer，这里只把本指针置空
+    javaListenerContainer = NULL;
     pthread_mutex_destroy(&decodeMutex);
 }
 
@@ -23,6 +26,8 @@ void WeVideoDecoder::initStream(VideoStream *videoStream, WeAudioDecoder *decode
     }
     this->videoStream = videoStream;
     this->weAudioDecoder = decoder;
+
+    checkHardCodec();
 
     // 计算两帧的间隔时间
     frameInterval = av_q2d(videoStream->codecContext->framerate);
@@ -37,9 +42,96 @@ void WeVideoDecoder::initStream(VideoStream *videoStream, WeAudioDecoder *decode
     lastDelay = avgFrameInterval;
 }
 
+void WeVideoDecoder::checkHardCodec() {
+    codecName = videoStream->codecContext->codec->name;
+    char support = 0;// 视频是否支持硬解码
+    javaListenerContainer->onCheckHardCodec->callback(2, codecName, &support);
+    if (LOG_DEBUG) {
+        LOGW(LOG_TAG, "pre to setHardCodec: %d for ffmpeg codec %s", support, codecName);
+    }
+
+    while (support) {
+        if (strcasecmp(codecName, "h264") == 0) {
+            avBitStreamFilter = av_bsf_get_by_name("h264_mp4toannexb");
+        } else if (strcasecmp(codecName, "h265") == 0 || strcasecmp(codecName, "hevc") == 0) {
+            avBitStreamFilter = av_bsf_get_by_name("hevc_mp4toannexb");
+        } else if (strcasecmp(codecName, "mpeg4") == 0) {
+            avBitStreamFilter = av_bsf_get_by_name("mpeg4_unpack_bframes");
+        } else if (strcasecmp(codecName, "vp9") == 0) {
+            avBitStreamFilter = av_bsf_get_by_name("vp9_superframe");
+        }
+        if (avBitStreamFilter == NULL) {
+            support = false;
+            LOGE(LOG_TAG, "Can't find AVBitStreamFilter for %s", codecName);
+            break;
+        }
+
+        if (av_bsf_alloc(avBitStreamFilter, &avBSFContext) != 0) {
+            support = false;
+            LOGE(LOG_TAG, "av_bsf_alloc failed for %s", codecName);
+            break;
+        }
+
+        if (avcodec_parameters_copy(avBSFContext->par_in, videoStream->codecParams) < 0) {
+            support = false;
+            LOGE(LOG_TAG, "avBSFContext avcodec_parameters_copy failed for %s", codecName);
+            break;
+        }
+
+        if (av_bsf_init(avBSFContext) != 0) {
+            support = false;
+            LOGE(LOG_TAG, "av_bsf_init failed for %s", codecName);
+            break;
+        }
+
+        avBSFContext->time_base_in = videoStream->streamTimeBase;
+        char initResult = 0;
+        javaListenerContainer->onInitVideoHardCodec
+                ->callback(8, codecName, videoStream->width, videoStream->height,
+                           videoStream->codecContext->extradata_size,
+                           videoStream->codecContext->extradata_size,
+                           videoStream->codecContext->extradata,
+                           videoStream->codecContext->extradata,
+                           &initResult);
+        if (!initResult) {
+            support = false;
+            LOGE(LOG_TAG, "InitVideoHardCodec failed for %s", codecName);
+            break;
+        }
+        break;
+    }
+
+    if (!support) {
+        if (avBitStreamFilter != NULL) {
+            avBitStreamFilter = NULL;
+        }
+        if (avBSFContext != NULL) {
+            av_bsf_free(&avBSFContext);
+            avBSFContext = NULL;
+        }
+    }
+
+    this->supportHardCodec = support;
+    LOGW(LOG_TAG, "Finally setHardCodec: %d", supportHardCodec);
+    javaListenerContainer->onSetVideoHardCodec->callback(1, supportHardCodec);
+}
+
+bool WeVideoDecoder::isSupportHardCodec() {
+    return supportHardCodec;
+}
+
 void WeVideoDecoder::releaseStream() {
     if (queue != NULL) {
         queue->clearQueue();
+    }
+
+    if (supportHardCodec) {
+        supportHardCodec = false;
+        codecName = NULL;
+        av_bsf_free(&avBSFContext);
+        avBSFContext = NULL;
+        avBitStreamFilter = NULL;
+        javaListenerContainer->onStopVideoHardCodec->callback(0);
     }
 
     releaseFormatConverter();
@@ -80,7 +172,7 @@ void WeVideoDecoder::flushCodecBuffers() {
  * @return >0：成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
  * -4：发送解码失败；-5：接收解码数据帧失败；-6：解析 YUV 失败；
  */
-int WeVideoDecoder::getYUVData(OnYUVDataCall *onYuvDataCall) {
+int WeVideoDecoder::getYUVData() {
     int ret = 0;
 
     if (readAllFramesComplete) {
@@ -128,7 +220,7 @@ int WeVideoDecoder::getYUVData(OnYUVDataCall *onYuvDataCall) {
     if (LOG_TIME_SYNC) {
         t4 = WeUtils::getCurrentTimeMill();
     }
-    if (!parseYUV(onYuvDataCall)) {
+    if (!parseYUV()) {
         t5 = WeUtils::getCurrentTimeMill();
         return -6;
     }
@@ -136,6 +228,25 @@ int WeVideoDecoder::getYUVData(OnYUVDataCall *onYuvDataCall) {
     if (LOG_TIME_SYNC) {
         t5 = WeUtils::getCurrentTimeMill();
     }
+    return 0;
+}
+
+/**
+ * 从队列中取 AVPacket 添加头信息生成 MediaCodec 可硬解码的数据
+ *
+ * @return 0：获取成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
+ * -4：发送 packet 过滤失败；-5：接收过滤好的 packet 失败；
+ */
+int WeVideoDecoder::getVideoPacket() {
+    int ret = 0;
+    if ((ret = getPacket()) != 0) {
+        return ret;
+    }
+
+    if ((ret = filterPacket()) != 0) {
+        return ret;
+    }
+
     return 0;
 }
 
@@ -208,22 +319,23 @@ bool WeVideoDecoder::receiveFrame() {
     return true;
 }
 
-bool WeVideoDecoder::parseYUV(OnYUVDataCall *onYuvDataCall) {
+bool WeVideoDecoder::parseYUV() {
     int ret = true;
     parseYUVComplete = false;
 
     /* ======音视频同步====== */
-//    computeFrameInterval_1(avFrame);
-//    computeFrameInterval_2(avFrame);
-//    computeFrameInterval_3(avFrame);
-    computeFrameDelay_4(avFrame);
+//    computeFrameDelay_1(avFrame->best_effort_timestamp);
+//    computeFrameDelay_2(avFrame->best_effort_timestamp, avFrame);
+//    computeFrameDelay_3(avFrame->best_effort_timestamp);
+    computeFrameDelay_4(avFrame->best_effort_timestamp);
 //    av_usleep(currentFrameInterval * 1000000 + 6000);// + 6000导致某些视频太慢
     av_usleep(actualDelay * 1000000);
     /* ======音视频同步====== */
 
     if (avFrame->format == TARGET_AV_PIXEL_FORMAT) {
-        onYuvDataCall->callback(5, videoStream->width, videoStream->height,
-                                avFrame->data[0], avFrame->data[1], avFrame->data[2]);
+        javaListenerContainer->onYuvDataCall->callback(5, videoStream->width, videoStream->height,
+                                                       avFrame->data[0], avFrame->data[1],
+                                                       avFrame->data[2]);
     } else {
         // need convert
         if (swsContext == NULL) {
@@ -239,12 +351,12 @@ bool WeVideoDecoder::parseYUV(OnYUVDataCall *onYuvDataCall) {
                     convertFrame->data,// dst[]
                     convertFrame->linesize// dstStride[]
             );
-            onYuvDataCall->callback(5,
-                                    videoStream->width,
-                                    videoStream->height,
-                                    convertFrame->data[0],
-                                    convertFrame->data[1],
-                                    convertFrame->data[2]);
+            javaListenerContainer->onYuvDataCall->callback(5,
+                                                           videoStream->width,
+                                                           videoStream->height,
+                                                           convertFrame->data[0],
+                                                           convertFrame->data[1],
+                                                           convertFrame->data[2]);
         } else {
             ret = false;
         }
@@ -255,8 +367,52 @@ bool WeVideoDecoder::parseYUV(OnYUVDataCall *onYuvDataCall) {
     return ret;
 }
 
-double WeVideoDecoder::computeFrameDelay_1(AVFrame *avFrame) {
-    pts = avFrame->best_effort_timestamp;
+/**
+ * 从队列中取 AVPacket 过滤添加头信息生成 MediaCodec 可硬解码的数据
+ * @return 0：过滤成功；-4：发送 packet 过滤失败；-5：接收过滤好的 packet 失败；
+ */
+int WeVideoDecoder::filterPacket() {
+    int ret = 0;
+    ret = av_bsf_send_packet(avBSFContext, avPacket);
+    releaseAvPacket();// 不管成功与否，都要先释放内存
+    if (ret != 0) {
+        LOGE(LOG_TAG, "av_bsf_send_packet occurred exception: %d %s", ret,
+             WeUtils::getAVErrorName(ret));
+        return -4;
+    }
+
+    receiveFilterPacket = false;
+    filteredPacket = av_packet_alloc();
+    while ((ret = av_bsf_receive_packet(avBSFContext, filteredPacket)) == 0) {
+        // 成功接收到数据
+        receiveFilterPacket = true;
+
+//        computeFrameDelay_1(filteredPacket->pts);
+        computeFrameDelay_4(filteredPacket->pts);
+        av_usleep(actualDelay * 1000000);
+        javaListenerContainer->onVideoPacketCall
+                ->callback(2, filteredPacket->size, filteredPacket->data);
+
+        av_packet_free(&filteredPacket);
+        av_freep(&filteredPacket);
+
+        filteredPacket = av_packet_alloc();
+        continue;
+    }
+    av_packet_free(&filteredPacket);
+    av_freep(&filteredPacket);
+    filteredPacket = NULL;
+
+    if (!receiveFilterPacket) {
+        LOGE(LOG_TAG, "av_bsf_receive_packet occurred exception: %d %s", ret,
+             WeUtils::getAVErrorName(ret));
+        return -5;
+    }
+
+    return 0;
+}
+
+double WeVideoDecoder::computeFrameDelay_1(double pts) {
     if (pts == AV_NOPTS_VALUE) {
         LOGE(LOG_TAG, "pts == AV_NOPTS_VALUE");
         pts = 0;
@@ -265,29 +421,31 @@ double WeVideoDecoder::computeFrameDelay_1(AVFrame *avFrame) {
     }
     if (pts > 0) {
         currentFrameTime = pts;
+    } else {
+        currentFrameTime += avgFrameInterval;
     }
 
-    double diffSecs = weAudioDecoder->getCurrentTimeSecs() - currentFrameTime;
-    if (diffSecs > 0.003) {// 音频比视频快，视频帧间隔需要调小一点儿
+    double diffSecs = currentFrameTime - weAudioDecoder->getCurrentTimeSecs();
+    if (diffSecs > 0.003) {// 视频比音频快，视频帧间隔需要调大一点儿
         if (diffSecs >= 0.5) {
-            // 音频比视频快很多，不用再等了
-            actualDelay = 0;
+            // 视频比音频快很多，用最大等待时间间隔
+            actualDelay = 2 * avgFrameInterval;
         } else {
-            // 音频比视频快一点，间隔做细微减小
-            actualDelay = actualDelay * 2 / 3;
+            // 视频比音频快一点，间隔做细微增加
+            actualDelay = actualDelay * 3 / 2;
             if (actualDelay < avgFrameInterval / 2) {
                 actualDelay = avgFrameInterval * 2 / 3;
             } else if (actualDelay > avgFrameInterval * 2) {
                 actualDelay = avgFrameInterval * 2;
             }
         }
-    } else if (diffSecs < -0.003) {// 音频比视频慢，视频帧间隔需要调大一点儿
+    } else if (diffSecs < -0.003) {// 视频比音频慢，视频帧间隔需要调小一点儿
         if (diffSecs <= -0.5) {
-            // 音频比视频慢很多，用最大等待时间间隔
-            actualDelay = 2 * avgFrameInterval;
+            // 视频比音频慢很多，不用再等了
+            actualDelay = 0;
         } else {
-            // 音频比视频慢一点，间隔做细微增加
-            actualDelay = actualDelay * 3 / 2;
+            // 视频比音频慢一点，间隔做细微减小
+            actualDelay = actualDelay * 2 / 3;
             if (actualDelay < avgFrameInterval / 2) {
                 actualDelay = avgFrameInterval * 2 / 3;
             } else if (actualDelay > avgFrameInterval * 2) {
@@ -306,8 +464,7 @@ double WeVideoDecoder::computeFrameDelay_1(AVFrame *avFrame) {
     return actualDelay;
 }
 
-double WeVideoDecoder::computeFrameDelay_2(AVFrame *avFrame) {
-    pts = avFrame->best_effort_timestamp;
+double WeVideoDecoder::computeFrameDelay_2(double pts, AVFrame *avFrame) {
     if (pts == AV_NOPTS_VALUE) {
         LOGE(LOG_TAG, "pts == AV_NOPTS_VALUE");
         playTS = currentFrameTime;
@@ -361,8 +518,7 @@ double WeVideoDecoder::computeFrameDelay_2(AVFrame *avFrame) {
     return actualDelay;
 }
 
-double WeVideoDecoder::computeFrameDelay_3(AVFrame *avFrame) {
-    pts = avFrame->best_effort_timestamp;
+double WeVideoDecoder::computeFrameDelay_3(double pts) {
     if (pts == AV_NOPTS_VALUE) {
         LOGE(LOG_TAG, "pts == AV_NOPTS_VALUE");
         playTS = currentFrameTime;
@@ -426,8 +582,7 @@ double WeVideoDecoder::computeFrameDelay_3(AVFrame *avFrame) {
     return actualDelay;
 }
 
-double WeVideoDecoder::computeFrameDelay_4(AVFrame *avFrame) {
-    pts = avFrame->best_effort_timestamp;
+double WeVideoDecoder::computeFrameDelay_4(double pts) {
     if (pts == AV_NOPTS_VALUE) {
         LOGE(LOG_TAG, "pts == AV_NOPTS_VALUE");
         playTS = lastPlayTS + avgFrameInterval;
@@ -437,12 +592,17 @@ double WeVideoDecoder::computeFrameDelay_4(AVFrame *avFrame) {
 
     delay = playTS - lastPlayTS;
     if (LOG_TIME_SYNC) {
-        LOGW(LOG_TAG, "SYNC pts=%f, playTS=%f, TimeBase--DEN=%d, av_q2d=%f, delay=%f", pts,
-             playTS,
-             videoStream->streamTimeBase.den, av_q2d(videoStream->streamTimeBase), delay);
+        LOGW(LOG_TAG, "SYNC pts=%f, playTS=%f, TimeBase--DEN=%d, av_q2d=%f, delay=%f, framDly=%f, avgDly=%f",
+                pts,playTS, videoStream->streamTimeBase.den, av_q2d(videoStream->streamTimeBase),
+                delay, frameInterval, avgFrameInterval);
     }
-    if (delay <= 0 || delay > 1) {
-        delay = lastDelay;
+    if (delay <= 0 || delay > avgFrameInterval * 3 / 2) {
+        // 在 delay 出现异常时，优先使用上一次的两帧间隔，否则用平均间隔
+        if (lastDelay > 0) {
+            delay = lastDelay;
+        } else {
+            delay = avgFrameInterval;
+        }
     }
     lastDelay = delay;
 

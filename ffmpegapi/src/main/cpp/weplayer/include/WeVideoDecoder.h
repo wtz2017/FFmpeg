@@ -18,6 +18,7 @@ extern "C"
 #include "WeUtils.h"
 #include "OnYUVDataCall.h"
 #include "WeAudioDecoder.h"
+#include "JavaListenerContainer.h"
 
 /* no AV sync correction is done if below the minimum AV sync threshold */
 #define AV_SYNC_THRESHOLD_MIN 0.04
@@ -35,9 +36,19 @@ class WeVideoDecoder {
 private:
     const char *LOG_TAG = "WeVideoDecoder";
 
+    JavaListenerContainer *javaListenerContainer = NULL;
+
     pthread_mutex_t decodeMutex;
 
     AVPacketQueue *queue = NULL;
+
+    // 硬解参数
+    const char *codecName = NULL;
+    bool supportHardCodec = false;
+    const AVBitStreamFilter *avBitStreamFilter = NULL;
+    AVBSFContext *avBSFContext = NULL;
+    bool receiveFilterPacket = false;
+    AVPacket *filteredPacket = NULL;
 
     AVPacket *avPacket = NULL;
     AVFrame *avFrame = NULL;
@@ -56,7 +67,6 @@ private:
     /* 音视频同步参数 */
     WeAudioDecoder *weAudioDecoder = NULL;
     bool resetFirstFrame = true;// 换源时、恢复播放时、SEEK 时更新为 true
-    double pts = 0;// AVFrame 推荐的显示时间，基于 StreamTimeBase 第几刻度
     double frameInterval = 0;// 两帧间隔，单位：秒
     double avgFrameInterval = 0;// 平均两帧间隔，单位：秒
     double lastShowAbsTime = 0;// 上一帧播放时间，绝对时间
@@ -76,7 +86,7 @@ public:
     long long t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0;//TODO TEST---Time Consuming---
 
 public:
-    WeVideoDecoder(AVPacketQueue *queue);
+    WeVideoDecoder(AVPacketQueue *queue, JavaListenerContainer *javaListenerContainer);
 
     ~WeVideoDecoder();
 
@@ -86,6 +96,11 @@ public:
      * @param decoder 音频解码器，用于音视频同步
      */
     void initStream(VideoStream *videoStream, WeAudioDecoder *decoder);
+
+    /**
+     * @return true 视频支持硬解码
+     */
+    bool isSupportHardCodec();
 
     void releaseStream();
 
@@ -106,14 +121,27 @@ public:
     /**
      * 从队列中取 AVPacket 解码生成 YUV 数据
      *
-     * @return >0：sampled bytes；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
+     * @return 0：获取成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
      * -4：发送解码失败；-5：接收解码数据帧失败；-6：解析 YUV 失败；
      */
-    int getYUVData(OnYUVDataCall *onYuvDataCall);
+    int getYUVData();
+
+    /**
+     * 从队列中取 AVPacket 添加头信息生成 MediaCodec 可硬解码的数据
+     *
+     * @return 0：获取成功；-1：数据加载中；-2：已经播放到末尾；-3：取包异常；
+     * -4：发送 packet 过滤失败；-5：接收过滤好的 packet 失败；
+     */
+    int getVideoPacket();
 
     bool readAllDataComplete();
 
 private:
+    /**
+     * 检测是否支持硬解码并初始化硬解码
+     */
+    void checkHardCodec();
+
     /**
      * 从队列中取 AVPacket
      *
@@ -135,15 +163,21 @@ private:
      */
     bool receiveFrame();
 
-    bool parseYUV(OnYUVDataCall *onYuvDataCall);
+    bool parseYUV();
 
-    double computeFrameDelay_1(AVFrame *avFrame);
+    /**
+     * 从队列中取 AVPacket 过滤添加头信息生成 MediaCodec 可硬解码的数据
+     * @return 0：过滤成功；-4：发送 packet 过滤失败；-5：接收过滤好的 packet 失败；
+     */
+    int filterPacket();
 
-    double computeFrameDelay_2(AVFrame *avFrame);
+    double computeFrameDelay_1(double pts);
 
-    double computeFrameDelay_3(AVFrame *avFrame);
+    double computeFrameDelay_2(double pts, AVFrame *avFrame);
 
-    double computeFrameDelay_4(AVFrame *avFrame);
+    double computeFrameDelay_3(double pts);
+
+    double computeFrameDelay_4(double pts);
 
     bool initFormatConverter();
 

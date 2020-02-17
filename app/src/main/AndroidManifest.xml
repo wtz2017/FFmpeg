@@ -13,7 +13,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".VideoPlayActivity"></activity>
+        <activity
+            android:name=".VideoPlayActivity"
+            android:theme="@style/FullScreenTheme" />
         <activity android:name=".OpenGLTestActivity" />
         <activity android:name=".AudioEditorActivity" />
         <activity

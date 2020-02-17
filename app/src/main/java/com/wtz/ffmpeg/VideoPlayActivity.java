@@ -5,23 +5,28 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.media.MediaCodecList;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
 import com.wtz.ffmpeg.utils.DateTimeUtil;
 import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.WePlayer;
-import com.wtz.ffmpegapi.opengl.WeSurfaceView;
+import com.wtz.ffmpegapi.WeSurfaceView;
 import com.wtz.ffmpegapi.utils.LogUtils;
+import com.wtz.ffmpegapi.utils.VideoUtils;
 
-import java.io.File;
 import java.text.DecimalFormat;
+import java.util.HashMap;
+import java.util.Map;
 
 public class VideoPlayActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "VideoPlayActivity";
@@ -44,6 +49,10 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     private SeekBar mVolumeSeekBar;
     private static final DecimalFormat VOLUME_FORMAT = new DecimalFormat("0%");
 
+    private TextView mVideoDecoderView;
+    private TextView mMachineDecoderView;
+    private TextView mReallyUsedDecoderView;
+
     private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
     private static final int MSG_UPDATE_PLAY_TIME = 1;
     private Handler mHandler = new Handler(Looper.getMainLooper()) {
@@ -61,10 +70,11 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
 
     private static final String[] mSources = {
             // Local File
-            "file:///sdcard/视频/0001.优酷网-28 黄石天书-0001-joined.flv",
+            "file:///sdcard/0001.优酷网-28 黄石天书-0001-joined.flv",
             "file:///sdcard/BINGO  Super Simple Songs.mp4",
             "file:///sdcard/Open Shut Them  Super Simple Songs.mp4",
             "file:///sdcard/冰河世纪4：大陆漂移.mp4",
+            "file:///sdcard/video-h265.mkv",
             "file:///sdcard/掰手腕.wmv",
             "file:///sdcard/机器人总动员.rmvb",
 
@@ -92,9 +102,37 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     protected void onCreate(Bundle savedInstanceState) {
         LogUtils.d(TAG, "onCreate ");
         super.onCreate(savedInstanceState);
+
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
         setContentView(R.layout.activity_video_play);
 
         initViews();
+        initMachineDecoderInfo();
+    }
+
+    private void initMachineDecoderInfo() {
+        StringBuilder builder = new StringBuilder("本机视频解码器: ");
+        Map<String, String> codecsMap = new HashMap<>();
+        String name = "";
+        int codecNum = MediaCodecList.getCodecCount();
+        for (int i = 0; i < codecNum; i++) {
+            String[] types = MediaCodecList.getCodecInfoAt(i).getSupportedTypes();
+            for (int j = 0; j < types.length; j++) {
+                if (types[j].startsWith("video")) {
+                    name = types[j].substring(6);
+                    if (!codecsMap.containsKey(name)) {
+                        codecsMap.put(name, name);
+                        builder.append(name);
+                        builder.append(";");
+                    }
+                }
+                LogUtils.w("MediaCodecList", "Codec " + i + " type: " + types[j]);
+            }
+        }
+        mMachineDecoderView.setText(builder.toString());
     }
 
     @Override
@@ -118,6 +156,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         mError = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
         mVolume = findViewById(R.id.tv_volume);
+        mVideoDecoderView = findViewById(R.id.tv_video_decoder);
+        mMachineDecoderView = findViewById(R.id.tv_machine_decoders);
+        mReallyUsedDecoderView = findViewById(R.id.tv_really_use_decoder);
 
         mPlaySeekBar = findViewById(R.id.seek_bar_play);
         setSeekbarWith(mPlaySeekBar);
@@ -187,7 +228,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         LogUtils.d(TAG, "onClick " + view);
         switch (view.getId()) {
             case R.id.btn_open_media:
-                openAudio(mSources[mIndex]);
+                openMedia(mSources[mIndex]);
                 break;
             case R.id.btn_next_media:
                 mIndex++;
@@ -195,7 +236,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                     mIndex = 0;
                 }
                 resetUI();
-                openAudio(mSources[mIndex]);
+                openMedia(mSources[mIndex]);
                 break;
             case R.id.btn_pause_audio:
                 if (mWePlayer == null) {
@@ -231,7 +272,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         }
     }
 
-    private void openAudio(String url) {
+    private void openMedia(String url) {
         if (mWePlayer == null) {
             mWePlayer = new WePlayer();
             mWePlayer.setSurfaceView(mWeSurfaceView);
@@ -250,6 +291,11 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                     mPlaySeekBar.setMax(mDuration);
                     mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
                     startUpdateTime();
+
+                    mVideoDecoderView.setText("视频编码类型：" + mWePlayer.getVideoCodecType());
+                    String useDecoder = mWePlayer.isVideoHardCodec() ?
+                            VideoUtils.findHardCodecType(mWePlayer.getVideoCodecType()) : "软解";
+                    mReallyUsedDecoderView.setText("实际解码类型：" + useDecoder);
                 }
             });
             mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {

@@ -6,7 +6,7 @@
 
 WeVideoPlayer::WeVideoPlayer(AVPacketQueue *queue, PlayStatus *status,
                              JavaListenerContainer *javaListenerContainer) {
-    this->decoder = new WeVideoDecoder(queue);
+    this->decoder = new WeVideoDecoder(queue, javaListenerContainer);
     this->status = status;
     this->javaListenerContainer = javaListenerContainer;
 }
@@ -102,17 +102,24 @@ void WeVideoPlayer::play() {
             continue;
         }
 
-        if (LOG_TIME_SYNC) {
-            decoder->t1 = decoder->t2 = decoder->t3 = decoder->t4 = decoder->t5 = 0;
+        if (decoder->isSupportHardCodec()) {
+            // 硬解码
+            ret = decoder->getVideoPacket();
+        } else {
+            // 软解码
+            if (LOG_TIME_SYNC) {
+                decoder->t1 = decoder->t2 = decoder->t3 = decoder->t4 = decoder->t5 = 0;
+            }
+            ret = decoder->getYUVData();
+            if (LOG_TIME_SYNC) {
+                LOGE(LOG_TAG,
+                     "getYUVData ret=%d; getPacket=%d; sendPacket=%d; receiveFrame=%d; parseYUV=%d",
+                     ret, decoder->t2 - decoder->t1, decoder->t3 - decoder->t2,
+                     decoder->t4 - decoder->t3,
+                     decoder->t5 - decoder->t4);
+            }
         }
-        ret = decoder->getYUVData(javaListenerContainer->onYuvDataCall);
-        if (LOG_TIME_SYNC) {
-            LOGE(LOG_TAG,
-                 "getYUVData ret=%d; getPacket=%d; sendPacket=%d; receiveFrame=%d; parseYUV=%d",
-                 ret, decoder->t2 - decoder->t1, decoder->t3 - decoder->t2,
-                 decoder->t4 - decoder->t3,
-                 decoder->t5 - decoder->t4);
-        }
+
         if (ret == 0) {
             // 成功获取数据
             if (status->isPlayLoading) {

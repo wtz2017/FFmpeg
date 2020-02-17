@@ -12,6 +12,11 @@
 #include "OnCompletionListener.h"
 #include "OnPCMDataCall.h"
 #include "OnYUVDataCall.h"
+#include "OnCheckVideoHardCodec.h"
+#include "OnInitVideoHardCodec.h"
+#include "OnVideoPacketCall.h"
+#include "OnSetVideoHardCodec.h"
+#include "OnStopVideoHardCodec.h"
 
 class JavaListenerContainer {
 
@@ -22,6 +27,11 @@ public:
     OnCompletionListener *onCompletionListener;
     OnPCMDataCall *onPcmDataCall;
     OnYUVDataCall *onYuvDataCall;
+    OnCheckVideoHardCodec *onCheckHardCodec;
+    OnInitVideoHardCodec *onInitVideoHardCodec;
+    OnSetVideoHardCodec *onSetVideoHardCodec;
+    OnVideoPacketCall *onVideoPacketCall;
+    OnStopVideoHardCodec *onStopVideoHardCodec;
 
 public:
     JavaListenerContainer() {
@@ -36,6 +46,20 @@ public:
         onErrorListener = NULL;
         delete onCompletionListener;
         onCompletionListener = NULL;
+        delete onPcmDataCall;
+        onPcmDataCall = NULL;
+        delete onYuvDataCall;
+        onYuvDataCall = NULL;
+        delete onCheckHardCodec;
+        onCheckHardCodec = NULL;
+        delete onInitVideoHardCodec;
+        onInitVideoHardCodec = NULL;
+        delete onSetVideoHardCodec;
+        onSetVideoHardCodec = NULL;
+        delete onVideoPacketCall;
+        onVideoPacketCall = NULL;
+        delete onStopVideoHardCodec;
+        onStopVideoHardCodec = NULL;
     }
 
 };
