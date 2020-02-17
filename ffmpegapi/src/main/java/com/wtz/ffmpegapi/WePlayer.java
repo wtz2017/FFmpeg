@@ -462,6 +462,7 @@ public class WePlayer {
     private void onNativeLoading(final boolean isLoading) {
         LogUtils.d(TAG, "onNativeLoading isLoading: " + isLoading + ", isReleased:" + isReleased);
         if (mOnPlayLoadingListener != null && !isReleased) {
+            // post 到 UI 线程：1.是保持原有顺序；2.是不占用 Native 工作线程
             mUIHandler.post(new Runnable() {
                 @Override
                 public void run() {

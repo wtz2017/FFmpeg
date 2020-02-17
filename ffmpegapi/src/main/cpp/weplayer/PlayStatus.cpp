@@ -4,13 +4,17 @@
 
 #include "PlayStatus.h"
 
-PlayStatus::PlayStatus() {
+PlayStatus::PlayStatus(OnNativeLoading *onPlayLoadingListener) {
     status = IDLE;
+    this->onPlayLoadingListener = onPlayLoadingListener;
     pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_init(&loadingMutex, NULL);
 }
 
 PlayStatus::~PlayStatus() {
     pthread_mutex_destroy(&mutex);
+    pthread_mutex_destroy(&loadingMutex);
+    onPlayLoadingListener = NULL;
 }
 
 void PlayStatus::setStatus(PlayStatus::Status status, const char *setterName) {
@@ -18,6 +22,15 @@ void PlayStatus::setStatus(PlayStatus::Status status, const char *setterName) {
         LOGW(LOG_TAG, "%s set status: %s", setterName, getStatusName(status));
     }
     this->status = status;
+}
+
+void PlayStatus::setLoading(bool isLoading) {
+    pthread_mutex_lock(&loadingMutex);
+    if (isLoading != this->isPlayLoading) {
+        this->isPlayLoading = isLoading;
+        onPlayLoadingListener->callback(1, isLoading);
+    }
+    pthread_mutex_unlock(&loadingMutex);
 }
 
 bool PlayStatus::isIdle() {

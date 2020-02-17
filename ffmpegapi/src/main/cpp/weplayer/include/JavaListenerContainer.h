@@ -21,17 +21,17 @@
 class JavaListenerContainer {
 
 public:
-    OnPreparedListener *onPreparedListener;
-    OnNativeLoading *onPlayLoadingListener;
-    OnErrorListener *onErrorListener;
-    OnCompletionListener *onCompletionListener;
-    OnPCMDataCall *onPcmDataCall;
-    OnYUVDataCall *onYuvDataCall;
-    OnCheckVideoHardCodec *onCheckHardCodec;
-    OnInitVideoHardCodec *onInitVideoHardCodec;
-    OnSetVideoHardCodec *onSetVideoHardCodec;
-    OnVideoPacketCall *onVideoPacketCall;
-    OnStopVideoHardCodec *onStopVideoHardCodec;
+    OnPreparedListener *onPreparedListener = NULL;
+    OnNativeLoading *onPlayLoadingListener = NULL;
+    OnErrorListener *onErrorListener = NULL;
+    OnCompletionListener *onCompletionListener = NULL;
+    OnPCMDataCall *onPcmDataCall = NULL;
+    OnYUVDataCall *onYuvDataCall = NULL;
+    OnCheckVideoHardCodec *onCheckHardCodec = NULL;
+    OnInitVideoHardCodec *onInitVideoHardCodec = NULL;
+    OnSetVideoHardCodec *onSetVideoHardCodec = NULL;
+    OnVideoPacketCall *onVideoPacketCall = NULL;
+    OnStopVideoHardCodec *onStopVideoHardCodec = NULL;
 
 public:
     JavaListenerContainer() {

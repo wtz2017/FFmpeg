@@ -14,7 +14,7 @@ WePlayer::~WePlayer() {
 }
 
 void WePlayer::init() {
-    status = new PlayStatus();
+    status = new PlayStatus(javaListenerContainer->onPlayLoadingListener);
     weDemux = new WeDemux();
     weAudioPlayer = new WeAudioPlayer(weDemux->getAudioQueue(), status, javaListenerContainer);
     weVideoPlayer = new WeVideoPlayer(weDemux->getVideoQueue(), status, javaListenerContainer);
@@ -123,6 +123,8 @@ void WePlayer::prepareAsync() {
     status->setStatus(PlayStatus::PREPARING, LOG_TAG);
     pthread_mutex_unlock(&status->mutex);
 
+    status->setLoading(true);
+
     int ret;
     if ((ret = weDemux->prepare()) != NO_ERROR) {
         handleErrorOnPreparing(ret);
@@ -160,6 +162,8 @@ void WePlayer::prepareAsync() {
         weDemux->getVideoQueue()->setProductDataComplete(false);
     }
 
+//    status->setLoading(false);//直到出错、或停止、或后续播放真正取到数据，才设置 false
+
     // 状态确认需要加锁同步，判断在准备期间是否已经被停止
     pthread_mutex_lock(&status->mutex);
     if (status == NULL || !status->isPreparing()) {
@@ -193,6 +197,8 @@ void WePlayer::handleErrorOnPreparing(int errorCode) {
     if (weDemux != NULL) {
         weDemux->releaseStream();
     }
+
+    status->setLoading(false);
 
     // 再设置出错状态
     pthread_mutex_lock(&status->mutex);
@@ -640,8 +646,7 @@ void WePlayer::stop() {
         weVideoPlayer->stopPlay();
     }
     if (status->isPlayLoading) {
-        status->isPlayLoading = false;
-        javaListenerContainer->onPlayLoadingListener->callback(1, false);
+        status->setLoading(false);
     }
 
     if (LOG_DEBUG) {

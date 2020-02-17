@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include "AndroidLog.h"
+#include "OnNativeLoading.h"
 
 class PlayStatus {
 
@@ -18,7 +19,7 @@ public:
 
     /**
      * 播放过程中可能因资源获取不顺利导致加载缓慢，如果缓冲队列数据为空，就说明正在播放加载中；
-     * 此变量作为大的播放状态的一个补充子状态，只有在 OpenSL 播放中才会回调取数据，从而判断是否在加载中。
+     * 此变量作为大的准备和播放状态的一个补充子状态，只有在 OpenSL 播放中才会回调取数据，从而判断是否在加载中。
      */
     bool isPlayLoading = false;
 
@@ -30,13 +31,17 @@ private:
     const char *LOG_TAG = "PlayStatus";
 
     Status status;
+    OnNativeLoading *onPlayLoadingListener = NULL;
+    pthread_mutex_t loadingMutex;
 
 public:
-    PlayStatus();
+    PlayStatus(OnNativeLoading *onPlayLoadingListener);
 
     ~PlayStatus();
 
     void setStatus(Status status, const char *setterName);
+
+    void setLoading(bool isLoading);
 
     bool isIdle();
 
