@@ -28,6 +28,9 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     private int mVideoHeight;
 
     private boolean isSurfaceDestroyed;
+    private boolean isGLReleased;
+    private boolean isPlayerReleased = true;// 在未绑定到 Player 之前设置为 true
+
     private boolean beHardCodec;
     private boolean justClearScreen;
     private static final int DELAY_CLEAR_SCREEN_TIME = 400;
@@ -82,7 +85,8 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     private ByteBuffer vBuffer;
 
     // 纹理内容句柄
-    private int[] mTextureYUVDataIds = new int[3];
+    private static final int TEXTURE_YUV_DATA_ID_NUM = 3;
+    private int[] mTextureYUVDataIds;
 
     // 用来传入纹理内容到片元着色器的句柄
     private int mTextureUniformYHandle;
@@ -92,7 +96,8 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
     /* ---------- 硬解 MediaCodec 纹理内容配置：start ---------- */
     // 纹理内容句柄
-    private int[] mTextureMediaCodecDataIds = new int[1];
+    private static final int TEXTURE_MEDIACODEC_DATA_ID_NUM = 1;
+    private int[] mTextureMediaCodecDataIds;
 
     // 用来传入纹理内容到片元着色器的句柄
     private int mTextureUnifMediaCodecHandle;
@@ -101,7 +106,12 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     private Surface mMediaCodecSurface;
     /* ---------- 硬解 MediaCodec 纹理内容配置：end ---------- */
 
+    private int mVertexShaderYUVHandle;
+    private int mFragmentShaderYUVHandle;
     private int mProgramYUVHandle;
+
+    private int mVertexShaderMediaCodecHandle;
+    private int mFragmentShaderMediaCodecHandle;
     private int mProgramMediaCodecHandle;
 
     private Handler mUIHandler = new Handler(Looper.getMainLooper());
@@ -114,7 +124,8 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         super(context, attrs);
 
         setEGLContextClientVersion(2);
-        setRenderer(this);
+        setRenderer(this);// 此条语句会创建启动 GLThread
+        isGLReleased = false;
         // 设置为脏模式：外部调用一次 requestRender() 就渲染一次，否则不重复渲染
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
@@ -135,17 +146,24 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         mTextureCoordinatesData = null;
     }
 
+    /**
+     * 此回调在主线程
+     */
     @Override
     protected void onAttachedToWindow() {
         LogUtils.w(TAG, "onAttachedToWindow");
         super.onAttachedToWindow();
     }
 
+    /**
+     * 此回调在 GLThread
+     */
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         LogUtils.w(TAG, "onSurfaceCreated");
         isSurfaceDestroyed = false;
-        // 初始化 shader 工作需要放在 onSurfaceCreated 之后的 UI 线程中
+        // 初始化 shader 工作需要放在 onSurfaceCreated 之后的 GLThread 线程中
+        // onDrawFrame() onSurfaceChanged() onSurfaceCreated() 都是在 GLThread 线程中
         initYUVProgram();
         initMediaCodecProgram();
     }
@@ -153,7 +171,10 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     private void initYUVProgram() {
         String vertexSource = ShaderUtil.readRawText(getContext(), R.raw.vertex_shader);
         String fragmentSource = ShaderUtil.readRawText(getContext(), R.raw.yuv_fragment_shader);
-        mProgramYUVHandle = ShaderUtil.createAndLinkProgram(vertexSource, fragmentSource);
+        int[] shaderIDs = ShaderUtil.createAndLinkProgram(vertexSource, fragmentSource);
+        mVertexShaderYUVHandle = shaderIDs[0];
+        mFragmentShaderYUVHandle = shaderIDs[1];
+        mProgramYUVHandle = shaderIDs[2];
         if (mProgramYUVHandle <= 0) {
             throw new RuntimeException("initYUVProgram Error: createAndLinkProgram for yuv failed.");
         }
@@ -166,7 +187,8 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         mTextureUniformVHandle = GLES20.glGetUniformLocation(mProgramYUVHandle, "u_TextureV");
 
         // 绑定纹理数据内容
-        GLES20.glGenTextures(3, mTextureYUVDataIds, 0);// 创建 3 个纹理
+        mTextureYUVDataIds = new int[TEXTURE_YUV_DATA_ID_NUM];
+        GLES20.glGenTextures(TEXTURE_YUV_DATA_ID_NUM, mTextureYUVDataIds, 0);// 创建 3 个纹理
         if (mTextureYUVDataIds[0] == 0) {
             throw new RuntimeException("initYUVProgram Error: glGenTextures generate texture 0 failed.");
         }
@@ -176,7 +198,7 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         if (mTextureYUVDataIds[2] == 0) {
             throw new RuntimeException("initYUVProgram Error: glGenTextures generate texture 2 failed.");
         }
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < TEXTURE_YUV_DATA_ID_NUM; i++) {
             // 在 OpenGL 中绑定这个创建的纹理
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureYUVDataIds[i]);
 
@@ -202,7 +224,10 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     private void initMediaCodecProgram() {
         String vertexSource = ShaderUtil.readRawText(getContext(), R.raw.vertex_shader);
         String fragmentSource = ShaderUtil.readRawText(getContext(), R.raw.mediacodec_fragment_shader);
-        mProgramMediaCodecHandle = ShaderUtil.createAndLinkProgram(vertexSource, fragmentSource);
+        int[] shaderIDs = ShaderUtil.createAndLinkProgram(vertexSource, fragmentSource);
+        mVertexShaderMediaCodecHandle = shaderIDs[0];
+        mFragmentShaderMediaCodecHandle = shaderIDs[1];
+        mProgramMediaCodecHandle = shaderIDs[2];
         if (mProgramMediaCodecHandle <= 0) {
             throw new RuntimeException("initMediaCodecProgram Error: createAndLinkProgram failed.");
         }
@@ -213,7 +238,8 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         mTextureUnifMediaCodecHandle = GLES20.glGetUniformLocation(mProgramMediaCodecHandle, "u_Texture_MediaCodec");
 
         // 绑定纹理数据内容
-        GLES20.glGenTextures(1, mTextureMediaCodecDataIds, 0);// 创建 1 个纹理
+        mTextureMediaCodecDataIds = new int[1];
+        GLES20.glGenTextures(TEXTURE_MEDIACODEC_DATA_ID_NUM, mTextureMediaCodecDataIds, 0);// 创建 1 个纹理
         if (mTextureMediaCodecDataIds[0] == 0) {
             throw new RuntimeException("initMediaCodecProgram Error: glGenTextures generate texture 0 failed.");
         }
@@ -232,13 +258,21 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         mMediaCodecSurface = new Surface(mMediaCodecSurfaceTexture);
     }
 
+    /**
+     * 此回调在 GLThread
+     */
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         LogUtils.d(TAG, "onSurfaceChanged: " + width + "x" + height);
         GLES20.glViewport(0, 0, width, height);
     }
 
+    protected void onBindPlayer() {
+        isPlayerReleased = false;
+    }
+
     protected void onPlayerPrepared() {
+        // 新的资源准备好时清除之前可能的延时清屏
         mUIHandler.removeCallbacks(mClearScreenRunnable);
     }
 
@@ -266,7 +300,9 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     }
 
     /**
-     * 在彻底停止数据回调后调用一次清屏
+     * 清屏为黑屏
+     *
+     * @param immediately true 表示立即清屏，false 表示延时清屏
      */
     private void clearScreen(boolean immediately) {
         if (immediately) {
@@ -286,8 +322,15 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         }
     };
 
+    /**
+     * 此回调在 GLThread
+     */
     @Override
     public void onDrawFrame(GL10 gl) {
+        if (isSurfaceDestroyed) {
+            return;
+        }
+
         // 清屏
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
         GLES20.glClearColor(0f, 0f, 0f, 1.0f);
@@ -415,17 +458,51 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
     protected void onPlayerReleased() {
         LogUtils.w(TAG, "onPlayerReleased...");
+        synchronized (WeSurfaceView.this) {
+            isPlayerReleased = true;
+            releaseMediaCodecSurface();
+        }
+
         clearScreen(true);
         mUIHandler.removeCallbacksAndMessages(null);
+    }
 
-        // 在 player 真正释放后再释放 Surface 资源，以免造成多线程并发异常
-        if (isSurfaceDestroyed) {
-            if (mMediaCodecSurface != null) {
-                mMediaCodecSurface.release();
-                mMediaCodecSurface = null;
-                mMediaCodecSurfaceTexture.release();
-                mMediaCodecSurfaceTexture = null;
+    /**
+     * 此回调在主线程
+     * 必须在此方法 return 之前，保证释放 GLES20 动作在 GLThread 中完成
+     */
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        LogUtils.w(TAG, "surfaceDestroyed");
+        synchronized (WeSurfaceView.this) {
+            isSurfaceDestroyed = true;
+            releaseMediaCodecSurface();
+        }
+
+        // queueEvent: Queue a runnable to be run on the GL rendering thread.
+        // 实际执行动作必须在 super.surfaceDestroyed(holder) 和本方法 return 之前有效
+        queueEvent(mReleaseGLES20);
+
+        while (!isGLReleased) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
+        }
+
+        LogUtils.w(TAG, "to call super.surfaceDestroyed");
+        super.surfaceDestroyed(holder);
+    }
+
+    /**
+     * 绘制动作在 GLThread 中
+     * 把释放绘制所用的资源动作也放入 GLThread 中，就可以避免并必导致异常
+     */
+    private Runnable mReleaseGLES20 = new Runnable() {
+        @Override
+        public void run() {
+            LogUtils.w(TAG, "queueEvent run release GLES20...");
             if (yBuffer != null) {
                 yBuffer.clear();
                 yBuffer = null;
@@ -446,18 +523,63 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
                 mTextureCoordinatesBuffer.clear();
                 mTextureCoordinatesBuffer = null;
             }
-            mTextureYUVDataIds = null;
-            mTextureMediaCodecDataIds = null;
+
+            if (mProgramMediaCodecHandle > 0) {
+                GLES20.glDetachShader(mProgramMediaCodecHandle, mVertexShaderMediaCodecHandle);
+                GLES20.glDeleteShader(mVertexShaderMediaCodecHandle);
+                mVertexShaderMediaCodecHandle = 0;
+
+                GLES20.glDetachShader(mProgramMediaCodecHandle, mFragmentShaderMediaCodecHandle);
+                GLES20.glDeleteShader(mFragmentShaderMediaCodecHandle);
+                mFragmentShaderMediaCodecHandle = 0;
+
+                GLES20.glDeleteProgram(mProgramMediaCodecHandle);
+                mProgramMediaCodecHandle = 0;
+            }
+
+            if (mProgramYUVHandle > 0) {
+                GLES20.glDetachShader(mProgramYUVHandle, mVertexShaderYUVHandle);
+                GLES20.glDeleteShader(mVertexShaderYUVHandle);
+                mVertexShaderYUVHandle = 0;
+
+                GLES20.glDetachShader(mProgramYUVHandle, mFragmentShaderYUVHandle);
+                GLES20.glDeleteShader(mFragmentShaderYUVHandle);
+                mFragmentShaderYUVHandle = 0;
+
+                GLES20.glDeleteProgram(mProgramYUVHandle);
+                mProgramYUVHandle = 0;
+            }
+
+            if (mTextureYUVDataIds != null) {
+                GLES20.glDeleteTextures(TEXTURE_YUV_DATA_ID_NUM, mTextureYUVDataIds, 0);
+                mTextureYUVDataIds = null;
+            }
+            if (mTextureMediaCodecDataIds != null) {
+                GLES20.glDeleteTextures(TEXTURE_MEDIACODEC_DATA_ID_NUM, mTextureMediaCodecDataIds, 0);
+                mTextureMediaCodecDataIds = null;
+            }
+
+            isGLReleased = true;
+        }
+    };
+
+    /**
+     * 1. 在 isSurfaceDestroyed 后才有必要释放 MediaCodecSurface
+     * 2. 在 isPlayerReleased 后释放 MediaCodecSurface 可避免多线程并发异常
+     */
+    private void releaseMediaCodecSurface() {
+        if (isSurfaceDestroyed && isPlayerReleased && mMediaCodecSurface != null) {
+            LogUtils.w(TAG, "releaseMediaCodecSurface");
+            mMediaCodecSurface.release();
+            mMediaCodecSurface = null;
+            mMediaCodecSurfaceTexture.release();
+            mMediaCodecSurfaceTexture = null;
         }
     }
 
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        LogUtils.w(TAG, "surfaceDestroyed");
-        super.surfaceDestroyed(holder);
-        isSurfaceDestroyed = true;
-    }
-
+    /**
+     * 此回调在主线程
+     */
     @Override
     protected void onDetachedFromWindow() {
         LogUtils.w(TAG, "onDetachedFromWindow");

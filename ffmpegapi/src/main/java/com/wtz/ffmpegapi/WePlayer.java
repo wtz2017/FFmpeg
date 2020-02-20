@@ -257,6 +257,7 @@ public class WePlayer {
 
         if (mWeSurfaceView != null) {
             mWeSurfaceView.onPlayerReleased();
+            mWeSurfaceView = null;
         }
     }
 
@@ -717,7 +718,9 @@ public class WePlayer {
     }
 
     public void setSurfaceView(WeSurfaceView surfaceView) {
+        if (surfaceView == null) throw new NullPointerException("WeSurfaceView can't be null");
         mWeSurfaceView = surfaceView;
+        mWeSurfaceView.onBindPlayer();
     }
 
     private void onNativeYUVDataCall(int width, int height, byte[] y, byte[] u, byte[] v) {

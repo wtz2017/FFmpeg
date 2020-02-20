@@ -39,14 +39,14 @@ public class ShaderUtil {
         return sb.toString();
     }
 
-    public static int createAndLinkProgram(String vertexSource, String fragmentSource) {
+    public static int[] createAndLinkProgram(String vertexSource, String fragmentSource) {
         int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexSource);
         if (vertexShader == 0) {
-            return 0;
+            return new int[]{0, 0, 0};
         }
         int fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource);
         if (fragmentShader == 0) {
-            return 0;
+            return new int[]{0, 0, 0};
         }
         int program = GLES20.glCreateProgram();
         if (program != 0) {
@@ -63,7 +63,7 @@ public class ShaderUtil {
                 program = 0;
             }
         }
-        return program;
+        return new int[]{vertexShader, fragmentShader, program};
     }
 
     private static int loadShader(int shaderType, String source) {
