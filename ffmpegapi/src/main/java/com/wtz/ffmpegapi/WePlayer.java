@@ -100,6 +100,8 @@ public class WePlayer {
     private PCMRecorder mPCMRecorder;
 
     // for video
+    private int mVideoWidth;
+    private int mVideoHeight;
     private String mFFmpegVideoCodecType;
     private boolean beVideoHardCodec;
     private WeSurfaceView mWeSurfaceView;
@@ -310,7 +312,7 @@ public class WePlayer {
      * called from native
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
-    private void onNativePrepared(String dataSource) {
+    private void onNativePrepared(String dataSource, int videoWidth, int videoHeight) {
         LogUtils.d(TAG, "onNativePrepared isReleased: " + isReleased + ", dataSource: " + dataSource);
         if (!TextUtils.equals(dataSource, mDataSource)) {
             LogUtils.w(TAG, "onNativePrepared data source changed! So the preparation is invalid!");
@@ -318,8 +320,10 @@ public class WePlayer {
         }
 
         isPrepared = true;
+        mVideoWidth = videoWidth;
+        mVideoHeight = videoHeight;
         if (mWeSurfaceView != null) {
-            mWeSurfaceView.onPlayerPrepared();
+            mWeSurfaceView.onPlayerPrepared(mVideoWidth, mVideoHeight);
         }
         setCacheVolume();
         if (mOnPreparedListener != null && !isReleased) {
@@ -721,6 +725,28 @@ public class WePlayer {
         if (surfaceView == null) throw new NullPointerException("WeSurfaceView can't be null");
         mWeSurfaceView = surfaceView;
         mWeSurfaceView.onBindPlayer();
+    }
+
+    /**
+     * 用于在视频资源 OnPrepared 之后获取视频宽度
+     */
+    public int getVideoWidthOnPrepared() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getVideoWidthOnPrepared method before prepare finished");
+            return 0;
+        }
+        return mVideoWidth;
+    }
+
+    /**
+     * 用于在视频资源 OnPrepared 之后获取视频高度
+     */
+    public int getVideoHeightOnPrepared() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getVideoHeightOnPrepared method before prepare finished");
+            return 0;
+        }
+        return mVideoHeight;
     }
 
     private void onNativeYUVDataCall(int width, int height, byte[] y, byte[] u, byte[] v) {

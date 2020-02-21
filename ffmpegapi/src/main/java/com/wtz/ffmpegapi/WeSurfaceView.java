@@ -271,8 +271,14 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         isPlayerReleased = false;
     }
 
-    protected void onPlayerPrepared() {
-        // 新的资源准备好时清除之前可能的延时清屏
+    protected void onPlayerPrepared(int videoWidth, int videoHeight) {
+        mVideoWidth = videoWidth;
+        mVideoHeight = videoHeight;
+        if (videoWidth == 0 || videoHeight == 0) {
+            return;
+        }
+
+        // 新的资源准备好时清除之前可能的延时清屏，尽量避免切换闪屏
         mUIHandler.removeCallbacks(mClearScreenRunnable);
     }
 

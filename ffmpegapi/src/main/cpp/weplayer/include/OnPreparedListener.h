@@ -24,14 +24,16 @@ public:
     }
 
     const char *getMethodSignature() {
-        return "(Ljava/lang/String;)V";
+        return "(Ljava/lang/String;II)V";
     }
 
     void reallyCallback(JNIEnv *env, jobject obj, jmethodID methodId, va_list args) {
         char *msg = va_arg(args, char *);
+        int videoWidth = va_arg(args, int);
+        int videoHeight = va_arg(args, int);
 
         jstring stringUtf = env->NewStringUTF(msg);
-        env->CallVoidMethod(obj, methodId, stringUtf);
+        env->CallVoidMethod(obj, methodId, stringUtf, videoWidth, videoHeight);
         env->DeleteLocalRef(stringUtf);
     }
 };

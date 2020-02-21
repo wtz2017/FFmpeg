@@ -83,6 +83,10 @@ public:
 
     int getPcmMaxBytesPerCallback();
 
+    int getVideoWidth();
+
+    int getVideoHeight();
+
     /**
      * setStopFlag 不走 java 调度线程消息队列，直接执行，避免无法立即通知结束工作
      */

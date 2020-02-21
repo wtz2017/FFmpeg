@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -31,14 +32,15 @@ import java.util.Map;
 public class VideoPlayActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "VideoPlayActivity";
 
-    private WeSurfaceView mWeSurfaceView;
-
     private WePlayer mWePlayer;
     private int mDuration;
     private boolean isSeeking;
     private boolean isLoading;
 
-    private ProgressDialog mProgressDialog;
+    private View mVideoLayout;
+    private WeSurfaceView mWeSurfaceView;
+    private ProgressBar mProgressBar;
+
     private TextView mPlayUrl;
     private TextView mError;
     private TextView mPlayTimeView;
@@ -81,6 +83,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             // HLS(HTTP Live Streaming)
             "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清
             "http://ivi.bupt.edu.cn/hls/cctv6hd.m3u8",//CCTV6高清
+
+            "http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3",// 测试非视频，带封面
+            "http://music.163.com/song/media/outer/url?id=29750099.mp3",// 测试非视频，不带封面
 
             // 1080P
             "https://www.apple.com/105/media/us/iphone-x/2017/01df5b43-28e4-4848-bf20-490c34a926a7/films/feature/iphone-x-feature-tpl-cc-us-20170912_1920x1080h.mp4",
@@ -149,7 +154,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_destroy_audio_player).setOnClickListener(this);
 
+        mVideoLayout = findViewById(R.id.fl_video_container);
         mWeSurfaceView = findViewById(R.id.we_surface_view);
+        mProgressBar = findViewById(R.id.pb_normal);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
         mPlayUrl.setText(mSources[mIndex]);
@@ -282,6 +289,8 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                     LogUtils.d(TAG, "WePlayer onPrepared");
                     mWePlayer.start();
 
+                    setSufaceLayoutOnPrepared();
+
                     float volume = mWePlayer.getVolume();
                     mVolume.setText("音量：" + VOLUME_FORMAT.format(volume));
                     mVolumeSeekBar.setProgress((int) (mVolumeSeekBar.getMax() * volume));
@@ -333,6 +342,34 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         mWePlayer.prepareAsync();
     }
 
+    private void setSufaceLayoutOnPrepared() {
+        int videoWidth = mWePlayer.getVideoWidthOnPrepared();
+        int videoHeight = mWePlayer.getVideoHeightOnPrepared();
+        if (videoWidth == 0 || videoHeight == 0) {
+            LogUtils.w(TAG, "video: " + videoWidth + "x" + videoHeight);
+            return;
+        }
+
+        float videoRatio = videoWidth * 1.0f / videoHeight;
+        float containerRatio = mVideoLayout.getWidth() * 1.0f / mVideoLayout.getHeight();
+        ViewGroup.LayoutParams lp = mWeSurfaceView.getLayoutParams();
+        if (containerRatio > videoRatio) {
+            // 视频属于瘦高类型
+            lp.height = mVideoLayout.getHeight();
+            lp.width = (int) (lp.height * videoRatio);
+        } else if (containerRatio < videoRatio) {
+            // 视频属于矮胖类型
+            lp.width = mVideoLayout.getWidth();
+            lp.height = (int) (lp.width / videoRatio);
+        } else {
+            lp.width = mVideoLayout.getWidth();
+            lp.height = mVideoLayout.getHeight();
+        }
+        mWeSurfaceView.setLayoutParams(lp);
+        LogUtils.d(TAG, "video container: " + mVideoLayout.getWidth() + "x" + mVideoLayout.getHeight()
+                + ", video: " + videoWidth + "x" + videoHeight + ", video layout: " + lp.width + "x" + lp.height);
+    }
+
     private void startUpdateTime() {
         mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
     }
@@ -371,18 +408,13 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void showProgressDialog(Context context) {
-        if (mProgressDialog == null) {
-            mProgressDialog = new ProgressDialog(context);
-            mProgressDialog.setMessage("正在加载中");
-        }
-        mProgressDialog.show();
+        if (mProgressBar == null) return;
+        mProgressBar.setVisibility(View.VISIBLE);
     }
 
     private void hideProgressDialog() {
-        if (mProgressDialog == null) {
-            return;
-        }
-        mProgressDialog.dismiss();
+        if (mProgressBar == null) return;
+        mProgressBar.setVisibility(View.GONE);
     }
 
     @Override

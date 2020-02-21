@@ -137,6 +137,10 @@ public:
 
     int getPcmMaxBytesPerCallback();
 
+    int getVideoWidth();
+
+    int getVideoHeight();
+
     bool isPlaying();
 
     /**

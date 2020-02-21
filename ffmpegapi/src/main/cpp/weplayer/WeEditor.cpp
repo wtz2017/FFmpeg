@@ -140,7 +140,8 @@ void WeEditor::prepareAsync() {
     }
     // 回调初始化准备完成，注意要在 java API 层把回调切换到主线程
     // ！！！注意：这里专门把 java 回调放到锁里，需要 java 层注意不要有其它本地方法调用和耗时操作！！！
-    javaListenerContainer->onPreparedListener->callback(1, weDemux->getDataSource());
+    javaListenerContainer->onPreparedListener->callback(3, weDemux->getDataSource(),
+                                                        getVideoWidth(), getVideoHeight());
 
     pthread_mutex_unlock(&status->mutex);
     prepareFinished = true;
@@ -361,6 +362,20 @@ int WeEditor::getPcmMaxBytesPerCallback() {
         return 0;
     }
     return weAudioEditor->getPcmMaxBytesPerCallback();
+}
+
+int WeEditor::getVideoWidth() {
+    if (weDemux == NULL || weDemux->getVideoStream() == NULL) {
+        return 0;
+    }
+    return weDemux->getVideoStream()->width;
+}
+
+int WeEditor::getVideoHeight() {
+    if (weDemux == NULL || weDemux->getVideoStream() == NULL) {
+        return 0;
+    }
+    return weDemux->getVideoStream()->height;
 }
 
 void WeEditor::setStopFlag() {
