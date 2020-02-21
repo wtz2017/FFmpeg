@@ -715,6 +715,7 @@ void WePlayer::release() {
 
     if (demuxThread != NULL) {
         demuxThread->shutdown();
+        pthread_join(demuxThread->thread, NULL);// 阻塞等待子线程结束
         delete demuxThread;
         demuxThread = NULL;
     }

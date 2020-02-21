@@ -36,7 +36,8 @@ void *threadCallback(void *context) {
     if (LOG_DEBUG) {
         LOGD(looperThread->LOG_TAG, "%s exit", looperThread->threadName);
     }
-    pthread_exit(&looperThread->thread);
+//    pthread_exit(&looperThread->thread);
+    return 0;//使用 return 更好的回收一些资源
 }
 
 void LooperThread::create() {

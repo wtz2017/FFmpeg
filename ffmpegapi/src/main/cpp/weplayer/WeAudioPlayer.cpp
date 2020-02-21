@@ -293,7 +293,7 @@ void WeAudioPlayer::release() {
     delete decoder;
     decoder = NULL;
 
-    destroyAudioPlayerThread();
+    destroyAudioPlayerThread();// 阻塞等待子线程结束
 
     // 最顶层 WePlayer 负责回收 javaListenerContainer，这里只把本指针置空
     javaListenerContainer = NULL;
@@ -305,6 +305,7 @@ void WeAudioPlayer::release() {
 void WeAudioPlayer::destroyAudioPlayerThread() {
     if (audioPlayerThread != NULL) {
         audioPlayerThread->shutdown();
+        pthread_join(audioPlayerThread->thread, NULL);// 阻塞等待子线程结束
         delete audioPlayerThread;
         audioPlayerThread = NULL;
     }
