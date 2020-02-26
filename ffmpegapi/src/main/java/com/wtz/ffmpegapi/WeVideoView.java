@@ -361,6 +361,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
             public void onStopped() {
                 LogUtils.w(TAG, "WePlayer onStopped");
                 clearScreen(false);
+                flushTexImage();
             }
         });
         mWePlayer.setOnResetListener(new WePlayer.OnResetListener() {
@@ -368,6 +369,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
             public void onReset() {
                 LogUtils.d(TAG, "WePlayer onReset");
                 clearScreen(false);
+                flushTexImage();
             }
         });
         mWePlayer.setOnReleasedListener(new WePlayer.OnReleasedListener() {
@@ -383,6 +385,18 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         if (mOnSurfaceCreatedListener != null) {
             mOnSurfaceCreatedListener.onSurfaceCreated();
         }
+    }
+
+    private void flushTexImage() {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (!isSurfaceDestroyed && mMediaCodecSurfaceTexture != null) {
+                    // 解决切换媒体资源时不会回调 onFrameAvailable 的问题
+                    mMediaCodecSurfaceTexture.updateTexImage();
+                }
+            }
+        });
     }
 
     /**
