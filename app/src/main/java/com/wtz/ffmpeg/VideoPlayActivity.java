@@ -259,17 +259,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                 if (isPlaying) {
                     mWeVideoView.start();
                 } else {
-                    mWeVideoView.start();
-                    //TODO 暂停状态下 SEEK 后的画面怎么获取
-                    final float volume = mWeVideoView.getVolume();
-                    mWeVideoView.setVolume(0);
-                    mHandler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mWeVideoView.pause();
-                            mWeVideoView.setVolume(volume);
-                        }
-                    }, 1200);//TODO TEST
+                    mWeVideoView.drawOneFrameThenPause();
                 }
 
                 setSufaceLayoutOnPrepared();

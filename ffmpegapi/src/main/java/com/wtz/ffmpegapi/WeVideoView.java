@@ -36,9 +36,11 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     private String mDataSource;
     private int mVideoWidth;
     private int mVideoHeight;
+    private float mPauseVolume;
     private int mDestroyedPosition;
 
     private boolean beHardCodec;
+    private boolean drawOneFrameThenPause = false;
     private boolean canRenderYUV;
     private boolean canRenderMedia;
     private boolean isSurfaceDestroyed;
@@ -424,12 +426,14 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
         canRenderYUV = true;
         requestRender();// 触发 onDrawFrame
+        pauseWhenDrawOneFrame();
     }
 
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
         canRenderMedia = true;
         requestRender();// 触发 onDrawFrame
+        pauseWhenDrawOneFrame();
     }
 
     /**
@@ -747,6 +751,23 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     public void pause() {
         if (mWePlayer != null) {
             mWePlayer.pause();
+        }
+    }
+
+    public void drawOneFrameThenPause() {
+        LogUtils.w(TAG, "drawOneFrameThenPause...");
+        drawOneFrameThenPause = true;
+        mPauseVolume = getVolume();
+        setVolume(0);
+        start();
+    }
+
+    private void pauseWhenDrawOneFrame() {
+        if (drawOneFrameThenPause) {
+            LogUtils.w(TAG, "pauseWhenDrawOneFrame...");
+            drawOneFrameThenPause = false;
+            pause();
+            setVolume(mPauseVolume);
         }
     }
 
