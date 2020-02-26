@@ -244,6 +244,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                 LogUtils.d(TAG, "mWeVideoView onSurfaceDestroyed: " + lastDataSource + ":" + lastPosition);
                 mDestroyedDataSource = lastDataSource;
                 mDestroyedPosition = lastPosition;
+                stopUpdateTime();
             }
         });
         mWeVideoView.setOnPreparedListener(new WePlayer.OnPreparedListener() {

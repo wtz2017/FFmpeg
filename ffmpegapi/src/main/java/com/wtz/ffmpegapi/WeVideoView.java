@@ -39,6 +39,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     private int mDestroyedPosition;
 
     private boolean beHardCodec;
+    private boolean canRenderYUV;
+    private boolean canRenderMedia;
     private boolean isSurfaceDestroyed;
     private boolean isGLReleased;
     private boolean justClearScreen;
@@ -362,6 +364,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
                 LogUtils.w(TAG, "WePlayer onStopped");
                 clearScreen(false);
                 flushTexImage();
+                canRenderMedia = false;
+                canRenderYUV = false;
             }
         });
         mWePlayer.setOnResetListener(new WePlayer.OnResetListener() {
@@ -370,6 +374,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
                 LogUtils.d(TAG, "WePlayer onReset");
                 clearScreen(false);
                 flushTexImage();
+                canRenderMedia = false;
+                canRenderYUV = false;
             }
         });
         mWePlayer.setOnReleasedListener(new WePlayer.OnReleasedListener() {
@@ -416,11 +422,13 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         uBuffer = ByteBuffer.wrap(u);
         vBuffer = ByteBuffer.wrap(v);
 
+        canRenderYUV = true;
         requestRender();// 触发 onDrawFrame
     }
 
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
+        canRenderMedia = true;
         requestRender();// 触发 onDrawFrame
     }
 
@@ -474,6 +482,10 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     private void renderYUV() {
+        if (!canRenderYUV) {
+            LogUtils.e(TAG, "CAN'T renderYUV");
+            return;
+        }
         if (mVideoWidth <= 0 || mVideoHeight <= 0 || yBuffer == null || uBuffer == null || vBuffer == null) {
             // 播放中可能部分画面数据不满足条件时走到这里
             // 返回函数前再画一次矩形，是为了解决之前已经清屏而这里又不绘制导致闪屏的问题
@@ -541,7 +553,12 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     private void renderMediaCodecData() {
+        if (!canRenderMedia) {
+            LogUtils.e(TAG, "CAN'T renderMedia");
+            return;
+        }
         if (mMediaCodecSurfaceTexture == null) {
+            LogUtils.e(TAG, "mMediaCodecSurfaceTexture is null");
             return;
         }
         // 使用程序对象 mProgramMediaCodecHandle 作为当前渲染状态的一部分
