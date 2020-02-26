@@ -88,9 +88,13 @@ public class WePlayer {
     private native void nativeSetRecordPCMFlag(boolean record);
 
     private OnPreparedListener mOnPreparedListener;
+    private OnYUVDataListener mOnYUVDataListener;
     private OnPlayLoadingListener mOnPlayLoadingListener;
     private OnErrorListener mOnErrorListener;
     private OnCompletionListener mOnCompletionListener;
+    private OnStoppedListener mOnStoppedListener;
+    private OnResetListener mOnResetListener;
+    private OnReleasedListener mOnReleasedListener;
 
     private String mDataSource;
     private float mVolumePercent = -1;
@@ -102,9 +106,8 @@ public class WePlayer {
     // for video
     private int mVideoWidth;
     private int mVideoHeight;
-    private String mFFmpegVideoCodecType;
+    private String mFFmpegVideoCodecType = "";
     private boolean beVideoHardCodec;
-    private WeSurfaceView mWeSurfaceView;
     private Surface mSurface;
     private MediaCodec mVideoDecoder;
     private MediaFormat mVideoFormat;
@@ -144,6 +147,10 @@ public class WePlayer {
         void onPrepared();
     }
 
+    public interface OnYUVDataListener {
+        void onYUVData(int width, int height, byte[] y, byte[] u, byte[] v);
+    }
+
     public interface OnPlayLoadingListener {
         void onPlayLoading(boolean isLoading);
     }
@@ -154,6 +161,18 @@ public class WePlayer {
 
     public interface OnCompletionListener {
         void onCompletion();
+    }
+
+    public interface OnStoppedListener {
+        void onStopped();
+    }
+
+    public interface OnResetListener {
+        void onReset();
+    }
+
+    public interface OnReleasedListener {
+        void onReleased();
     }
 
     public WePlayer() {
@@ -257,14 +276,22 @@ public class WePlayer {
 
         mUIHandler.removeCallbacksAndMessages(null);
 
-        if (mWeSurfaceView != null) {
-            mWeSurfaceView.onPlayerReleased();
-            mWeSurfaceView = null;
+        if (mOnReleasedListener != null) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnReleasedListener.onReleased();
+                }
+            });
         }
     }
 
     public void setOnPreparedListener(OnPreparedListener listener) {
         this.mOnPreparedListener = listener;
+    }
+
+    public void setOnYUVDataListener(OnYUVDataListener listener) {
+        this.mOnYUVDataListener = listener;
     }
 
     public void setOnPlayLoadingListener(OnPlayLoadingListener listener) {
@@ -277,6 +304,18 @@ public class WePlayer {
 
     public void setOnCompletionListener(OnCompletionListener listener) {
         this.mOnCompletionListener = listener;
+    }
+
+    public void setOnStoppedListener(OnStoppedListener listener) {
+        this.mOnStoppedListener = listener;
+    }
+
+    public void setOnResetListener(OnResetListener listener) {
+        this.mOnResetListener = listener;
+    }
+
+    public void setOnReleasedListener(OnReleasedListener listener) {
+        this.mOnReleasedListener = listener;
     }
 
     public void setDataSource(String dataSource) {
@@ -322,9 +361,6 @@ public class WePlayer {
         isPrepared = true;
         mVideoWidth = videoWidth;
         mVideoHeight = videoHeight;
-        if (mWeSurfaceView != null) {
-            mWeSurfaceView.onPlayerPrepared(mVideoWidth, mVideoHeight);
-        }
         setCacheVolume();
         if (mOnPreparedListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
@@ -514,6 +550,7 @@ public class WePlayer {
 
     public void stop() {
         isPrepared = false;
+        beVideoHardCodec = false;
         nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
         stopRecord();
 
@@ -525,8 +562,13 @@ public class WePlayer {
 
     private void handleStop() {
         nativeStop();
-        if (mWeSurfaceView != null) {
-            mWeSurfaceView.onPlayerStopped();
+        if (mOnStoppedListener != null) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnStoppedListener.onStopped();
+                }
+            });
         }
     }
 
@@ -549,8 +591,13 @@ public class WePlayer {
     private void handleReset() {
         nativeReset();
         // 在彻底停止数据回调后调用一次清屏
-        if (mWeSurfaceView != null) {
-            mWeSurfaceView.onPlayerReset();
+        if (mOnResetListener != null) {
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnResetListener.onReset();
+                }
+            });
         }
     }
 
@@ -721,10 +768,9 @@ public class WePlayer {
         mPCMRecorder.encode(pcmData, size);
     }
 
-    public void setSurfaceView(WeSurfaceView surfaceView) {
-        if (surfaceView == null) throw new NullPointerException("WeSurfaceView can't be null");
-        mWeSurfaceView = surfaceView;
-        mWeSurfaceView.onBindPlayer();
+    public void setSurface(Surface surface) {
+        if (surface == null) throw new NullPointerException("surface can't be null");
+        this.mSurface = surface;
     }
 
     /**
@@ -750,8 +796,9 @@ public class WePlayer {
     }
 
     private void onNativeYUVDataCall(int width, int height, byte[] y, byte[] u, byte[] v) {
-        if (mWeSurfaceView != null) {
-            mWeSurfaceView.setYUVData(width, height, y, u, v);
+        // 直接在本线程中回调，之后 native 内部数据会回收
+        if (mOnYUVDataListener != null) {
+            mOnYUVDataListener.onYUVData(width, height, y, u, v);
         }
     }
 
@@ -778,11 +825,6 @@ public class WePlayer {
      */
     private boolean onNativeInitVideoHardCodec(String ffmpegCodecType, int width, int height,
                                                byte[] csd0, byte[] csd1) {
-        if (mWeSurfaceView == null) {
-            LogUtils.e(TAG, "onNativeInitVideoHardCodec mWeSurfaceView is null!");
-            return false;
-        }
-        mSurface = mWeSurfaceView.getMediaCodecSurface();
         if (mSurface == null) {
             LogUtils.e(TAG, "onNativeInitVideoHardCodec mSurface is null!");
             return false;
@@ -827,9 +869,14 @@ public class WePlayer {
      */
     private void onNativeSetVideoHardCodec(boolean hardCodec) {
         this.beVideoHardCodec = hardCodec;
-        if (mWeSurfaceView != null) {
-            mWeSurfaceView.setHardCodec(hardCodec);
-        }
+    }
+
+    public boolean isVideoHardCodec() {
+        return beVideoHardCodec;
+    }
+
+    public String getVideoCodecType() {
+        return mFFmpegVideoCodecType;
     }
 
     private void onNativeVideoPacketCall(int packetSize, byte[] packet) {
@@ -884,14 +931,6 @@ public class WePlayer {
         }
         mVideoFormat = null;
         mVideoBufferInfo = null;
-    }
-
-    public boolean isVideoHardCodec() {
-        return beVideoHardCodec;
-    }
-
-    public String getVideoCodecType() {
-        return mFFmpegVideoCodecType;
     }
 
 }

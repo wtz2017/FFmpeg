@@ -162,7 +162,7 @@ void WePlayer::prepareAsync() {
         weDemux->getVideoQueue()->setProductDataComplete(false);
     }
 
-//    status->setLoading(false);//直到出错、或停止、或后续播放真正取到数据，才设置 false
+    status->setLoading(false);
 
     // 状态确认需要加锁同步，判断在准备期间是否已经被停止
     pthread_mutex_lock(&status->mutex);

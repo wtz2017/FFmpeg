@@ -47,7 +47,7 @@
         android:layout_marginBottom="5dp"
         android:background="#E8E8E8">
 
-        <com.wtz.ffmpegapi.WeSurfaceView
+        <com.wtz.ffmpegapi.WeVideoView
             android:id="@+id/we_surface_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -126,19 +126,6 @@
             android:layout_weight="1"
             android:text="恢复" />
 
-        <Button
-            android:id="@+id/btn_stop_play_audio"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="停止" />
-
-        <Button
-            android:id="@+id/btn_destroy_audio_player"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="销毁" />
     </LinearLayout>
 
     <TextView

@@ -21,17 +21,26 @@ import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Renderer, SurfaceTexture.OnFrameAvailableListener {
-    private static final String TAG = "WeSurfaceView";
+public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer,
+        SurfaceTexture.OnFrameAvailableListener, WePlayer.OnYUVDataListener {
+    private static final String TAG = "WeVideoView";
 
+    private WePlayer mWePlayer;
+    private OnSurfaceCreatedListener mOnSurfaceCreatedListener;
+    private OnSurfaceDestroyedListener mOnSurfaceDestroyedListener;
+    private WePlayer.OnPreparedListener mOnPreparedListener;
+    private WePlayer.OnPlayLoadingListener mOnPlayLoadingListener;
+    private WePlayer.OnErrorListener mOnErrorListener;
+    private WePlayer.OnCompletionListener mOnCompletionListener;
+
+    private String mDataSource;
     private int mVideoWidth;
     private int mVideoHeight;
-
-    private boolean isSurfaceDestroyed;
-    private boolean isGLReleased;
-    private boolean isPlayerReleased = true;// 在未绑定到 Player 之前设置为 true
+    private int mDestroyedPosition;
 
     private boolean beHardCodec;
+    private boolean isSurfaceDestroyed;
+    private boolean isGLReleased;
     private boolean justClearScreen;
     private static final int DELAY_CLEAR_SCREEN_TIME = 400;
 
@@ -39,12 +48,7 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
     /* ---------- 顶点坐标配置：start ---------- */
     // java 层顶点坐标
-    private float[] mVertexCoordinatesData = {
-            -1f, -1f,
-            1f, -1f,
-            -1f, 1f,
-            1f, 1f
-    };
+    private float[] mVertexCoordinatesData;
 
     // 每个顶点坐标大小
     private static final int VERTEX_COORDINATE_DATA_SIZE = 2;
@@ -59,12 +63,7 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
     /* ---------- 纹理坐标配置：start ---------- */
     // java 层纹理坐标
-    private float[] mTextureCoordinatesData = {
-            0f, 1f,
-            1f, 1f,
-            0f, 0f,
-            1f, 0f
-    };
+    private float[] mTextureCoordinatesData;
 
     // 每个纹理坐标大小
     private static final int TEXTURE_COORDINATE_DATA_SIZE = 2;
@@ -116,11 +115,43 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
     private Handler mUIHandler = new Handler(Looper.getMainLooper());
 
-    public WeSurfaceView(Context context) {
+    public interface OnSurfaceCreatedListener {
+        void onSurfaceCreated();
+    }
+
+    public interface OnSurfaceDestroyedListener {
+        void onSurfaceDestroyed(String lastDataSource, int lastPosition);
+    }
+
+    public void setOnSurfaceCreatedListener(OnSurfaceCreatedListener listener) {
+        this.mOnSurfaceCreatedListener = listener;
+    }
+
+    public void setOnSurfaceDestroyedListener(OnSurfaceDestroyedListener listener) {
+        this.mOnSurfaceDestroyedListener = listener;
+    }
+
+    public void setOnPreparedListener(WePlayer.OnPreparedListener listener) {
+        this.mOnPreparedListener = listener;
+    }
+
+    public void setOnPlayLoadingListener(WePlayer.OnPlayLoadingListener listener) {
+        this.mOnPlayLoadingListener = listener;
+    }
+
+    public void setOnErrorListener(WePlayer.OnErrorListener listener) {
+        this.mOnErrorListener = listener;
+    }
+
+    public void setOnCompletionListener(WePlayer.OnCompletionListener listener) {
+        this.mOnCompletionListener = listener;
+    }
+
+    public WeVideoView(Context context) {
         this(context, null);
     }
 
-    public WeSurfaceView(Context context, AttributeSet attrs) {
+    public WeVideoView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
         setEGLContextClientVersion(2);
@@ -128,22 +159,6 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         isGLReleased = false;
         // 设置为脏模式：外部调用一次 requestRender() 就渲染一次，否则不重复渲染
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
-
-        mVertexCoordinatesBuffer = ByteBuffer
-                .allocateDirect(mVertexCoordinatesData.length * BYTES_PER_FLOAT)
-                .order(ByteOrder.nativeOrder())
-                .asFloatBuffer()
-                .put(mVertexCoordinatesData);
-        mVertexCoordinatesBuffer.position(0);
-        mVertexCoordinatesData = null;
-
-        mTextureCoordinatesBuffer = ByteBuffer
-                .allocateDirect(mTextureCoordinatesData.length * BYTES_PER_FLOAT)
-                .order(ByteOrder.nativeOrder())
-                .asFloatBuffer()
-                .put(mTextureCoordinatesData);
-        mTextureCoordinatesBuffer.position(0);
-        mTextureCoordinatesData = null;
     }
 
     /**
@@ -161,11 +176,44 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         LogUtils.w(TAG, "onSurfaceCreated");
+        isGLReleased = false;
         isSurfaceDestroyed = false;
         // 初始化 shader 工作需要放在 onSurfaceCreated 之后的 GLThread 线程中
         // onDrawFrame() onSurfaceChanged() onSurfaceCreated() 都是在 GLThread 线程中
+        initCoordinatesData();
         initYUVProgram();
         initMediaCodecProgram();
+        initPlayer();
+    }
+
+    private void initCoordinatesData() {
+        mVertexCoordinatesData = new float[]{
+                -1f, -1f,
+                1f, -1f,
+                -1f, 1f,
+                1f, 1f
+        };
+        mVertexCoordinatesBuffer = ByteBuffer
+                .allocateDirect(mVertexCoordinatesData.length * BYTES_PER_FLOAT)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer()
+                .put(mVertexCoordinatesData);
+        mVertexCoordinatesBuffer.position(0);
+        mVertexCoordinatesData = null;
+
+        mTextureCoordinatesData = new float[]{
+                0f, 1f,
+                1f, 1f,
+                0f, 0f,
+                1f, 0f
+        };
+        mTextureCoordinatesBuffer = ByteBuffer
+                .allocateDirect(mTextureCoordinatesData.length * BYTES_PER_FLOAT)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer()
+                .put(mTextureCoordinatesData);
+        mTextureCoordinatesBuffer.position(0);
+        mTextureCoordinatesData = null;
     }
 
     private void initYUVProgram() {
@@ -258,6 +306,85 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         mMediaCodecSurface = new Surface(mMediaCodecSurfaceTexture);
     }
 
+    private void initPlayer() {
+        mWePlayer = new WePlayer();
+        mWePlayer.setSurface(mMediaCodecSurface);
+        mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
+            @Override
+            public void onPrepared() {
+                LogUtils.d(TAG, "WePlayer onPrepared");
+                beHardCodec = mWePlayer.isVideoHardCodec();
+                mVideoWidth = mWePlayer.getVideoWidthOnPrepared();
+                mVideoHeight = mWePlayer.getVideoHeightOnPrepared();
+
+                if (mVideoWidth > 0 && mVideoHeight > 0) {
+                    // 新的资源准备好时清除之前可能的延时清屏，尽量避免切换闪屏
+                    mUIHandler.removeCallbacks(mClearScreenRunnable);
+                } else {
+                    // 是纯音乐，需要清屏
+                }
+
+                if (mOnPreparedListener != null) {
+                    mOnPreparedListener.onPrepared();
+                }
+            }
+        });
+        mWePlayer.setOnYUVDataListener(this);
+        mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
+            @Override
+            public void onPlayLoading(boolean isLoading) {
+                if (mOnPlayLoadingListener != null) {
+                    mOnPlayLoadingListener.onPlayLoading(isLoading);
+                }
+            }
+        });
+        mWePlayer.setOnErrorListener(new WePlayer.OnErrorListener() {
+            @Override
+            public void onError(int code, String msg) {
+                LogUtils.e(TAG, "WePlayer onError: " + code + "; " + msg);
+                if (mOnErrorListener != null) {
+                    mOnErrorListener.onError(code, msg);
+                }
+            }
+        });
+        mWePlayer.setOnCompletionListener(new WePlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion() {
+                LogUtils.d(TAG, "WePlayer onCompletion");
+                if (mOnCompletionListener != null) {
+                    mOnCompletionListener.onCompletion();
+                }
+            }
+        });
+        mWePlayer.setOnStoppedListener(new WePlayer.OnStoppedListener() {
+            @Override
+            public void onStopped() {
+                LogUtils.w(TAG, "WePlayer onStopped");
+                clearScreen(false);
+            }
+        });
+        mWePlayer.setOnResetListener(new WePlayer.OnResetListener() {
+            @Override
+            public void onReset() {
+                LogUtils.d(TAG, "WePlayer onReset");
+                clearScreen(false);
+            }
+        });
+        mWePlayer.setOnReleasedListener(new WePlayer.OnReleasedListener() {
+            @Override
+            public void onReleased() {
+                LogUtils.w(TAG, "WePlayer onReleased");
+                clearScreen(true);
+                releaseMediaCodecSurface();
+                mUIHandler.removeCallbacksAndMessages(null);
+                mWePlayer = null;
+            }
+        });
+        if (mOnSurfaceCreatedListener != null) {
+            mOnSurfaceCreatedListener.onSurfaceCreated();
+        }
+    }
+
     /**
      * 此回调在 GLThread
      */
@@ -267,30 +394,8 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         GLES20.glViewport(0, 0, width, height);
     }
 
-    protected void onBindPlayer() {
-        isPlayerReleased = false;
-    }
-
-    protected void onPlayerPrepared(int videoWidth, int videoHeight) {
-        mVideoWidth = videoWidth;
-        mVideoHeight = videoHeight;
-        if (videoWidth == 0 || videoHeight == 0) {
-            return;
-        }
-
-        // 新的资源准备好时清除之前可能的延时清屏，尽量避免切换闪屏
-        mUIHandler.removeCallbacks(mClearScreenRunnable);
-    }
-
-    protected void setHardCodec(boolean hardCodec) {
-        this.beHardCodec = hardCodec;
-    }
-
-    protected Surface getMediaCodecSurface() {
-        return mMediaCodecSurface;
-    }
-
-    protected void setYUVData(int width, int height, byte[] y, byte[] u, byte[] v) {
+    @Override
+    public void onYUVData(int width, int height, byte[] y, byte[] u, byte[] v) {
         mVideoWidth = width;
         mVideoHeight = height;
         yBuffer = ByteBuffer.wrap(y);
@@ -454,25 +559,6 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
     }
 
-    protected void onPlayerStopped() {
-        clearScreen(false);
-    }
-
-    protected void onPlayerReset() {
-        clearScreen(false);
-    }
-
-    protected void onPlayerReleased() {
-        LogUtils.w(TAG, "onPlayerReleased...");
-        synchronized (WeSurfaceView.this) {
-            isPlayerReleased = true;
-            releaseMediaCodecSurface();
-        }
-
-        clearScreen(true);
-        mUIHandler.removeCallbacksAndMessages(null);
-    }
-
     /**
      * 此回调在主线程
      * 必须在此方法 return 之前，保证释放 GLES20 动作在 GLThread 中完成
@@ -480,14 +566,17 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         LogUtils.w(TAG, "surfaceDestroyed");
-        synchronized (WeSurfaceView.this) {
-            isSurfaceDestroyed = true;
-            releaseMediaCodecSurface();
+        isSurfaceDestroyed = true;
+
+        mDestroyedPosition = getCurrentPosition() - 1000;
+        if (mDestroyedPosition < 0) {
+            mDestroyedPosition = 0;
         }
+        mWePlayer.release();
 
         // queueEvent: Queue a runnable to be run on the GL rendering thread.
         // 实际执行动作必须在 super.surfaceDestroyed(holder) 和本方法 return 之前有效
-        queueEvent(mReleaseGLES20);
+        queueEvent(mReleaseGLES20Runnable);
 
         while (!isGLReleased) {
             try {
@@ -499,13 +588,17 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
 
         LogUtils.w(TAG, "to call super.surfaceDestroyed");
         super.surfaceDestroyed(holder);
+
+        if (mOnSurfaceDestroyedListener != null) {
+            mOnSurfaceDestroyedListener.onSurfaceDestroyed(mDataSource, mDestroyedPosition);
+        }
     }
 
     /**
      * 绘制动作在 GLThread 中
      * 把释放绘制所用的资源动作也放入 GLThread 中，就可以避免并必导致异常
      */
-    private Runnable mReleaseGLES20 = new Runnable() {
+    private Runnable mReleaseGLES20Runnable = new Runnable() {
         @Override
         public void run() {
             LogUtils.w(TAG, "queueEvent run release GLES20...");
@@ -570,17 +663,16 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     };
 
     /**
-     * 1. 在 isSurfaceDestroyed 后才有必要释放 MediaCodecSurface
-     * 2. 在 isPlayerReleased 后释放 MediaCodecSurface 可避免多线程并发异常
+     * 1. 在 SurfaceDestroyed 后才有必要释放 MediaCodecSurface
+     * 2. 在 PlayerReleased 后释放 MediaCodecSurface 可避免多线程并发异常
      */
     private void releaseMediaCodecSurface() {
-        if (isSurfaceDestroyed && isPlayerReleased && mMediaCodecSurface != null) {
-            LogUtils.w(TAG, "releaseMediaCodecSurface");
-            mMediaCodecSurface.release();
-            mMediaCodecSurface = null;
-            mMediaCodecSurfaceTexture.release();
-            mMediaCodecSurfaceTexture = null;
-        }
+        LogUtils.w(TAG, "releaseMediaCodecSurface");
+        if (mMediaCodecSurfaceTexture == null) return;
+        mMediaCodecSurface.release();
+        mMediaCodecSurface = null;
+        mMediaCodecSurfaceTexture.release();
+        mMediaCodecSurfaceTexture = null;
     }
 
     /**
@@ -590,6 +682,117 @@ public class WeSurfaceView extends GLSurfaceView implements GLSurfaceView.Render
     protected void onDetachedFromWindow() {
         LogUtils.w(TAG, "onDetachedFromWindow");
         super.onDetachedFromWindow();
+        resetData();
+    }
+
+    private void resetData() {
+        mDataSource = null;
+        mVideoWidth = 0;
+        mVideoHeight = 0;
+        mDestroyedPosition = 0;
+        beHardCodec = false;
+    }
+
+    /* ============================== Player Function ============================== */
+    public void setDataSource(String dataSource) {
+        mDataSource = dataSource;
+        if (mWePlayer != null) {
+            mWePlayer.setDataSource(dataSource);
+        }
+    }
+
+    public void prepareAsync() {
+        if (mWePlayer != null) {
+            mWePlayer.prepareAsync();
+        }
+    }
+
+    public void start() {
+        if (mWePlayer != null) {
+            mWePlayer.start();
+        }
+    }
+
+    public void pause() {
+        if (mWePlayer != null) {
+            mWePlayer.pause();
+        }
+    }
+
+    public void reset() {
+        resetData();
+        if (mWePlayer != null) {
+            mWePlayer.reset();
+        }
+    }
+
+    public boolean isPlaying() {
+        return mWePlayer != null ? mWePlayer.isPlaying() : false;
+    }
+
+    /**
+     * Gets the duration of the file.
+     *
+     * @return the duration in milliseconds
+     */
+    public int getDuration() {
+        return mWePlayer != null ? mWePlayer.getDuration() : 0;
+    }
+
+    /**
+     * Gets the current playback position.
+     *
+     * @return the current position in milliseconds
+     */
+    public int getCurrentPosition() {
+        return mWePlayer != null ? mWePlayer.getCurrentPosition() : 0;
+    }
+
+    /**
+     * Seeks to specified time position
+     *
+     * @param msec the offset in milliseconds from the start to seek to
+     */
+    public void seekTo(int msec) {
+        if (mWePlayer != null) {
+            mWePlayer.seekTo(msec);
+        }
+    }
+
+    public int getVideoWidthOnPrepared() {
+        return mWePlayer != null ? mWePlayer.getVideoWidthOnPrepared() : 0;
+    }
+
+    public int getVideoHeightOnPrepared() {
+        return mWePlayer != null ? mWePlayer.getVideoHeightOnPrepared() : 0;
+    }
+
+    /**
+     * 设置音量
+     *
+     * @param percent 范围是：0 ~ 1.0
+     */
+    public void setVolume(float percent) {
+        if (mWePlayer != null) {
+            mWePlayer.setVolume(percent);
+        }
+    }
+
+    /**
+     * 获取当前音量百分比
+     *
+     * @return 范围是：0 ~ 1.0
+     */
+    public float getVolume() {
+        return mWePlayer != null ? mWePlayer.getVolume() : 0;
+    }
+
+    public boolean isVideoHardCodec() {
+        return mWePlayer != null ? mWePlayer.isVideoHardCodec() : beHardCodec;
+    }
+
+    public String getVideoCodecType() {
+        return mWePlayer != null ? mWePlayer.getVideoCodecType() : "";
     }
 
 }

@@ -3,13 +3,13 @@ package com.wtz.ffmpeg;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.media.MediaCodecList;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -21,7 +21,7 @@ import android.widget.TextView;
 import com.wtz.ffmpeg.utils.DateTimeUtil;
 import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.WePlayer;
-import com.wtz.ffmpegapi.WeSurfaceView;
+import com.wtz.ffmpegapi.WeVideoView;
 import com.wtz.ffmpegapi.utils.LogUtils;
 import com.wtz.ffmpegapi.utils.VideoUtils;
 
@@ -32,13 +32,15 @@ import java.util.Map;
 public class VideoPlayActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "VideoPlayActivity";
 
-    private WePlayer mWePlayer;
     private int mDuration;
     private boolean isSeeking;
     private boolean isLoading;
+    private boolean isPlaying;
+    private String mDestroyedDataSource;
+    private int mDestroyedPosition;
 
     private View mVideoLayout;
-    private WeSurfaceView mWeSurfaceView;
+    private WeVideoView mWeVideoView;
     private ProgressBar mProgressBar;
 
     private TextView mPlayUrl;
@@ -146,16 +148,20 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         super.onStart();
     }
 
+    @Override
+    protected void onResume() {
+        LogUtils.d(TAG, "onResume");
+        mWeVideoView.onResume();// 不要忘了在此调用
+        super.onResume();
+    }
+
     private void initViews() {
         findViewById(R.id.btn_open_media).setOnClickListener(this);
         findViewById(R.id.btn_next_media).setOnClickListener(this);
         findViewById(R.id.btn_pause_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
-        findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
-        findViewById(R.id.btn_destroy_audio_player).setOnClickListener(this);
 
         mVideoLayout = findViewById(R.id.fl_video_container);
-        mWeSurfaceView = findViewById(R.id.we_surface_view);
         mProgressBar = findViewById(R.id.pb_normal);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
@@ -189,10 +195,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 LogUtils.d(TAG, "mPlaySeekBar onStopTrackingTouch");
-                if (mWePlayer != null) {
-                    mWePlayer.seekTo(seekBar.getProgress());
-                }
+                mWeVideoView.seekTo(seekBar.getProgress());
                 isSeeking = false;
+                resumePlay();//视频 seek 后直接播放以获取对应画面
             }
         });
 
@@ -202,11 +207,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         mVolumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                if (mWePlayer != null) {
-                    float percent = seekBar.getProgress() / (float) seekBar.getMax();
-                    mVolume.setText("音量：" + VOLUME_FORMAT.format(percent));
-                    mWePlayer.setVolume(percent);
-                }
+                float percent = seekBar.getProgress() / (float) seekBar.getMax();
+                mVolume.setText("音量：" + VOLUME_FORMAT.format(percent));
+                mWeVideoView.setVolume(percent);
             }
 
             @Override
@@ -217,6 +220,100 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 LogUtils.d(TAG, "mVolumeSeekBar onStopTrackingTouch");
+            }
+        });
+
+        initVideoView();
+    }
+
+    private void initVideoView() {
+        mWeVideoView = findViewById(R.id.we_surface_view);
+        mWeVideoView.setOnSurfaceCreatedListener(new WeVideoView.OnSurfaceCreatedListener() {
+            @Override
+            public void onSurfaceCreated() {
+                LogUtils.d(TAG, "mWeVideoView onSurfaceCreated mDestroyedDataSource: " + mDestroyedDataSource);
+                if (!TextUtils.isEmpty(mDestroyedDataSource)) {
+                    mWeVideoView.setDataSource(mDestroyedDataSource);
+                    mWeVideoView.prepareAsync();
+                }
+            }
+        });
+        mWeVideoView.setOnSurfaceDestroyedListener(new WeVideoView.OnSurfaceDestroyedListener() {
+            @Override
+            public void onSurfaceDestroyed(String lastDataSource, int lastPosition) {
+                LogUtils.d(TAG, "mWeVideoView onSurfaceDestroyed: " + lastDataSource + ":" + lastPosition);
+                mDestroyedDataSource = lastDataSource;
+                mDestroyedPosition = lastPosition;
+            }
+        });
+        mWeVideoView.setOnPreparedListener(new WePlayer.OnPreparedListener() {
+            @Override
+            public void onPrepared() {
+                LogUtils.d(TAG, "mWeVideoView onPrepared mDestroyedPosition=" + mDestroyedPosition);
+                if (mDestroyedPosition > 0) {
+                    mWeVideoView.seekTo(mDestroyedPosition);
+                    mDestroyedPosition = 0;
+                }
+
+                if (isPlaying) {
+                    mWeVideoView.start();
+                } else {
+                    mWeVideoView.start();
+                    //TODO 暂停状态下 SEEK 后的画面怎么获取
+                    final float volume = mWeVideoView.getVolume();
+                    mWeVideoView.setVolume(0);
+                    mHandler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            mWeVideoView.pause();
+                            mWeVideoView.setVolume(volume);
+                        }
+                    }, 1200);//TODO TEST
+                }
+
+                setSufaceLayoutOnPrepared();
+
+                float volume = mWeVideoView.getVolume();
+                mVolume.setText("音量：" + VOLUME_FORMAT.format(volume));
+                mVolumeSeekBar.setProgress((int) (mVolumeSeekBar.getMax() * volume));
+
+                mDuration = mWeVideoView.getDuration();
+                LogUtils.d(TAG, "mDuration=" + mDuration);
+                mPlaySeekBar.setMax(mDuration);
+                mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
+                startUpdateTime();
+
+                mVideoDecoderView.setText("视频编码类型：" + mWeVideoView.getVideoCodecType());
+                String useDecoder = mWeVideoView.isVideoHardCodec() ?
+                        VideoUtils.findHardCodecType(mWeVideoView.getVideoCodecType()) : "软解";
+                mReallyUsedDecoderView.setText("实际解码类型：" + useDecoder);
+            }
+        });
+        mWeVideoView.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
+            @Override
+            public void onPlayLoading(boolean isLoading) {
+                LogUtils.d(TAG, "mWeVideoView onPlayLoading: " + isLoading);
+                VideoPlayActivity.this.isLoading = isLoading;
+                if (isLoading) {
+                    stopUpdateTime();
+                    showProgressDialog(VideoPlayActivity.this);
+                } else {
+                    startUpdateTime();
+                    hideProgressDialog();
+                }
+            }
+        });
+        mWeVideoView.setOnErrorListener(new WePlayer.OnErrorListener() {
+            @Override
+            public void onError(int code, String msg) {
+                LogUtils.e(TAG, "mWeVideoView onError: " + code + "; " + msg);
+                mError.setText("Error " + code);
+            }
+        });
+        mWeVideoView.setOnCompletionListener(new WePlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion() {
+                LogUtils.d(TAG, "mWeVideoView onCompletion");
             }
         });
     }
@@ -246,105 +343,40 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                 openMedia(mSources[mIndex]);
                 break;
             case R.id.btn_pause_audio:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.pause();
-                stopUpdateTime();
+                pause();
                 break;
             case R.id.btn_resume_play_audio:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.start();
-                startUpdateTime();
-                break;
-            case R.id.btn_stop_play_audio:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.stop();
-                stopUpdateTime();
-                resetUI();
-                break;
-            case R.id.btn_destroy_audio_player:
-                if (mWePlayer == null) {
-                    return;
-                }
-                mWePlayer.release();
-                stopUpdateTime();
-                resetUI();
-                mWePlayer = null;
+                resumePlay();
                 break;
         }
     }
 
     private void openMedia(String url) {
-        if (mWePlayer == null) {
-            mWePlayer = new WePlayer();
-            mWePlayer.setSurfaceView(mWeSurfaceView);
-            mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared() {
-                    LogUtils.d(TAG, "WePlayer onPrepared");
-                    mWePlayer.start();
+        isPlaying = true;
+        mDestroyedDataSource = null;
+        mDestroyedPosition = 0;
 
-                    setSufaceLayoutOnPrepared();
-
-                    float volume = mWePlayer.getVolume();
-                    mVolume.setText("音量：" + VOLUME_FORMAT.format(volume));
-                    mVolumeSeekBar.setProgress((int) (mVolumeSeekBar.getMax() * volume));
-
-                    mDuration = mWePlayer.getDuration();
-                    LogUtils.d(TAG, "mDuration=" + mDuration);
-                    mPlaySeekBar.setMax(mDuration);
-                    mDurationText = DateTimeUtil.changeRemainTimeToHms(mDuration);
-                    startUpdateTime();
-
-                    mVideoDecoderView.setText("视频编码类型：" + mWePlayer.getVideoCodecType());
-                    String useDecoder = mWePlayer.isVideoHardCodec() ?
-                            VideoUtils.findHardCodecType(mWePlayer.getVideoCodecType()) : "软解";
-                    mReallyUsedDecoderView.setText("实际解码类型：" + useDecoder);
-                }
-            });
-            mWePlayer.setOnPlayLoadingListener(new WePlayer.OnPlayLoadingListener() {
-                @Override
-                public void onPlayLoading(boolean isLoading) {
-                    LogUtils.d(TAG, "WePlayer onPlayLoading: " + isLoading);
-                    VideoPlayActivity.this.isLoading = isLoading;
-                    if (isLoading) {
-                        stopUpdateTime();
-                        showProgressDialog(VideoPlayActivity.this);
-                    } else {
-                        startUpdateTime();
-                        hideProgressDialog();
-                    }
-                }
-            });
-            mWePlayer.setOnErrorListener(new WePlayer.OnErrorListener() {
-                @Override
-                public void onError(int code, String msg) {
-                    LogUtils.e(TAG, "WePlayer onError: " + code + "; " + msg);
-                    mError.setText("Error " + code);
-                }
-            });
-            mWePlayer.setOnCompletionListener(new WePlayer.OnCompletionListener() {
-                @Override
-                public void onCompletion() {
-                    LogUtils.d(TAG, "WePlayer onCompletion");
-                }
-            });
-        } else {
-            mWePlayer.reset();
-        }
         mPlayUrl.setText(url);
-        mWePlayer.setDataSource(url);
-        mWePlayer.prepareAsync();
+        mWeVideoView.reset();
+        mWeVideoView.setDataSource(url);
+        mWeVideoView.prepareAsync();
+    }
+
+    private void pause() {
+        isPlaying = false;
+        mWeVideoView.pause();
+        stopUpdateTime();
+    }
+
+    private void resumePlay() {
+        isPlaying = true;
+        mWeVideoView.start();
+        startUpdateTime();
     }
 
     private void setSufaceLayoutOnPrepared() {
-        int videoWidth = mWePlayer.getVideoWidthOnPrepared();
-        int videoHeight = mWePlayer.getVideoHeightOnPrepared();
+        int videoWidth = mWeVideoView.getVideoWidthOnPrepared();
+        int videoHeight = mWeVideoView.getVideoHeightOnPrepared();
         if (videoWidth == 0 || videoHeight == 0) {
             LogUtils.w(TAG, "video: " + videoWidth + "x" + videoHeight);
             return;
@@ -352,7 +384,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
 
         float videoRatio = videoWidth * 1.0f / videoHeight;
         float containerRatio = mVideoLayout.getWidth() * 1.0f / mVideoLayout.getHeight();
-        ViewGroup.LayoutParams lp = mWeSurfaceView.getLayoutParams();
+        ViewGroup.LayoutParams lp = mWeVideoView.getLayoutParams();
         if (containerRatio > videoRatio) {
             // 视频属于瘦高类型
             lp.height = mVideoLayout.getHeight();
@@ -365,7 +397,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             lp.width = mVideoLayout.getWidth();
             lp.height = mVideoLayout.getHeight();
         }
-        mWeSurfaceView.setLayoutParams(lp);
+        mWeVideoView.setLayoutParams(lp);
         LogUtils.d(TAG, "video container: " + mVideoLayout.getWidth() + "x" + mVideoLayout.getHeight()
                 + ", video: " + videoWidth + "x" + videoHeight + ", video layout: " + lp.width + "x" + lp.height);
     }
@@ -386,7 +418,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void updatePlayTime() {
-        if (mWePlayer == null || isLoading) return;
+        if (isLoading) return;
 
         if (mDuration == 0) {
             // 直播，显示日期时间
@@ -396,9 +428,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             // seek 时 seekbar 会自动更新位置，只需要根据 seek 位置更新时间
             String currentPosition = DateTimeUtil.changeRemainTimeToHms(mPlaySeekBar.getProgress());
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);
-        } else if (mWePlayer.isPlaying()) {
+        } else if (mWeVideoView.isPlaying()) {
             // 没有 seek 时，如果还在播放中，就正常按实际播放时间更新时间和 seekbar
-            int position = mWePlayer.getCurrentPosition();
+            int position = mWeVideoView.getCurrentPosition();
             String currentPosition = DateTimeUtil.changeRemainTimeToHms(position);
             mPlayTimeView.setText(currentPosition + "/" + mDurationText);
             mPlaySeekBar.setProgress(position);
@@ -418,6 +450,13 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     @Override
+    protected void onPause() {
+        LogUtils.d(TAG, "onPause");
+        mWeVideoView.onPause();// 不要忘了在此调用
+        super.onPause();
+    }
+
+    @Override
     protected void onStop() {
         LogUtils.d(TAG, "onStop");
         super.onStop();
@@ -426,11 +465,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     @Override
     protected void onDestroy() {
         LogUtils.d(TAG, "onDestroy");
-        if (mWePlayer != null) {
-            mWePlayer.release();
-            stopUpdateTime();
-            mWePlayer = null;
-        }
+        stopUpdateTime();
 
         mHandler.removeCallbacksAndMessages(null);
         super.onDestroy();

@@ -122,15 +122,17 @@ void WeVideoPlayer::play() {
 
         if (ret == 0) {
             // 成功获取数据
-            if (status->isPlayLoading) {
-                status->setLoading(false);
-            }
+            // 由音频流单方面来判断是否在loading，避免播放纯音乐带有图片封面时频繁回调
+//            if (status->isPlayLoading) {
+//                status->setLoading(false);
+//            }
             continue;
         } else if (ret == -1) {
             // 数据加载中，等一会儿再来取
-            if (!status->isPlayLoading) {
-                status->setLoading(true);
-            }
+            // 由音频流单方面来判断是否在loading，避免播放纯音乐带有图片封面时频繁回调
+//            if (!status->isPlayLoading) {
+//                status->setLoading(true);
+//            }
             av_usleep(100 * 1000);// 睡眠 100 ms，降低 CPU 使用率
             decoder->enableFirstFrame();
             continue;
@@ -139,16 +141,18 @@ void WeVideoPlayer::play() {
             break;
         } else {
             // 各种原因失败，直接取下一个包，不用等待
-            if (status->isPlayLoading) {
-                status->setLoading(false);
-            }
+            // 由音频流单方面来判断是否在loading，避免播放纯音乐带有图片封面时频繁回调
+//            if (status->isPlayLoading) {
+//                status->setLoading(false);
+//            }
             continue;
         }
     }
     // 这里加一条判断 loading 是为了补充非播放状态时退出 while 循环的场景，同时适用于正常取到数据场景
-    if (status->isPlayLoading) {
-        status->setLoading(false);
-    }
+    // 由音频流单方面来判断是否在loading，避免播放纯音乐带有图片封面时频繁回调
+//    if (status->isPlayLoading) {
+//        status->setLoading(false);
+//    }
     playFinished = true;
 }
 
