@@ -448,6 +448,7 @@ void WePlayer::seekTo(int msec) {
     clearCache();
 
     status->isSeeking = false;
+    javaListenerContainer->onSeekCompleteListener->callback(0);
 }
 
 void WePlayer::clearCache() {

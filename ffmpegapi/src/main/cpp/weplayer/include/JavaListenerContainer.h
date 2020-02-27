@@ -17,12 +17,14 @@
 #include "OnVideoPacketCall.h"
 #include "OnSetVideoHardCodec.h"
 #include "OnStopVideoHardCodec.h"
+#include "OnSeekComplete.h"
 
 class JavaListenerContainer {
 
 public:
     OnPreparedListener *onPreparedListener = NULL;
     OnNativeLoading *onPlayLoadingListener = NULL;
+    OnSeekComplete *onSeekCompleteListener = NULL;
     OnErrorListener *onErrorListener = NULL;
     OnCompletionListener *onCompletionListener = NULL;
     OnPCMDataCall *onPcmDataCall = NULL;
@@ -42,6 +44,8 @@ public:
         onPreparedListener = NULL;
         delete onPlayLoadingListener;
         onPlayLoadingListener = NULL;
+        delete onSeekCompleteListener;
+        onSeekCompleteListener = NULL;
         delete onErrorListener;
         onErrorListener = NULL;
         delete onCompletionListener;

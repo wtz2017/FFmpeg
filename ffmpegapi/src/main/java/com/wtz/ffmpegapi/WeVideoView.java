@@ -30,6 +30,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     private OnSurfaceDestroyedListener mOnSurfaceDestroyedListener;
     private WePlayer.OnPreparedListener mOnPreparedListener;
     private WePlayer.OnPlayLoadingListener mOnPlayLoadingListener;
+    private WePlayer.OnSeekCompleteListener mOnSeekCompleteListener;
     private WePlayer.OnErrorListener mOnErrorListener;
     private WePlayer.OnCompletionListener mOnCompletionListener;
 
@@ -141,6 +142,10 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
     public void setOnPlayLoadingListener(WePlayer.OnPlayLoadingListener listener) {
         this.mOnPlayLoadingListener = listener;
+    }
+
+    public void setOnSeekCompleteListener(WePlayer.OnSeekCompleteListener listener) {
+        this.mOnSeekCompleteListener = listener;
     }
 
     public void setOnErrorListener(WePlayer.OnErrorListener listener) {
@@ -363,6 +368,14 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
             public void onPlayLoading(boolean isLoading) {
                 if (mOnPlayLoadingListener != null) {
                     mOnPlayLoadingListener.onPlayLoading(isLoading);
+                }
+            }
+        });
+        mWePlayer.setOnSeekCompleteListener(new WePlayer.OnSeekCompleteListener() {
+            @Override
+            public void onSeekComplete() {
+                if (mOnSeekCompleteListener != null) {
+                    mOnSeekCompleteListener.onSeekComplete();
                 }
             }
         });

@@ -204,7 +204,6 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                 if (mWePlayer != null) {
                     mWePlayer.seekTo(seekBar.getProgress());
                 }
-                isSeeking = false;
             }
         });
 
@@ -457,6 +456,13 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                         startUpdateDecibels();
                         hideProgressDialog();
                     }
+                }
+            });
+            mWePlayer.setOnSeekCompleteListener(new WePlayer.OnSeekCompleteListener() {
+                @Override
+                public void onSeekComplete() {
+                    LogUtils.d(TAG, "mWePlayer onSeekComplete");
+                    isSeeking = false;
                 }
             });
             mWePlayer.setOnErrorListener(new WePlayer.OnErrorListener() {

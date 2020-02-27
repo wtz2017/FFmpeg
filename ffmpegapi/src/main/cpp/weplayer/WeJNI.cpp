@@ -37,6 +37,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
         JavaListenerContainer *javaListenerContainer = new JavaListenerContainer();
         javaListenerContainer->onPreparedListener = new OnPreparedListener(jvm, env, thiz);
         javaListenerContainer->onPlayLoadingListener = new OnNativeLoading(jvm, env, thiz);
+        javaListenerContainer->onSeekCompleteListener = new OnSeekComplete(jvm, env, thiz);
         javaListenerContainer->onErrorListener = new OnErrorListener(jvm, env, thiz);
         javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
         javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);

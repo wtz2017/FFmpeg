@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.PowerManager;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -114,6 +115,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
+        // 用来控制屏幕常亮
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         setContentView(R.layout.activity_video_play);
 
         initViews();
@@ -196,7 +200,6 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             public void onStopTrackingTouch(SeekBar seekBar) {
                 LogUtils.d(TAG, "mPlaySeekBar onStopTrackingTouch");
                 mWeVideoView.seekTo(seekBar.getProgress());
-                isSeeking = false;
                 resumePlay();//视频 seek 后直接播放以获取对应画面
             }
         });
@@ -292,6 +295,13 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
                     startUpdateTime();
                     hideProgressDialog();
                 }
+            }
+        });
+        mWeVideoView.setOnSeekCompleteListener(new WePlayer.OnSeekCompleteListener() {
+            @Override
+            public void onSeekComplete() {
+                LogUtils.d(TAG, "mWeVideoView onSeekComplete");
+                isSeeking = false;
             }
         });
         mWeVideoView.setOnErrorListener(new WePlayer.OnErrorListener() {

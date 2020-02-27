@@ -90,6 +90,7 @@ public class WePlayer {
     private OnPreparedListener mOnPreparedListener;
     private OnYUVDataListener mOnYUVDataListener;
     private OnPlayLoadingListener mOnPlayLoadingListener;
+    private OnSeekCompleteListener mOnSeekCompleteListener;
     private OnErrorListener mOnErrorListener;
     private OnCompletionListener mOnCompletionListener;
     private OnStoppedListener mOnStoppedListener;
@@ -153,6 +154,10 @@ public class WePlayer {
 
     public interface OnPlayLoadingListener {
         void onPlayLoading(boolean isLoading);
+    }
+
+    public interface OnSeekCompleteListener {
+        void onSeekComplete();
     }
 
     public interface OnErrorListener {
@@ -296,6 +301,10 @@ public class WePlayer {
 
     public void setOnPlayLoadingListener(OnPlayLoadingListener listener) {
         this.mOnPlayLoadingListener = listener;
+    }
+
+    public void setOnSeekCompleteListener(OnSeekCompleteListener listener) {
+        this.mOnSeekCompleteListener = listener;
     }
 
     public void setOnErrorListener(OnErrorListener listener) {
@@ -508,6 +517,22 @@ public class WePlayer {
                 @Override
                 public void run() {
                     mOnPlayLoadingListener.onPlayLoading(isLoading);
+                }
+            });
+        }
+    }
+
+    /**
+     * called from native
+     */
+    private void onNativeSeekComplete() {
+        LogUtils.d(TAG, "onNativeSeekComplete");
+        if (mOnSeekCompleteListener != null && !isReleased) {
+            // post 到 UI 线程：1.是保持原有顺序；2.是不占用 Native 工作线程
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnSeekCompleteListener.onSeekComplete();
                 }
             });
         }
