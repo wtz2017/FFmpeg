@@ -165,6 +165,16 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
     }
 
+    public void onActivityStart() {
+        LogUtils.w(TAG, "onActivityStart");
+        super.onResume();
+    }
+
+    @Override
+    public void onResume() {
+        // do nothing 防止外层应用调用 super.onResume();
+    }
+
     /**
      * 此回调在主线程
      */
@@ -175,11 +185,25 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     /**
+     * 此回调在主线程
+     */
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        LogUtils.w(TAG, "surfaceCreated");
+        super.surfaceCreated(holder);
+    }
+
+    /**
      * 此回调在 GLThread
+     * <p>
+     * onSurfaceCreated 并不一定与 surfaceCreated 及 surfaceDestroyed 保持一样的调用次数
+     * onSurfaceCreated will be called when the rendering thread
+     * starts and whenever the EGL context is lost. The EGL context will typically
+     * be lost when the Android device awakes after going to sleep.
      */
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        LogUtils.w(TAG, "onSurfaceCreated");
+        LogUtils.w(TAG, "onSurfaceCreated isSurfaceDestroyed=" + isSurfaceDestroyed);
         isGLReleased = false;
         isSurfaceDestroyed = false;
         // 初始化 shader 工作需要放在 onSurfaceCreated 之后的 GLThread 线程中
@@ -601,17 +625,19 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         LogUtils.w(TAG, "surfaceDestroyed");
-        isSurfaceDestroyed = true;
-
-        mDestroyedPosition = getCurrentPosition() - 1000;
-        if (mDestroyedPosition < 0) {
-            mDestroyedPosition = 0;
-        }
-        mWePlayer.release();
+        releaseOnSurfaceDestroyed();
 
         // queueEvent: Queue a runnable to be run on the GL rendering thread.
         // 实际执行动作必须在 super.surfaceDestroyed(holder) 和本方法 return 之前有效
         queueEvent(mReleaseGLES20Runnable);
+        // TODO 在 android.opengl.GLSurfaceView.Renderer.onSurfaceCreated 中注释写到：
+        // * onSurfaceCreated will be called when the rendering thread
+        // * starts and whenever the EGL context is lost. The EGL context will typically
+        // * be lost when the Android device awakes after going to sleep.
+        // * Note that when the EGL context is lost, all OpenGL resources associated
+        // * with that context will be automatically deleted. You do not need to call
+        // * the corresponding "glDelete" methods such as glDeleteTextures to
+        // * manually delete these lost resources.
 
         while (!isGLReleased) {
             try {
@@ -623,9 +649,37 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
         LogUtils.w(TAG, "to call super.surfaceDestroyed");
         super.surfaceDestroyed(holder);
+    }
 
-        if (mOnSurfaceDestroyedListener != null) {
-            mOnSurfaceDestroyedListener.onSurfaceDestroyed(mDataSource, mDestroyedPosition);
+    @Override
+    public void onPause() {
+        // do nothing 防止外层应用调用 super.onPause()
+    }
+
+    public void onActivityStop() {
+        LogUtils.w(TAG, "onActivityStop isSurfaceDestroyed=" + isSurfaceDestroyed);
+        super.onPause();
+        // onSurfaceCreated 并不一定与 surfaceCreated 及 surfaceDestroyed 保持一样的调用次数
+        // * onSurfaceCreated will be called when the rendering thread
+        // * starts and whenever the EGL context is lost. The EGL context will typically
+        // * be lost when the Android device awakes after going to sleep.
+        releaseOnSurfaceDestroyed();// 在 Activity stop 不可见时主动释放资源
+    }
+
+    private void releaseOnSurfaceDestroyed() {
+        if (!isSurfaceDestroyed) {
+            LogUtils.w(TAG, "releaseOnSurfaceDestroyed...");
+            isSurfaceDestroyed = true;
+
+            mDestroyedPosition = getCurrentPosition() - 1000;
+            if (mDestroyedPosition < 0) {
+                mDestroyedPosition = 0;
+            }
+            mWePlayer.release();
+
+            if (mOnSurfaceDestroyedListener != null) {
+                mOnSurfaceDestroyedListener.onSurfaceDestroyed(mDataSource, mDestroyedPosition);
+            }
         }
     }
 
@@ -757,8 +811,10 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     public void drawOneFrameThenPause() {
         LogUtils.w(TAG, "drawOneFrameThenPause...");
         drawOneFrameThenPause = true;
-        mPauseVolume = getVolume();
-        setVolume(0);
+        if (mWePlayer != null) {
+            mPauseVolume = mWePlayer.getVolume();
+            mWePlayer.setVolume(0);
+        }
         start();
     }
 
@@ -836,7 +892,15 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
      * @return 范围是：0 ~ 1.0
      */
     public float getVolume() {
-        return mWePlayer != null ? mWePlayer.getVolume() : 0;
+        if (mWePlayer != null) {
+            if (drawOneFrameThenPause) {
+                return mPauseVolume;
+            } else {
+                return mWePlayer.getVolume();
+            }
+        }
+
+        return 0;
     }
 
     public boolean isVideoHardCodec() {

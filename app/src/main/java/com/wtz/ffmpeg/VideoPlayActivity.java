@@ -146,12 +146,12 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     protected void onStart() {
         LogUtils.d(TAG, "onStart");
         super.onStart();
+        mWeVideoView.onActivityStart();// 不要忘了在此调用
     }
 
     @Override
     protected void onResume() {
         LogUtils.d(TAG, "onResume");
-        mWeVideoView.onResume();// 不要忘了在此调用
         super.onResume();
     }
 
@@ -443,13 +443,13 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     @Override
     protected void onPause() {
         LogUtils.d(TAG, "onPause");
-        mWeVideoView.onPause();// 不要忘了在此调用
         super.onPause();
     }
 
     @Override
     protected void onStop() {
         LogUtils.d(TAG, "onStop");
+        mWeVideoView.onActivityStop();// 不要忘了在此调用
         super.onStop();
     }
 
