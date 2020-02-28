@@ -340,7 +340,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     private void initPlayer() {
-        mWePlayer = new WePlayer();
+        mWePlayer = new WePlayer(false);
         mWePlayer.setSurface(mMediaCodecSurface);
         mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
             @Override

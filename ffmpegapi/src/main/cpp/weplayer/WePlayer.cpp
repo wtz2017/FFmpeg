@@ -4,7 +4,8 @@
 
 #include "WePlayer.h"
 
-WePlayer::WePlayer(JavaListenerContainer *javaListenerContainer) {
+WePlayer::WePlayer(bool onlyDecodeAudio, JavaListenerContainer *javaListenerContainer) {
+    this->onlyDecodeAudio = onlyDecodeAudio;
     this->javaListenerContainer = javaListenerContainer;
     init();
 }
@@ -15,18 +16,22 @@ WePlayer::~WePlayer() {
 
 void WePlayer::init() {
     status = new PlayStatus(javaListenerContainer->onPlayLoadingListener);
-    weDemux = new WeDemux();
+    weDemux = new WeDemux(onlyDecodeAudio);
     weAudioPlayer = new WeAudioPlayer(weDemux->getAudioQueue(), status, javaListenerContainer);
-    weVideoPlayer = new WeVideoPlayer(weDemux->getVideoQueue(), status, javaListenerContainer);
+    if (!onlyDecodeAudio) {
+        weVideoPlayer = new WeVideoPlayer(weDemux->getVideoQueue(), status, javaListenerContainer);
+    }
 
     int ret;
     if ((ret = weAudioPlayer->init()) != NO_ERROR) {
         handleErrorOnInit(ret, E_NAME_AUDIO_PLAY);
         return;
     }
-    if ((ret = weVideoPlayer->init()) != NO_ERROR) {
-        handleErrorOnInit(ret, E_NAME_VIDEO_PLAY);
-        return;
+    if (!onlyDecodeAudio) {
+        if ((ret = weVideoPlayer->init()) != NO_ERROR) {
+            handleErrorOnInit(ret, E_NAME_VIDEO_PLAY);
+            return;
+        }
     }
 
     createDemuxThread();// 开启解封装线程
@@ -232,7 +237,9 @@ void WePlayer::start() {
         if (weDemux->getAudioQueue()->isProductDataComplete()) {
             seekToBegin = true;// 在播放完成后，如果用户没有 seek，就从头开始播放
             weDemux->getAudioQueue()->setProductDataComplete(false);
-            weDemux->getVideoQueue()->setProductDataComplete(false);
+            if (weDemux->getVideoStream() != NULL) {
+                weDemux->getVideoQueue()->setProductDataComplete(false);
+            }
         }
         int ret;
         if ((ret = weAudioPlayer->startPlay()) != NO_ERROR) {
@@ -302,7 +309,9 @@ void WePlayer::demux() {
         } else {
             // 数据读取已经到末尾 或 出错了
             weDemux->getAudioQueue()->setProductDataComplete(true);
-            weDemux->getVideoQueue()->setProductDataComplete(true);
+            if (weDemux->getVideoStream() != NULL) {
+                weDemux->getVideoQueue()->setProductDataComplete(true);
+            }
             releaseAvPacket();
 
             // 等待播放完成后退出，否则造成播放不完整
@@ -323,7 +332,9 @@ void WePlayer::demux() {
     } // 读包大循环
 
     weDemux->getAudioQueue()->setProductDataComplete(true);
-    weDemux->getVideoQueue()->setProductDataComplete(true);
+    if (weDemux->getVideoStream() != NULL) {
+        weDemux->getVideoQueue()->setProductDataComplete(true);
+    }
     demuxFinished = true;// 提前中断退出
 }
 

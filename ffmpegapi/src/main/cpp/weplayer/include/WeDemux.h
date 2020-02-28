@@ -23,6 +23,7 @@ private:
     pthread_mutex_t demuxMutex;
 
     bool stopWork = true;
+    bool onlyDecodeAudio = false;
 
     char *dataSource = NULL;
     AVFormatContext *pFormatCtx = NULL;
@@ -37,7 +38,7 @@ public:
     const char *LOG_TAG = "WeDemux";
 
 public:
-    WeDemux();
+    WeDemux(bool onlyDecodeAudio);
 
     ~WeDemux();
 

@@ -4,7 +4,8 @@
 
 #include "WeDemux.h"
 
-WeDemux::WeDemux() {
+WeDemux::WeDemux(bool onlyDecodeAudio) {
+    this->onlyDecodeAudio = onlyDecodeAudio;
     init();
 }
 
@@ -14,7 +15,9 @@ WeDemux::~WeDemux() {
 
 void WeDemux::init() {
     audioQueue = new AVPacketQueue("Audio");
-    videoQueue = new AVPacketQueue("Video");
+    if (!onlyDecodeAudio) {
+        videoQueue = new AVPacketQueue("Video");
+    }
     pthread_mutex_init(&demuxMutex, NULL);
 
     // 注册解码器并初始化网络
@@ -122,10 +125,12 @@ int WeDemux::prepare() {
                 audioStream = new AudioStream(i, pFormatCtx->streams[i]->codecpar,
                                               pFormatCtx->streams[i]->time_base, duration);
             }
-        } else if (mediaType == AVMEDIA_TYPE_VIDEO) {
-            videoStream = new VideoStream(i, pFormatCtx->streams[i]->codecpar,
-                                          pFormatCtx->streams[i]->time_base,
-                                          pFormatCtx->streams[i]->avg_frame_rate);
+        } else if (!onlyDecodeAudio) {
+            if (mediaType == AVMEDIA_TYPE_VIDEO) {
+                videoStream = new VideoStream(i, pFormatCtx->streams[i]->codecpar,
+                                              pFormatCtx->streams[i]->time_base,
+                                              pFormatCtx->streams[i]->avg_frame_rate);
+            }
         }
     }
     // 可以没有视频流，但音频流一定得有

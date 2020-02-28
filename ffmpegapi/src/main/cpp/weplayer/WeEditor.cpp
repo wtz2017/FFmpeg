@@ -15,7 +15,7 @@ WeEditor::~WeEditor() {
 
 void WeEditor::init() {
     status = new EditStatus();
-    weDemux = new WeDemux();
+    weDemux = new WeDemux(false);
     weAudioEditor = new WeAudioEditor(weDemux->getAudioQueue(), status, javaListenerContainer);
 
     int ret;

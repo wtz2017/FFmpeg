@@ -25,6 +25,7 @@ class WePlayer {
 private:
     JavaListenerContainer *javaListenerContainer = NULL;
 
+    bool onlyDecodeAudio = false;
     bool initSuccess = false;
     bool prepareFinished = true;
     bool demuxFinished = true;
@@ -45,7 +46,7 @@ public:
     PlayStatus *status = NULL;
 
 public:
-    WePlayer(JavaListenerContainer *javaListenerContainer);
+    WePlayer(bool onlyDecodeAudio, JavaListenerContainer *javaListenerContainer);
 
     ~WePlayer();
 

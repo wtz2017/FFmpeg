@@ -415,7 +415,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     private void openAudio(String url) {
         if (mWePlayer == null) {
-            mWePlayer = new WePlayer();
+            mWePlayer = new WePlayer(true);
             mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared() {

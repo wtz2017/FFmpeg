@@ -24,15 +24,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 // ------------------------------ WePlayer Start ------------------------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, jstring dataSource) {
-    if (dataSource == NULL || env->GetStringUTFLength(dataSource) == 0) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass,
-                      "Can't set a 'null' string to data source!");
-        env->DeleteLocalRef(exceptionClass);
-        return;
-    }
-
+Java_com_wtz_ffmpegapi_WePlayer_nativeCreatePlayer(JNIEnv *env, jobject thiz, jboolean onlyDecodeAudio) {
     if (pWePlayer == NULL) {
         JavaListenerContainer *javaListenerContainer = new JavaListenerContainer();
         javaListenerContainer->onPreparedListener = new OnPreparedListener(jvm, env, thiz);
@@ -47,7 +39,23 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, j
         javaListenerContainer->onSetVideoHardCodec = new OnSetVideoHardCodec(jvm, env, thiz);
         javaListenerContainer->onVideoPacketCall = new OnVideoPacketCall(jvm, env, thiz);
         javaListenerContainer->onStopVideoHardCodec = new OnStopVideoHardCodec(jvm, env, thiz);
-        pWePlayer = new WePlayer(javaListenerContainer);
+        pWePlayer = new WePlayer(onlyDecodeAudio, javaListenerContainer);
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WePlayer_nativeSetDataSource(JNIEnv *env, jobject thiz, jstring dataSource) {
+    if (pWePlayer == NULL) {
+        LOGE(LOG_TAG, "nativeSetDataSource...but pWePlayer is NULL");
+        return;
+    }
+    if (dataSource == NULL || env->GetStringUTFLength(dataSource) == 0) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass,
+                      "Can't set a 'null' string to data source!");
+        env->DeleteLocalRef(exceptionClass);
+        return;
     }
 
     /**
@@ -81,10 +89,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativePrepareAsync(JNIEnv *env, jobject thiz) {
     if (pWePlayer == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass,
-                      "Have you called setDataSource before calling the prepare function?");
-        env->DeleteLocalRef(exceptionClass);
+        LOGE(LOG_TAG, "nativePrepareAsync...but pWePlayer is NULL");
         return;
     }
 
@@ -187,9 +192,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeStart(JNIEnv *env, jobject thiz) {
     if (pWePlayer == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass, "Have you called prepare before calling the start function?");
-        env->DeleteLocalRef(exceptionClass);
+        LOGE(LOG_TAG, "nativeStart...but pWePlayer is NULL");
         return;
     }
 
@@ -204,9 +207,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativePause(JNIEnv *env, jobject thiz) {
     if (pWePlayer == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass, "Have you called start before calling the pause function?");
-        env->DeleteLocalRef(exceptionClass);
+        LOGE(LOG_TAG, "nativePause...but pWePlayer is NULL");
         return;
     }
 
@@ -221,10 +222,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WePlayer_nativeSeekTo(JNIEnv *env, jobject thiz, jint msec) {
     if (pWePlayer == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass,
-                      "Have you called prepare before calling the seekTo function?");
-        env->DeleteLocalRef(exceptionClass);
+        LOGE(LOG_TAG, "nativeSeekTo...but pWePlayer is NULL");
         return;
     }
 
@@ -393,16 +391,7 @@ Java_com_wtz_ffmpegapi_WePlayer_nativeRelease(JNIEnv *env, jobject thiz) {
 // ------------------------------ WeEditor Start ------------------------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_wtz_ffmpegapi_WeEditor_nativeSetEditDataSource(JNIEnv *env, jobject thiz,
-                                                        jstring dataSource) {
-    if (dataSource == NULL || env->GetStringUTFLength(dataSource) == 0) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass,
-                      "Can't set a 'null' string to data source!");
-        env->DeleteLocalRef(exceptionClass);
-        return;
-    }
-
+Java_com_wtz_ffmpegapi_WeEditor_nativeCreateEditor(JNIEnv *env, jobject thiz) {
     if (pWeEditor == NULL) {
         JavaListenerContainer *javaListenerContainer = new JavaListenerContainer();
         javaListenerContainer->onPreparedListener = new OnPreparedListener(jvm, env, thiz);
@@ -411,6 +400,23 @@ Java_com_wtz_ffmpegapi_WeEditor_nativeSetEditDataSource(JNIEnv *env, jobject thi
         javaListenerContainer->onCompletionListener = new OnCompletionListener(jvm, env, thiz);
         javaListenerContainer->onPcmDataCall = new OnPCMDataCall(jvm, env, thiz);
         pWeEditor = new WeEditor(javaListenerContainer);
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wtz_ffmpegapi_WeEditor_nativeSetEditDataSource(JNIEnv *env, jobject thiz,
+                                                        jstring dataSource) {
+    if (pWeEditor == NULL) {
+        LOGE(LOG_TAG, "nativeSetEditDataSource...but pWeEditor is NULL");
+        return;
+    }
+    if (dataSource == NULL || env->GetStringUTFLength(dataSource) == 0) {
+        jclass exceptionClass = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionClass,
+                      "Can't set a 'null' string to data source!");
+        env->DeleteLocalRef(exceptionClass);
+        return;
     }
 
     int jstrUtf16Len = env->GetStringLength(dataSource);
@@ -433,10 +439,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WeEditor_nativePrepareEdit(JNIEnv *env, jobject thiz) {
     if (pWeEditor == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass,
-                      "Have you called setDataSource before calling the prepare function?");
-        env->DeleteLocalRef(exceptionClass);
+        LOGE(LOG_TAG, "nativePrepareEdit...but pWeEditor is NULL");
         return;
     }
 
@@ -452,9 +455,7 @@ JNIEXPORT void JNICALL
 Java_com_wtz_ffmpegapi_WeEditor_nativeStartEdit(JNIEnv *env, jobject thiz, jint startTimeMsec,
                                                 jint endTimeMsec) {
     if (pWeEditor == NULL) {
-        jclass exceptionClass = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionClass, "Have you called prepare before calling the start function?");
-        env->DeleteLocalRef(exceptionClass);
+        LOGE(LOG_TAG, "nativeStartEdit...but pWeEditor is NULL");
         return;
     }
 

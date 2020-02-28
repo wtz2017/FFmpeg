@@ -26,6 +26,8 @@ public class WeEditor {
         System.loadLibrary("swscale");
     }
 
+    private native void nativeCreateEditor();
+
     private native void nativeSetEditDataSource(String dataSource);
 
     private native void nativePrepareEdit();
@@ -68,6 +70,7 @@ public class WeEditor {
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
     private HandlerThread mWorkThread;
+    private static final int HANDLE_CREATE_EDITOR = 0;
     private static final int HANDLE_SET_DATA_SOURCE = 1;
     private static final int HANDLE_PREPARE_ASYNC = 2;
     private static final int HANDLE_START_EDIT = 3;
@@ -105,6 +108,10 @@ public class WeEditor {
                     return;
                 }
                 switch (msgType) {
+                    case HANDLE_CREATE_EDITOR:
+                        handleCreateEditor();
+                        break;
+
                     case HANDLE_SET_DATA_SOURCE:
                         handleSetDataSource(msg);
                         break;
@@ -131,6 +138,7 @@ public class WeEditor {
                 }
             }
         };
+        createEditor();
     }
 
     public void release() {
@@ -184,6 +192,16 @@ public class WeEditor {
 
     public void setOnCompletionListener(OnCompletionListener listener) {
         this.mOnCompletionListener = listener;
+    }
+
+    private void createEditor() {
+        mWorkHandler.removeMessages(HANDLE_CREATE_EDITOR);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_CREATE_EDITOR);
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleCreateEditor() {
+        nativeCreateEditor();
     }
 
     public void setDataSource(String dataSource) {

@@ -30,6 +30,8 @@ public class WePlayer {
         System.loadLibrary("swscale");
     }
 
+    private native void nativeCreatePlayer(boolean onlyDecodeAudio);
+
     private native void nativeSetDataSource(String dataSource);
 
     private native void nativePrepareAsync();
@@ -117,6 +119,7 @@ public class WePlayer {
     private Handler mUIHandler;// 用以把回调切换到主线程，不占用工作线程资源
     private Handler mWorkHandler;
     private HandlerThread mWorkThread;
+    private static final int HANDLE_CREATE_PLAYER = 0;
     private static final int HANDLE_SET_DATA_SOURCE = 1;
     private static final int HANDLE_PREPARE_ASYNC = 2;
     private static final int HANDLE_SET_VOLUME = 3;
@@ -180,7 +183,12 @@ public class WePlayer {
         void onReleased();
     }
 
-    public WePlayer() {
+    /**
+     * 针对带有封面的纯音频，可以设置是否只解码音频
+     *
+     * @param onlyDecodeAudio true:只解码音频
+     */
+    public WePlayer(boolean onlyDecodeAudio) {
         mUIHandler = new Handler(Looper.getMainLooper());
         mWorkThread = new HandlerThread("WePlayer-dispatcher");
         mWorkThread.start();
@@ -194,6 +202,10 @@ public class WePlayer {
                     return;
                 }
                 switch (msgType) {
+                    case HANDLE_CREATE_PLAYER:
+                        handleCreatePlayer(msg);
+                        break;
+
                     case HANDLE_SET_DATA_SOURCE:
                         handleSetDataSource(msg);
                         break;
@@ -244,6 +256,7 @@ public class WePlayer {
                 }
             }
         };
+        createPlayer(onlyDecodeAudio);
     }
 
     public void release() {
@@ -325,6 +338,18 @@ public class WePlayer {
 
     public void setOnReleasedListener(OnReleasedListener listener) {
         this.mOnReleasedListener = listener;
+    }
+
+    private void createPlayer(boolean onlyDecodeAudio) {
+        mWorkHandler.removeMessages(HANDLE_CREATE_PLAYER);
+        Message msg = mWorkHandler.obtainMessage(HANDLE_CREATE_PLAYER);
+        msg.obj = onlyDecodeAudio;
+        mWorkHandler.sendMessage(msg);
+    }
+
+    private void handleCreatePlayer(Message msg) {
+        boolean onlyDecodeAudio = (boolean) msg.obj;
+        nativeCreatePlayer(onlyDecodeAudio);
     }
 
     public void setDataSource(String dataSource) {

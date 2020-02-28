@@ -98,7 +98,7 @@ void LooperThread::sendMessage(int msgType) {
     pthread_mutex_lock(&mutex);
 
     if (LOG_DEBUG) {
-        LOGD(LOG_TAG, "%s sendMessage：%d", threadName, msgType);
+        LOGD(LOG_TAG, "%s sendMessage: %d", threadName, msgType);
     }
     queue.push(msgType);
     pthread_cond_signal(&condition);
