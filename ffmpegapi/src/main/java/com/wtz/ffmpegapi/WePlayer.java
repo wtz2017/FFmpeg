@@ -132,6 +132,11 @@ public class WePlayer {
     private static final int HANDLE_STOP = 10;
     private static final int HANDLE_RESET = 11;
     private static final int HANDLE_RELEASE = 12;
+    // 调用 stop 或 reset 时可以直接 remove 的消息，注意不要把 HANDLE_CREATE_PLAYER 删除了
+    private static final int[] NEED_REMOVE_WHEN_STOPPING = {
+            HANDLE_SET_DATA_SOURCE, HANDLE_PREPARE_ASYNC, HANDLE_SET_VOLUME, HANDLE_SET_CHANNEL,
+            HANDLE_SET_PITCH, HANDLE_SET_TEMPO, HANDLE_START, HANDLE_PAUSE, HANDLE_SEEK
+    };
 
     public enum SoundChannel {
         RIGHT_CHANNEL(0), LEFT_CHANNEL(1), STERO(2);
@@ -604,8 +609,12 @@ public class WePlayer {
         nativeSetStopFlag();// 设置停止标志位立即执行，不进消息队列
         stopRecord();
 
-        // 先清除其它所有未执行消息，再执行具体释放动作
-        mWorkHandler.removeCallbacksAndMessages(null);
+        // 先清除其它未执行的不必要消息，再执行具体释放动作
+        // 不要使用 removeCallbacksAndMessages(null)，避免清除 HANDLE_CREATE_PLAYER
+        for (int msg : NEED_REMOVE_WHEN_STOPPING) {
+            mWorkHandler.removeMessages(msg);
+        }
+
         Message msg = mWorkHandler.obtainMessage(HANDLE_STOP);
         mWorkHandler.sendMessage(msg);
     }
@@ -633,7 +642,11 @@ public class WePlayer {
         stopRecord();
 
         // 先清除其它所有未执行消息，再执行具体重置动作
-        mWorkHandler.removeCallbacksAndMessages(null);
+        // 不要使用 removeCallbacksAndMessages(null)，避免清除 HANDLE_CREATE_PLAYER
+        for (int msg : NEED_REMOVE_WHEN_STOPPING) {
+            mWorkHandler.removeMessages(msg);
+        }
+
         Message msg = mWorkHandler.obtainMessage(HANDLE_RESET);
         mWorkHandler.sendMessage(msg);
     }
