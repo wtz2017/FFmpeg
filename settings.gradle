@@ -1,2 +1,2 @@
-include ':app', ':ffmpegapi'
+include ':app', ':ffmpegapi', ':liveplay'
 rootProject.name='FFmpeg'
