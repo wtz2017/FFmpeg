@@ -433,6 +433,8 @@ public class AudioService extends Service implements WePlayer.OnPreparedListener
         isPrepared = true;
         if (mOnPreparedListener != null) {
             mOnPreparedListener.onPrepared();
+        } else {
+            start();
         }
     }
 

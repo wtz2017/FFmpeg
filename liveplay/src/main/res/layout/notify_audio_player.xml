@@ -1,78 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/rl_play_layout"
+    android:id="@+id/rl_notify_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="horizontal">
+    android:layout_height="match_parent">
+
+    <!-- 在 RemoteViews 中某些手机对于设置了可获取焦点属性：
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        按钮不能在第一次得到响应，需要多按一次才响应 -->
 
     <ImageView
         android:id="@+id/iv_album"
         android:layout_width="@dimen/dp_60"
         android:layout_height="@dimen/dp_60"
+        android:layout_centerVertical="true"
         android:layout_gravity="center_vertical"
         android:background="@android:color/white"
         android:scaleType="fitCenter"
         android:src="@drawable/icon_radio_default" />
 
-    <RelativeLayout
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/tv_title"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_alignTop="@+id/iv_album"
         android:layout_marginLeft="@dimen/dp_10"
-        android:layout_weight="1">
+        android:layout_marginBottom="@dimen/dp_4"
+        android:layout_toRightOf="@+id/iv_album"
+        android:ellipsize="end"
+        android:gravity="left|center_vertical"
+        android:lines="1"
+        android:text="名称"
+        android:textColor="#808080"
+        android:textSize="@dimen/sp_19" />
 
-        <TextView
-            android:id="@+id/tv_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/dp_4"
-            android:ellipsize="end"
-            android:gravity="left|center_vertical"
-            android:lines="1"
-            android:text="名称"
-            android:textColor="#CCFFFFFF"
-            android:textSize="@dimen/sp_19" />
+    <ImageView
+        android:id="@+id/iv_last_song"
+        android:layout_width="@dimen/dp_30"
+        android:layout_height="@dimen/dp_30"
+        android:layout_below="@+id/tv_title"
+        android:layout_alignLeft="@+id/tv_title"
+        android:src="@drawable/pre_image_selector" />
 
-        <ImageView
-            android:id="@+id/iv_last_song"
-            android:layout_width="@dimen/dp_30"
-            android:layout_height="@dimen/dp_30"
-            android:layout_below="@+id/tv_title"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:src="@drawable/pre_image_selector" />
+    <ImageView
+        android:id="@+id/iv_pause_play"
+        android:layout_width="@dimen/dp_30"
+        android:layout_height="@dimen/dp_30"
+        android:layout_below="@+id/tv_title"
+        android:layout_marginLeft="@dimen/dp_12"
+        android:layout_toRightOf="@+id/iv_last_song"
+        android:src="@drawable/pause_image_selector" />
 
-        <ImageView
-            android:id="@+id/iv_pause_play"
-            android:layout_width="@dimen/dp_30"
-            android:layout_height="@dimen/dp_30"
-            android:layout_below="@+id/tv_title"
-            android:layout_marginLeft="@dimen/dp_12"
-            android:layout_toRightOf="@+id/iv_last_song"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:src="@drawable/pause_image_selector" />
-
-        <ImageView
-            android:id="@+id/iv_next_song"
-            android:layout_width="@dimen/dp_30"
-            android:layout_height="@dimen/dp_30"
-            android:layout_below="@+id/tv_title"
-            android:layout_marginLeft="@dimen/dp_12"
-            android:layout_toRightOf="@+id/iv_pause_play"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:src="@drawable/next_image_selector" />
-    </RelativeLayout>
+    <ImageView
+        android:id="@+id/iv_next_song"
+        android:layout_width="@dimen/dp_30"
+        android:layout_height="@dimen/dp_30"
+        android:layout_below="@+id/tv_title"
+        android:layout_marginLeft="@dimen/dp_12"
+        android:layout_toRightOf="@+id/iv_pause_play"
+        android:src="@drawable/next_image_selector" />
 
     <ImageView
         android:id="@+id/iv_stop_play"
         android:layout_width="@dimen/dp_30"
         android:layout_height="@dimen/dp_30"
+        android:layout_alignParentRight="true"
+        android:layout_centerVertical="true"
         android:layout_marginRight="@dimen/dp_10"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
         android:src="@drawable/ic_close_black_48dp" />
 
-</LinearLayout>
+</RelativeLayout>

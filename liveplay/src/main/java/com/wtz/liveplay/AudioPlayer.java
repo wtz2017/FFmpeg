@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -26,6 +27,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.squareup.picasso.Picasso;
 import com.wtz.ffmpegapi.WePlayer;
+import com.wtz.liveplay.utils.DateTimeUtil;
 import com.wtz.liveplay.utils.ScreenUtils;
 import com.wtz.liveplay.view.LoadingDialog;
 
@@ -50,6 +52,8 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
     private int mAlbumHeight;
     private Drawable mAlbumDrawable;
 
+    private TextView tvTime;
+
     private TextView tvName;
 
     private ImageView ivPre;
@@ -61,7 +65,20 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
 
     private boolean isPrepared;
 
-    private Handler mHandler = new Handler(Looper.getMainLooper());
+    private static final int UPDATE_PLAY_TIME_INTERVAL = 300;
+    private static final int MSG_UPDATE_PLAY_TIME = 1;
+    private Handler mHandler = new Handler(Looper.getMainLooper()){
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            switch (msg.what) {
+                case MSG_UPDATE_PLAY_TIME:
+                    updatePlayTime();
+                    removeMessages(MSG_UPDATE_PLAY_TIME);
+                    sendEmptyMessageDelayed(MSG_UPDATE_PLAY_TIME, UPDATE_PLAY_TIME_INTERVAL);
+                    break;
+            }
+        }
+    };
 
     private AudioService mService;
     private boolean mBound = false;
@@ -112,6 +129,7 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
     @Override
     protected void onResume() {
         Log.d(TAG, "onResume");
+        startUpdateTime();
         super.onResume();
     }
 
@@ -162,7 +180,7 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
         return true;
     }
 
-    private void initViews() {//TODO 时间 电池
+    private void initViews() {
         ivAlbum = findViewById(R.id.iv_album);
         setAlbumLayout(ivAlbum);
         if (mAlbumDrawable != null) {
@@ -170,6 +188,9 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
         } else {
             ivAlbum.setImageResource(R.drawable.icon_radio_default);
         }
+
+        tvTime = findViewById(R.id.tv_time);
+        startUpdateTime();
 
         tvName = findViewById(R.id.tv_name);
         tvName.setText(mAudioList.get(mIndex).name);
@@ -192,6 +213,18 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
         ivNext.setOnTouchListener(this);
 
         mLoadingDialog = new LoadingDialog(this);
+    }
+
+    private void startUpdateTime() {
+        mHandler.sendEmptyMessage(MSG_UPDATE_PLAY_TIME);
+    }
+
+    private void stopUpdateTime() {
+        mHandler.removeMessages(MSG_UPDATE_PLAY_TIME);
+    }
+
+    private void updatePlayTime() {
+        tvTime.setText(DateTimeUtil.getCurrentDateTime("HH:mm:ss"));
     }
 
     private void setAlbumLayout(ImageView album) {
@@ -468,6 +501,7 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
     @Override
     protected void onStop() {
         Log.d(TAG, "onStop");
+        stopUpdateTime();
         super.onStop();
     }
 
