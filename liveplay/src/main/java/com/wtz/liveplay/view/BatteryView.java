@@ -95,7 +95,7 @@ public class BatteryView extends View {
         initView();
     }
 
-    private void initView() {
+    private void initView() {//TODO 支持属性配置是否展示百分比
         // 从 Dimen 初始化各个参数大小
         mHeadWidth = getContext().getResources().getDimension(HEAD_WIDTH_DIMEN_ID) + 0.5f;
         mHeadHeight = getContext().getResources().getDimension(HEAD_HEIGHT_DIMEN_ID) + 0.5f;

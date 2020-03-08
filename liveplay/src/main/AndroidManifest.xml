@@ -25,6 +25,13 @@
         </activity>
 
         <activity
+            android:name=".VideoPlayer"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:screenOrientation="landscape"
+            android:launchMode="singleInstance"
+            android:theme="@style/FullScreenTheme" />
+
+        <activity
             android:name=".AudioPlayer"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:launchMode="singleInstance"

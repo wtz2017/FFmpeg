@@ -38,7 +38,7 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
         View.OnTouchListener, WePlayer.OnPreparedListener, WePlayer.OnPlayLoadingListener,
         AudioService.OnPlayItemChangedListener, AudioService.OnPlayStatusChangedListener,
         WePlayer.OnErrorListener, AudioService.OnUserExitListener {
-    private static final String TAG = AudioPlayer.class.getSimpleName();
+    private static final String TAG = "AudioPlayer";
 
     public static final String KEY_AUDIO_LIST = "key_audio_list";
     public static final String KEY_AUDIO_INDEX = "key_audio_index";
@@ -508,7 +508,9 @@ public class AudioPlayer extends AppCompatActivity implements View.OnClickListen
     @Override
     protected void onDestroy() {
         Log.d(TAG, "onDestroy");
-        Picasso.get().cancelRequest(ivAlbum);
+        if (ivAlbum != null) {
+            Picasso.get().cancelRequest(ivAlbum);
+        }
         mAlbumDrawable = null;
 
         hideLoading();

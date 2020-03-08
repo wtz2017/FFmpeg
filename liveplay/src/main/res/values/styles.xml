@@ -29,7 +29,7 @@
         <!-- 是否有覆盖 -->
         <item name="android:windowContentOverlay">@null</item>
         <!--背景变暗-->
-        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
     </style>
 
 </resources>

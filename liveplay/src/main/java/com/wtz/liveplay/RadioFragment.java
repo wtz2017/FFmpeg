@@ -161,7 +161,7 @@ public class RadioFragment extends Fragment {
     private void initChannelsGridView(View root) {
         mChannelsGridView = root.findViewById(R.id.recycler_view_channels);
         int[] wh = ScreenUtils.getScreenPixels(getActivity());
-        int spanCount = wh[0] / 480;
+        int spanCount = wh[0] / 360;
         GridLayoutManager channelsLayoutManager = new GridLayoutManager(getActivity(), spanCount);
         channelsLayoutManager.setOrientation(RecyclerView.VERTICAL);
         mChannelsGridView.setLayoutManager(channelsLayoutManager);

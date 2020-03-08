@@ -38,6 +38,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     private int mVideoWidth;
     private int mVideoHeight;
     private float mPauseVolume;
+    private float mUserVolume;
     private int mDestroyedPosition;
 
     private boolean beHardCodec;
@@ -341,6 +342,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
     private void initPlayer() {
         mWePlayer = new WePlayer(false);
+        mWePlayer.setVolume(mUserVolume);
         mWePlayer.setSurface(mMediaCodecSurface);
         mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
             @Override
@@ -428,7 +430,12 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
             }
         });
         if (mOnSurfaceCreatedListener != null) {
-            mOnSurfaceCreatedListener.onSurfaceCreated();
+            mUIHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mOnSurfaceCreatedListener.onSurfaceCreated();
+                }
+            });
         }
     }
 
@@ -803,6 +810,10 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         }
     }
 
+    public String getCurrentSource() {
+        return mDataSource;
+    }
+
     public void prepareAsync() {
         if (mWePlayer != null) {
             mWePlayer.prepareAsync();
@@ -894,6 +905,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
      * @param percent 范围是：0 ~ 1.0
      */
     public void setVolume(float percent) {
+        mUserVolume = percent;
         if (mWePlayer != null) {
             mWePlayer.setVolume(percent);
         }
