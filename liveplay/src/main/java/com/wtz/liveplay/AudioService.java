@@ -61,7 +61,7 @@ public class AudioService extends Service implements WePlayer.OnPreparedListener
     private static final String PLAY_PAUSE_ACTION = "com.wtz.liveplay.PLAY_PAUSE";
     private static final String LAST_SONG_ACTION = "com.wtz.liveplay.LAST_SONG";
     private static final String NEXT_SONG_ACTION = "com.wtz.liveplay.NEXT_SONG";
-    private static final String STOP_PLAY_ACTION = "com.wtz.liveplay.STOP_PLAY";
+    public static final String STOP_PLAY_ACTION = "com.wtz.liveplay.STOP_PLAY";
 
     private ArrayList<AudioItem> mAudioList = new ArrayList<>();
     private int mListSize;

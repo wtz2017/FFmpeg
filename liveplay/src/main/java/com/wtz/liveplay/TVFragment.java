@@ -78,7 +78,6 @@ public class TVFragment extends Fragment {
             @Override
             public void onItemClick(View view, int position) {
                 Log.d(TAG, "mChannelsAdapter onItemClick position=" + position);
-                // TODO 当要打开视频时，需要先结束电台音频服务
                 play(position);
             }
 
@@ -207,6 +206,12 @@ public class TVFragment extends Fragment {
     }
 
     private void play(int index) {
+        // 当要打开视频时，需要先结束电台音频服务
+        Intent stopAudioIntent = new Intent(AudioService.STOP_PLAY_ACTION);
+        stopAudioIntent.setPackage(getActivity().getPackageName());
+        getActivity().sendBroadcast(stopAudioIntent);
+
+        // 然后再打开视频
         Intent i = new Intent(getActivity(), VideoPlayer.class);
         i.putParcelableArrayListExtra(VideoPlayer.KEY_VIDEO_LIST, mChannelList);
         i.putExtra(VideoPlayer.KEY_VIDEO_INDEX, index);
