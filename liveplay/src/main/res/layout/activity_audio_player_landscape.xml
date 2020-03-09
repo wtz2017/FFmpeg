@@ -26,10 +26,10 @@
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingLeft="@dimen/dp_6"
-            android:paddingRight="@dimen/dp_6"
             android:layout_marginBottom="@dimen/dp_20"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:paddingLeft="@dimen/dp_6"
+            android:paddingRight="@dimen/dp_6">
 
             <TextView
                 android:id="@+id/tv_time"
@@ -41,10 +41,12 @@
 
             <com.wtz.liveplay.view.BatteryView
                 android:id="@+id/battery_view"
-                android:layout_centerVertical="true"
-                android:layout_alignParentRight="true"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:layout_centerVertical="true"
+                app:battery_height="@dimen/dp_16"
+                app:show_percent="true" />
         </RelativeLayout>
 
         <TextView

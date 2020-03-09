@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -20,17 +21,7 @@ import java.text.DecimalFormat;
 
 public class BatteryView extends View {
 
-    private static final int HEAD_WIDTH_DIMEN_ID = R.dimen.dp_3;
-    private static final int HEAD_HEIGHT_DIMEN_ID = R.dimen.dp_5;
-    private static final int BODY_WIDTH_DIMEN_ID = R.dimen.dp_29;
-    private static final int BODY_HEIGHT_DIMEN_ID = R.dimen.dp_16;
-    private static final int BODY_BORDER_DIMEN_ID = R.dimen.dp_2;
-    private static final int BODY_PADDING_DIMEN_ID = R.dimen.dp_1;
-    private static final int BODY_RADIUS_DIMEN_ID = R.dimen.dp_2;
-    private static final int CHARGE_TRIANGLE_WIDTH_DIMEN_ID = R.dimen.dp_8;
-    private static final int CHARGE_TRIANGLE_HEIGHT_DIMEN_ID = R.dimen.dp_4;
-    private static final int POWER_TEXT_SIZE_DIMEN_ID = R.dimen.dp_15;
-    private static final int POWER_TEXT_MARGIN_BOTTOM_DIMEN_ID = R.dimen.dp_2;
+    private static final int DEFAULT_BODY_HEIGHT_DIMEN_ID = R.dimen.dp_16;
 
     private float mHeadWidth;// 电池头宽度
     private float mHeadHeight;// 电池头高度
@@ -45,11 +36,11 @@ public class BatteryView extends View {
 
     private float mFullPowerWidth;// 电池内芯最大宽度
 
-    private float mChargeTriangleWidth = 20;// 充电标志单个三角形宽度
-    private float mChargeTriangleHeight = 10;// 充电标志单个三角形高度
+    private float mChargeTriangleWidth;// 充电标志单个三角形宽度
+    private float mChargeTriangleHeight;// 充电标志单个三角形高度
 
-    private float mPowerTextSize = 36;// 电池百分比字体大小
-    private float mPowerTextMarginBottom = 6;// 电池百分比离底部距离
+    private float mPowerTextSize;// 电池百分比字体大小
+    private float mPowerTextMarginBottom;// 电池百分比离底部距离
     private float mPowerTextWidth;
     private float mPowerTextX;
     private float mPowerTextX1;
@@ -80,34 +71,41 @@ public class BatteryView extends View {
     private float mPower;// 当前电量
     private static final DecimalFormat POWER_FORMAT = new DecimalFormat("0%");
 
-    public BatteryView(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        initView();
+    public BatteryView(Context context) {
+        this(context, null);
     }
 
     public BatteryView(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, 0);
+    }
+
+    public BatteryView(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+
+        TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.BatteryViewAttrs);
+        showPowerPercent = a.getBoolean(R.styleable.BatteryViewAttrs_show_percent, true);
+        float defaultHeight = getContext().getResources().getDimension(DEFAULT_BODY_HEIGHT_DIMEN_ID) + 0.5f;
+        mBodyHeight = a.getDimension(R.styleable.BatteryViewAttrs_battery_height, defaultHeight);
+        a.recycle();
+
         initView();
     }
 
-    public BatteryView(Context context) {
-        super(context);
-        initView();
-    }
+    private void initView() {
+        // 初始化各个参数大小
+        mHeadHeight = mBodyHeight * 0.1875f;
+        mHeadWidth = mHeadHeight * 0.6f;
 
-    private void initView() {//TODO 支持属性配置是否展示百分比
-        // 从 Dimen 初始化各个参数大小
-        mHeadWidth = getContext().getResources().getDimension(HEAD_WIDTH_DIMEN_ID) + 0.5f;
-        mHeadHeight = getContext().getResources().getDimension(HEAD_HEIGHT_DIMEN_ID) + 0.5f;
-        mBodyWidth = getContext().getResources().getDimension(BODY_WIDTH_DIMEN_ID) + 0.5f;
-        mBodyHeight = getContext().getResources().getDimension(BODY_HEIGHT_DIMEN_ID) + 0.5f;
-        mBodyBorder = getContext().getResources().getDimension(BODY_BORDER_DIMEN_ID) + 0.5f;
-        mBodyPadding = getContext().getResources().getDimension(BODY_PADDING_DIMEN_ID) + 0.5f;
-        mBodyRadius = getContext().getResources().getDimension(BODY_RADIUS_DIMEN_ID) + 0.5f;
-        mChargeTriangleWidth = getContext().getResources().getDimension(CHARGE_TRIANGLE_WIDTH_DIMEN_ID) + 0.5f;
-        mChargeTriangleHeight = getContext().getResources().getDimension(CHARGE_TRIANGLE_HEIGHT_DIMEN_ID) + 0.5f;
-        mPowerTextSize = getContext().getResources().getDimension(POWER_TEXT_SIZE_DIMEN_ID) + 0.5f;
-        mPowerTextMarginBottom = getContext().getResources().getDimension(POWER_TEXT_MARGIN_BOTTOM_DIMEN_ID) + 0.5f;
+        mBodyWidth = mBodyHeight * 1.8125f;
+        mBodyBorder = mBodyHeight * 0.125f;
+        mBodyPadding = mBodyBorder * 0.5f;
+        mBodyRadius = mBodyBorder;
+
+        mChargeTriangleWidth = mBodyWidth * 0.275f;
+        mChargeTriangleHeight = mBodyHeight * 0.25f;
+
+        mPowerTextSize = mBodyHeight * 0.9375f;
+        mPowerTextMarginBottom = mPowerTextSize * 0.1333f;
 
         // 电池头区域
         mHeadRect = new RectF(0, (mBodyHeight - mHeadHeight) / 2,
@@ -140,7 +138,7 @@ public class BatteryView extends View {
                 mBodyCenterY - mChargeTriangleHeight / 4);
         mChargePath1.lineTo(
                 mBodyCenterX,
-                mBodyCenterY + 3.0f * mChargeTriangleHeight /4);
+                mBodyCenterY + 3.0f * mChargeTriangleHeight / 4);
         mChargePath1.close();
 
         mChargePath2 = new Path();

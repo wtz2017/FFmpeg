@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="BatteryViewAttrs">
+        <attr name="show_percent" format="boolean" />
+        <attr name="battery_height" format="dimension" />
+    </declare-styleable>
+</resources>
