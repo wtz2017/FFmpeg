@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -19,6 +20,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.CircularProgressDrawable;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.wtz.liveplay.adapter.BaseRecyclerViewAdapter;
 import com.wtz.liveplay.adapter.RadioChannelsGridAdapter;
@@ -42,6 +45,9 @@ public class RadioFragment extends Fragment {
 
     private LayoutInflater mInflater;
     private FrameLayout mRoot;
+    private SwipeRefreshLayout mSwipeRefreshLayout;
+    private TextView mRefreshTipsView;
+    private int mRefreshTipsVisibility = View.GONE;;
 
     private LoadingDialog mLoadingDialog;
     private Dialog mErrorDialog;
@@ -94,6 +100,7 @@ public class RadioFragment extends Fragment {
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         Log.d(TAG, "onConfigurationChanged");
         super.onConfigurationChanged(newConfig);
+        mRefreshTipsVisibility = mRefreshTipsView.getVisibility();
         configView();
     }
 
@@ -110,6 +117,7 @@ public class RadioFragment extends Fragment {
         mRoot.removeAllViews();
         mRoot.addView(content);
 
+        initSwipeRefreshLayout();
         initPlacesGridView(mRoot, isPortrait);
         initChannelsGridView(mRoot);
     }
@@ -124,6 +132,22 @@ public class RadioFragment extends Fragment {
     public void onResume() {
         Log.d(TAG, "onResume");
         super.onResume();
+    }
+
+    private void initSwipeRefreshLayout() {
+        mRefreshTipsView = mRoot.findViewById(R.id.tv_refresh_tips);
+        mRefreshTipsView.setVisibility(mRefreshTipsVisibility);
+        mSwipeRefreshLayout = mRoot.findViewById(R.id.swipe_refresh_layout);
+        mSwipeRefreshLayout.setColorSchemeColors(Color.parseColor("#FF0000"));
+        mSwipeRefreshLayout.setSize(CircularProgressDrawable.LARGE);
+        mSwipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                Log.d(TAG, "onRefresh");
+                mRefreshTipsView.setVisibility(View.GONE);
+                initData();
+            }
+        });
     }
 
     private void initPlacesGridView(View root, boolean isPortrait) {
@@ -212,6 +236,9 @@ public class RadioFragment extends Fragment {
             @Override
             public void onSuccess(RadioPlaces data) {
                 Log.d(TAG, "getPlaces onSuccess isDataOK=" + data.isDataOK());
+                if (mPlaceList != null) {
+                    mPlaceList.clear();
+                }
                 mPlaceList = data.getPlaceList();
                 mPlacesAdapter.update(mPlaceList);
                 RadioPlaces.Place place = mPlaceList.get(mCurrentPlaceIndex);
@@ -237,10 +264,14 @@ public class RadioFragment extends Fragment {
             @Override
             public void onSuccess(RadioChannels data) {
                 Log.d(TAG, "getChannelsData onSuccess isDataOK=" + data.isDataOK());
+                if (mChannelList != null) {
+                    mChannelList.clear();
+                }
                 mChannelList = data.getChannelList();
                 mChannelsAdapter.update(mChannelList);
                 mPlayList.clear();
                 mChannelsGridView.smoothScrollToPosition(0);
+                mRefreshTipsView.setVisibility(View.GONE);
                 hideLoading();
             }
 
@@ -273,6 +304,7 @@ public class RadioFragment extends Fragment {
     }
 
     private void showError(int errorCode) {
+        mRefreshTipsView.setVisibility(View.VISIBLE);
         if (mErrorDialog == null) {
             mErrorDialog = new Dialog(getActivity(), R.style.NormalDialogStyle);
             View content = LayoutInflater.from(getActivity()).inflate(R.layout.dialog_error, null);
@@ -332,6 +364,7 @@ public class RadioFragment extends Fragment {
     }
 
     private void onRetry() {
+        mRefreshTipsView.setVisibility(View.GONE);
         switch (mErrorType) {
             case ERROR_GET_PLACES:
                 getPlacesData();
@@ -344,6 +377,9 @@ public class RadioFragment extends Fragment {
     }
 
     private void showLoading() {
+        if (mSwipeRefreshLayout.isRefreshing()) {
+            return;
+        }
         if (mLoadingDialog == null) {
             mLoadingDialog = new LoadingDialog(getActivity());
             mLoadingDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
@@ -363,6 +399,9 @@ public class RadioFragment extends Fragment {
     }
 
     private void hideLoading() {
+        if (mSwipeRefreshLayout != null && mSwipeRefreshLayout.isRefreshing()) {
+            mSwipeRefreshLayout.setRefreshing(false);
+        }
         if (mLoadingDialog != null) {
             mLoadingDialog.cancel();
         }
@@ -393,6 +432,8 @@ public class RadioFragment extends Fragment {
     @Override
     public void onDestroyView() {
         Log.d(TAG, "onDestroyView");
+        hideError();
+        hideLoading();
         super.onDestroyView();
     }
 

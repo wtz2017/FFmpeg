@@ -3,6 +3,10 @@ package com.wtz.liveplay.view;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.os.Build;
 import android.widget.ProgressBar;
 
 import com.wtz.liveplay.R;
@@ -15,7 +19,17 @@ public class LoadingDialog {
 
     public LoadingDialog(Context context) {
         mDialog = new Dialog(context, R.style.NormalDialogStyle);
-        mDialog.setContentView(new ProgressBar(context));
+        ProgressBar progressBar = new ProgressBar(context);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            ColorStateList colorStateList = ColorStateList.valueOf(Color.RED);
+            progressBar.setIndeterminateTintList(colorStateList);
+            progressBar.setIndeterminateTintMode(PorterDuff.Mode.SRC_ATOP);
+        } else {
+            progressBar.setIndeterminateDrawable(context.getResources()
+                    .getDrawable(R.drawable.circle_progress_bar_anim));
+        }
+        mDialog.setContentView(progressBar);
+
         mDialog.setCanceledOnTouchOutside(true);
         mDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
             @Override
