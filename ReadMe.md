@@ -34,19 +34,19 @@ FFmpeg study and Audio/Video Player base on FFmpeg + OpenSL ES + OpenGL ES + GLS
 
 - 用于测试验证 ffmpegapi  提供的各个功能接口的 Demo；
 - 效果图如下：
--- ![测试目录](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-1.png)
--- ![音频播放](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-2.png)
--- ![音频编辑](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-3.png)
--- ![视频播放](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-4.png)
+  - ![测试目录](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-1.png)
+  - ![音频播放](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-2.png)
+  - ![音频编辑](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-3.png)
+  - ![视频播放](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-app-4.png)
 
 ## liveplay 模块
 
 - 基于 ffmpegapi  模块实现的广播电台和电视直播小应用；
 - 效果图如下：
--- ![广播电台列表](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-1.png)
--- ![电视直播列表](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-2.png)
--- ![广播电台播放-竖屏](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-3.png)
--- ![广播电台播放-横屏](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-4.png)
--- ![广播电台播放服务通知](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-5.png)
--- ![电视直播-1](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-6.png)
--- ![电视直播-2](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-7.png)
+  - ![广播电台列表](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-1.png)
+  - ![电视直播列表](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-2.png)
+  - ![广播电台播放-竖屏](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-3.png)
+  - ![广播电台播放-横屏](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-4.png)
+  - ![广播电台播放服务通知](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-5.png)
+  - ![电视直播-1](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-6.png)
+  - ![电视直播-2](https://github.com/wtz2017/FFmpeg/blob/master/images/ffmpeg-liveplay-7.png)
