@@ -17,11 +17,9 @@ public class WeEditor {
     static {
         System.loadLibrary("weplayer");
         System.loadLibrary("avcodec");
-        System.loadLibrary("avdevice");
         System.loadLibrary("avfilter");
         System.loadLibrary("avformat");
         System.loadLibrary("avutil");
-        System.loadLibrary("postproc");
         System.loadLibrary("swresample");
         System.loadLibrary("swscale");
     }
@@ -237,7 +235,7 @@ public class WeEditor {
      * called from native
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
      */
-    private void onNativePrepared(String dataSource) {
+    private void onNativePrepared(String dataSource, int videoWidth, int videoHeight) {
         LogUtils.d(TAG, "onNativePrepared isReleased: " + isReleased + ", dataSource: " + dataSource);
         if (!TextUtils.equals(dataSource, mDataSource)) {
             LogUtils.w(TAG, "onNativePrepared data source changed! So the preparation is invalid!");
