@@ -38,7 +38,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     private int mVideoWidth;
     private int mVideoHeight;
     private float mPauseVolume;
-    private float mUserVolume;
+    private float mUserVolume = -1;
     private int mDestroyedPosition;
 
     private boolean beHardCodec;
@@ -51,6 +51,16 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     private static final int DELAY_CLEAR_SCREEN_TIME = 400;
 
     private static final int BYTES_PER_FLOAT = 4;
+
+    /**
+     * 在使用 VBO (顶点缓冲对象)之前，对象数据存储在客户端内存中，每次渲染时将其传输到 GPU 中。
+     * 随着我们的场景越来越复杂，有更多的物体和三角形，这会给 GPU 和内存增加额外的成本。
+     * 使用 VBO，信息将被传输一次，然后渲染器将从该图形存储器缓存中得到数据。
+     * 要注意的是：VBO 必须创建在一个有效的 OpenGL 上下文中，即在 GLThread 中创建。
+     */
+    private int[] mVBOIds;// 顶点缓冲区对象 ID 数组
+    private int mVertexCoordBytes;
+    private int mTextureCoordBytes;
 
     /* ---------- 顶点坐标配置：start ---------- */
     // java 层顶点坐标
@@ -221,6 +231,21 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     private void initCoordinatesData() {
+        /*
+         *        归一化顶点坐标系                纹理坐标系
+         *               y
+         *               ↑                          ┆
+         * (-1,1)------(0,1)------(1,1)        ---(0,0)------(1,0)-->x
+         *    ┆          ┆          ┆               ┆          ┆
+         *    ┆          ┆          ┆               ┆          ┆
+         * (-1,0)------(0,0)------(1,0)-->x         ┆          ┆
+         *    ┆          ┆          ┆               ┆          ┆
+         *    ┆          ┆          ┆               ┆          ┆
+         * (-1,-1)-----(0,-1)-----(1,-1)          (0,1)------(1,1)
+         *                                          ↓
+         *                                          y
+         */
+        // 顶点坐标
         mVertexCoordinatesData = new float[]{
                 -1f, -1f,
                 1f, -1f,
@@ -235,6 +260,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         mVertexCoordinatesBuffer.position(0);
         mVertexCoordinatesData = null;
 
+        // 纹理坐标，上下左右四角要与顶点坐标一一对应起来
         mTextureCoordinatesData = new float[]{
                 0f, 1f,
                 1f, 1f,
@@ -248,6 +274,27 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
                 .put(mTextureCoordinatesData);
         mTextureCoordinatesBuffer.position(0);
         mTextureCoordinatesData = null;
+
+        // 创建 VBO
+        mVBOIds = new int[1];// 顶点与纹理共用一个 VBO
+        GLES20.glGenBuffers(1, mVBOIds, 0);
+        // 绑定 VBO
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, mVBOIds[0]);
+        // 为 VBO 分配内存
+        mVertexCoordBytes = mVertexCoordinatesBuffer.capacity() * BYTES_PER_FLOAT;
+        mTextureCoordBytes = mTextureCoordinatesBuffer.capacity() * BYTES_PER_FLOAT;
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER,
+                mVertexCoordBytes + mTextureCoordBytes,/* 这个缓冲区应该包含的字节数 */
+                null,/* 初始化整个内存数据，这里先不设置 */
+                GLES20.GL_STATIC_DRAW /* 这个缓冲区不会动态更新 */
+        );
+        // 为 VBO 设置数据
+        GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER,
+                0, mVertexCoordBytes, mVertexCoordinatesBuffer);
+        GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER,
+                mVertexCoordBytes, mTextureCoordBytes, mTextureCoordinatesBuffer);
+        // 解绑 VBO
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
     }
 
     private void initYUVProgram() {
@@ -342,7 +389,6 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
     private void initPlayer() {
         mWePlayer = new WePlayer(false);
-        mWePlayer.setVolume(mUserVolume);
         mWePlayer.setSurface(mMediaCodecSurface);
         mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
             @Override
@@ -429,6 +475,10 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
                 mWePlayer = null;
             }
         });
+        if (mUserVolume < 0) {
+            mUserVolume = 1.0f;
+        }
+        mWePlayer.setVolume(mUserVolume);
         if (mOnSurfaceCreatedListener != null) {
             mUIHandler.post(new Runnable() {
                 @Override
@@ -544,7 +594,12 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         // 使用程序对象 mProgramYUVHandle 作为当前渲染状态的一部分
         GLES20.glUseProgram(mProgramYUVHandle);
 
+        // 准备设置坐标，先绑定 VBO ---------->
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, mVBOIds[0]);
+
         /* ---------- 设置要绘制的图形区域顶点 ---------- */
+        // 启用 index 指定的通用顶点属性数组
+        GLES20.glEnableVertexAttribArray(mVertexCoordinateYUVHandle);
         // 指定索引 index 处的通用顶点属性数组的位置和数据格式，以便在渲染时使用
         // index 指定要修改的通用顶点属性的索引。
         // size 指定每个通用顶点属性的组件数，必须为 1、2、3 或 4，初始值为 4。
@@ -555,15 +610,20 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         // stride 指定连续通用顶点属性之间的字节偏移量。这里一个点两个 float 横纵坐标，所以是 2x4=8 字节
         // pointer 指定指向数组中第一个通用顶点属性的第一个组件的指针。初始值为0。
         GLES20.glVertexAttribPointer(mVertexCoordinateYUVHandle, VERTEX_COORDINATE_DATA_SIZE,
-                GLES20.GL_FLOAT, false, 8, mVertexCoordinatesBuffer);
-        // 启用 index 指定的通用顶点属性数组
-        GLES20.glEnableVertexAttribArray(mVertexCoordinateYUVHandle);
+                GLES20.GL_FLOAT, false, 8,
+                0 /* 此处为 VBO 中的数据偏移地址 */
+        );
 
         /* ---------- 设置要绘制的图形区域颜色，这里是纹理 ---------- */
         // 设置纹理坐标
-        GLES20.glVertexAttribPointer(mTextureCoordinateYUVHandle, TEXTURE_COORDINATE_DATA_SIZE,
-                GLES20.GL_FLOAT, false, 8, mTextureCoordinatesBuffer);
         GLES20.glEnableVertexAttribArray(mTextureCoordinateYUVHandle);
+        GLES20.glVertexAttribPointer(mTextureCoordinateYUVHandle, TEXTURE_COORDINATE_DATA_SIZE,
+                GLES20.GL_FLOAT, false, 8,
+                mVertexCoordBytes /* 此处为 VBO 中的数据偏移地址 */
+        );
+
+        // 所有坐标设置完成后，解绑 VBO <----------
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
         // 将 3 个纹理单元分别激活，并绑定到 YUV 数据
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -596,7 +656,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         vBuffer.clear();
         vBuffer = null;
 
-        // 开始渲染图形
+        // 开始渲染图形：按照绑定的顶点坐标数组从第 1 个开始画 4 个点，一共 2 个三角形，组成一个矩形
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
     }
 
@@ -612,16 +672,26 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         // 使用程序对象 mProgramMediaCodecHandle 作为当前渲染状态的一部分
         GLES20.glUseProgram(mProgramMediaCodecHandle);
 
-        // 设置要绘制的图形区域顶点
-        GLES20.glVertexAttribPointer(mVertexCoordiMediaCodecHandle, VERTEX_COORDINATE_DATA_SIZE,
-                GLES20.GL_FLOAT, false, 8, mVertexCoordinatesBuffer);
+        // 准备设置坐标，先绑定 VBO ---------->
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, mVBOIds[0]);
+
         // 启用 index 指定的通用顶点属性数组
         GLES20.glEnableVertexAttribArray(mVertexCoordiMediaCodecHandle);
+        // 设置要绘制的图形区域顶点
+        GLES20.glVertexAttribPointer(mVertexCoordiMediaCodecHandle, VERTEX_COORDINATE_DATA_SIZE,
+                GLES20.GL_FLOAT, false, 8,
+                0 /* 此处为 VBO 中的数据偏移地址 */
+        );
 
         // 设置纹理坐标
-        GLES20.glVertexAttribPointer(mTextureCoordiMediaCodecHandle, TEXTURE_COORDINATE_DATA_SIZE,
-                GLES20.GL_FLOAT, false, 8, mTextureCoordinatesBuffer);
         GLES20.glEnableVertexAttribArray(mTextureCoordiMediaCodecHandle);
+        GLES20.glVertexAttribPointer(mTextureCoordiMediaCodecHandle, TEXTURE_COORDINATE_DATA_SIZE,
+                GLES20.GL_FLOAT, false, 8,
+                mVertexCoordBytes /* 此处为 VBO 中的数据偏移地址 */
+        );
+
+        // 所有坐标设置完成后，解绑 VBO <----------
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
         // 激活纹理单元，并绑定到 MediaCodec 数据
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -634,7 +704,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         // 将 MediaCodec 数据传入到片元着色器 Uniform 变量中
         GLES20.glUniform1i(mTextureUnifMediaCodecHandle, 0);// 纹理标准采样器在着色器中使用纹理单元 0
 
-        // 开始渲染图形
+        // 开始渲染图形：按照绑定的顶点坐标数组从第 1 个开始画 4 个点，一共 2 个三角形，组成一个矩形
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
     }
 
@@ -765,6 +835,11 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
             if (mTextureMediaCodecDataIds != null) {
                 GLES20.glDeleteTextures(TEXTURE_MEDIACODEC_DATA_ID_NUM, mTextureMediaCodecDataIds, 0);
                 mTextureMediaCodecDataIds = null;
+            }
+
+            if (mVBOIds != null) {
+                GLES20.glDeleteBuffers(mVBOIds.length, mVBOIds, 0);
+                mVBOIds = null;
             }
 
             isGLReleased = true;

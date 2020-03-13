@@ -82,7 +82,7 @@ private:
     SLPlayItf playController = NULL;
     SLVolumeItf volumeController = NULL;
     SLMuteSoloItf muteSoloController = NULL;
-    float volumePercent = 0.6;
+    float volumePercent = 1.0;
     static const int CHANNEL_RIGHT = 0;
     static const int CHANNEL_LEFT = 1;
     static const int CHANNEL_STEREO = 2;
