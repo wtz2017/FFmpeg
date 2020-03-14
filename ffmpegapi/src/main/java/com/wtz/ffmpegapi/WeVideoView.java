@@ -348,6 +348,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 //            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
         }
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
     }
 
     private void initMediaCodecProgram() {
@@ -374,12 +375,11 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         }
 
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mTextureMediaCodecDataIds[0]);
-
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_REPEAT);
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_REPEAT);
-
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
 
         // MediaCodec 向 mMediaCodecSurface 发送数据，mMediaCodecSurface 通过 mMediaCodecSurfaceTexture 回调 OnFrameAvailableListener
         mMediaCodecSurfaceTexture = new SurfaceTexture(mTextureMediaCodecDataIds[0]);
@@ -658,6 +658,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
         // 开始渲染图形：按照绑定的顶点坐标数组从第 1 个开始画 4 个点，一共 2 个三角形，组成一个矩形
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
     }
 
     private void renderMediaCodecData() {
@@ -706,6 +708,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
         // 开始渲染图形：按照绑定的顶点坐标数组从第 1 个开始画 4 个点，一共 2 个三角形，组成一个矩形
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
     }
 
     /**
