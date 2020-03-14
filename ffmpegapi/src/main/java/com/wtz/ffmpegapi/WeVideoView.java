@@ -13,6 +13,7 @@ import android.view.SurfaceHolder;
 
 import com.wtz.ffmpegapi.utils.ShaderUtil;
 import com.wtz.ffmpegapi.utils.LogUtils;
+import com.wtz.ffmpegapi.utils.TextureUtils;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -232,17 +233,17 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
 
     private void initCoordinatesData() {
         /*
-         *        归一化顶点坐标系                纹理坐标系
-         *               y
-         *               ↑                          ┆
-         * (-1,1)------(0,1)------(1,1)        ---(0,0)------(1,0)-->x
-         *    ┆          ┆          ┆               ┆          ┆
-         *    ┆          ┆          ┆               ┆          ┆
-         * (-1,0)------(0,0)------(1,0)-->x         ┆          ┆
-         *    ┆          ┆          ┆               ┆          ┆
-         *    ┆          ┆          ┆               ┆          ┆
-         * (-1,-1)-----(0,-1)-----(1,-1)          (0,1)------(1,1)
-         *                                          ↓
+         *        归一化顶点坐标系                窗口纹理坐标系             FBO 纹理坐标系
+         *               y                                                    y
+         *               ↑                          ┆                         ↑
+         * (-1,1)------(0,1)------(1,1)        ---(0,0)------(1,0)-->x   ---(0,1)------(1,1)
+         *    ┆          ┆          ┆               ┆          ┆              ┆          ┆
+         *    ┆          ┆          ┆               ┆          ┆              ┆          ┆
+         * (-1,0)------(0,0)------(1,0)-->x         ┆          ┆              ┆          ┆
+         *    ┆          ┆          ┆               ┆          ┆              ┆          ┆
+         *    ┆          ┆          ┆               ┆          ┆              ┆          ┆
+         * (-1,-1)-----(0,-1)-----(1,-1)          (0,1)------(1,1)       ---(0,0)------(1,0)-->x
+         *                                          ↓                         ┆
          *                                          y
          */
         // 顶点坐标
@@ -260,7 +261,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         mVertexCoordinatesBuffer.position(0);
         mVertexCoordinatesData = null;
 
-        // 纹理坐标，上下左右四角要与顶点坐标一一对应起来
+        // 窗口纹理坐标，上下左右四角要与顶点坐标一一对应起来
         mTextureCoordinatesData = new float[]{
                 0f, 1f,
                 1f, 1f,
@@ -316,39 +317,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         mTextureUniformVHandle = GLES20.glGetUniformLocation(mProgramYUVHandle, "u_TextureV");
 
         // 绑定纹理数据内容
-        mTextureYUVDataIds = new int[TEXTURE_YUV_DATA_ID_NUM];
-        GLES20.glGenTextures(TEXTURE_YUV_DATA_ID_NUM, mTextureYUVDataIds, 0);// 创建 3 个纹理
-        if (mTextureYUVDataIds[0] == 0) {
-            throw new RuntimeException("initYUVProgram Error: glGenTextures generate texture 0 failed.");
-        }
-        if (mTextureYUVDataIds[1] == 0) {
-            throw new RuntimeException("initYUVProgram Error: glGenTextures generate texture 1 failed.");
-        }
-        if (mTextureYUVDataIds[2] == 0) {
-            throw new RuntimeException("initYUVProgram Error: glGenTextures generate texture 2 failed.");
-        }
-        for (int i = 0; i < TEXTURE_YUV_DATA_ID_NUM; i++) {
-            // 在 OpenGL 中绑定这个创建的纹理
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureYUVDataIds[i]);
-
-            // 在使用纹理的时候，有时候会出现超过纹理边界的问题，
-            // GL_TEXTURE_WRAP 系列参数用来设置超出边界时应该怎样处理。
-            // GL_REPEAT 犹如字面意思那样会重复，当几何纹理坐标大于1.0的时候，
-            // 所取的纹理坐标的值位于纹理坐标减去1.0的位置，例如：纹理坐标是 1.1 的时候，所取的颜色的值是 0.1。
-            // 所以 1.0 和 2.0 一样，1.1 和 0.1一样，所以就向字面意思那样会重复。
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_REPEAT);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_REPEAT);
-
-            // GL_TEXTURE_MIN_FILTER 告诉 OpenGL 在绘制小于原始大小（以像素为单位）的纹理时要应用哪种类型的过滤，
-            // GL_TEXTURE_MAG_FILTER 告诉 OpenGL 在放大纹理超过原始大小时要应用哪种类型的过滤。
-            // GL_NEAREST 是最快也是最粗糙的过滤形式，所做的就是在屏幕的每个点选择最近的像素，这可能导致图像伪像和锯齿。
-            // GL_LINEAR 使用纹理中坐标最接近的若干个颜色，通过加权平均算法得到需要绘制的像素颜色。
-//            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-//            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-        }
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
+        mTextureYUVDataIds = TextureUtils.genTexture2D(TEXTURE_YUV_DATA_ID_NUM);
     }
 
     private void initMediaCodecProgram() {
@@ -367,19 +336,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         mTextureCoordiMediaCodecHandle = GLES20.glGetAttribLocation(mProgramMediaCodecHandle, "a_TexCoordinate");
         mTextureUnifMediaCodecHandle = GLES20.glGetUniformLocation(mProgramMediaCodecHandle, "u_Texture_MediaCodec");
 
-        // 绑定纹理数据内容
-        mTextureMediaCodecDataIds = new int[1];
-        GLES20.glGenTextures(TEXTURE_MEDIACODEC_DATA_ID_NUM, mTextureMediaCodecDataIds, 0);// 创建 1 个纹理
-        if (mTextureMediaCodecDataIds[0] == 0) {
-            throw new RuntimeException("initMediaCodecProgram Error: glGenTextures generate texture 0 failed.");
-        }
-
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mTextureMediaCodecDataIds[0]);
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_REPEAT);
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_REPEAT);
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
+        // 创建 Texture 对象并初始化配置
+        mTextureMediaCodecDataIds = TextureUtils.genTextureOES(TEXTURE_MEDIACODEC_DATA_ID_NUM);
 
         // MediaCodec 向 mMediaCodecSurface 发送数据，mMediaCodecSurface 通过 mMediaCodecSurfaceTexture 回调 OnFrameAvailableListener
         mMediaCodecSurfaceTexture = new SurfaceTexture(mTextureMediaCodecDataIds[0]);
@@ -709,7 +667,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         // 开始渲染图形：按照绑定的顶点坐标数组从第 1 个开始画 4 个点，一共 2 个三角形，组成一个矩形
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
 
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);// 解绑 Texture
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, 0);// 解绑 Texture
     }
 
     /**
