@@ -299,8 +299,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     private void initYUVProgram() {
-        String vertexSource = ShaderUtil.readRawText(getContext(), R.raw.vertex_shader);
-        String fragmentSource = ShaderUtil.readRawText(getContext(), R.raw.yuv_fragment_shader);
+        String vertexSource = ShaderUtil.readRawText(getContext(), R.raw.we_play_vertex_shader);
+        String fragmentSource = ShaderUtil.readRawText(getContext(), R.raw.we_play_fragment_yuv_shader);
         int[] shaderIDs = ShaderUtil.createAndLinkProgram(vertexSource, fragmentSource);
         mVertexShaderYUVHandle = shaderIDs[0];
         mFragmentShaderYUVHandle = shaderIDs[1];
@@ -321,8 +321,8 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     private void initMediaCodecProgram() {
-        String vertexSource = ShaderUtil.readRawText(getContext(), R.raw.vertex_shader);
-        String fragmentSource = ShaderUtil.readRawText(getContext(), R.raw.mediacodec_fragment_shader);
+        String vertexSource = ShaderUtil.readRawText(getContext(), R.raw.we_play_vertex_shader);
+        String fragmentSource = ShaderUtil.readRawText(getContext(), R.raw.we_play_fragment_mediacodec_shader);
         int[] shaderIDs = ShaderUtil.createAndLinkProgram(vertexSource, fragmentSource);
         mVertexShaderMediaCodecHandle = shaderIDs[0];
         mFragmentShaderMediaCodecHandle = shaderIDs[1];
