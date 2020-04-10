@@ -31,6 +31,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
 
     private WePlayer mWePlayer;
     private int mDuration;
+    private int mSeekPosition;
+    private boolean isPrepared;
     private boolean isSeeking;
     private boolean isLoading;
 
@@ -201,8 +203,11 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 LogUtils.d(TAG, "mPlaySeekBar onStopTrackingTouch");
-                if (mWePlayer != null) {
+                if (mWePlayer != null && isPrepared) {
                     mWePlayer.seekTo(seekBar.getProgress());
+                } else {
+                    mSeekPosition = seekBar.getProgress();
+                    isSeeking = false;
                 }
             }
         });
@@ -324,6 +329,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                     return;
                 }
                 mWePlayer.stop();
+                isPrepared = false;
+                mSeekPosition = 0;
                 stopUpdateTime();
                 stopUpdateDecibels();
                 resetUI();
@@ -414,12 +421,19 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void openAudio(String url) {
+        isPrepared = false;
+        isLoading = false;
         if (mWePlayer == null) {
             mWePlayer = new WePlayer(true);
             mWePlayer.setOnPreparedListener(new WePlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared() {
                     LogUtils.d(TAG, "WePlayer onPrepared");
+                    isPrepared = true;
+                    if (mSeekPosition > 0) {
+                        mWePlayer.seekTo(mSeekPosition);
+                        mSeekPosition = 0;
+                    }
                     mWePlayer.start();
 
                     float volume = mWePlayer.getVolume();

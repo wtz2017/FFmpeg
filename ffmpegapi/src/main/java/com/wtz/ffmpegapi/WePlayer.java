@@ -90,6 +90,7 @@ public class WePlayer {
     private native void nativeSetRecordPCMFlag(boolean record);
 
     private OnPreparedListener mOnPreparedListener;
+    private OnPCMDataCallListener mOnPCMDataCallListener;
     private OnYUVDataListener mOnYUVDataListener;
     private OnPlayLoadingListener mOnPlayLoadingListener;
     private OnSeekCompleteListener mOnSeekCompleteListener;
@@ -101,6 +102,7 @@ public class WePlayer {
 
     private String mDataSource;
     private float mVolumePercent = -1;
+    private boolean needCallbackPcm;
     private boolean isPrepared;
     private boolean isReleased;
 
@@ -154,6 +156,10 @@ public class WePlayer {
 
     public interface OnPreparedListener {
         void onPrepared();
+    }
+
+    public interface OnPCMDataCallListener {
+        void onPCMDataCall(byte[] pcmData, int size);
     }
 
     public interface OnYUVDataListener {
@@ -313,6 +319,10 @@ public class WePlayer {
         this.mOnPreparedListener = listener;
     }
 
+    public void setOnPCMDataCallListener(OnPCMDataCallListener listener) {
+        this.mOnPCMDataCallListener = listener;
+    }
+
     public void setOnYUVDataListener(OnYUVDataListener listener) {
         this.mOnYUVDataListener = listener;
     }
@@ -401,6 +411,7 @@ public class WePlayer {
         mVideoWidth = videoWidth;
         mVideoHeight = videoHeight;
         setCacheVolume();
+        nativeSetRecordPCMFlag(needCallbackPcm);
         if (mOnPreparedListener != null && !isReleased) {
             mUIHandler.post(new Runnable() {
                 @Override
@@ -721,6 +732,14 @@ public class WePlayer {
         return nativeGetAudioBitsPerSample();
     }
 
+    public int getPcmMaxBytesPerCallback() {
+        if (!isPrepared) {
+            LogUtils.e(TAG, "Can't call getPcmMaxBytesPerCallback method before prepare finished");
+            return 0;
+        }
+        return nativeGetPcmMaxBytesPerCallback();
+    }
+
     /**
      * called from native
      * ！！！注意：此回调处于 native 的锁中，不可以有其它过多操作，不可以调用 native 方法，以防死锁！！！
@@ -807,6 +826,14 @@ public class WePlayer {
         }
     }
 
+    /**
+     * 是否开启 PCM 数据回调
+     */
+    public void enablePCMDataCall(boolean enable) {
+        needCallbackPcm = enable;
+        nativeSetRecordPCMFlag(enable);
+    }
+
     public double getRecordTimeSecs() {
         return mPCMRecorder != null ? mPCMRecorder.getRecordTimeSecs() : 0;
     }
@@ -823,12 +850,15 @@ public class WePlayer {
             return;
         }
 
-        if (mPCMRecorder == null) {
-            LogUtils.e(TAG, "onNativePCMDataCall but mPCMRecorder is null");
-            return;
+        // 用于专门的录音
+        if (mPCMRecorder != null) {
+            mPCMRecorder.encode(pcmData, size);
         }
 
-        mPCMRecorder.encode(pcmData, size);
+        // 用于第三方更灵活的二次开发使用
+        if (mOnPCMDataCallListener != null) {
+            mOnPCMDataCallListener.onPCMDataCall(pcmData, size);
+        }
     }
 
     public void setSurface(Surface surface) {
