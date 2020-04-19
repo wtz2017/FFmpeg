@@ -18,6 +18,7 @@ private:
     JNIEnv *_mainEnv;
     jobject _globalObj;
     jmethodID _methodID = NULL;// 若不初始化，则值为非空；置空用于后边判断一次性懒加载
+    bool needDetach = false;
 
 public:
     /**

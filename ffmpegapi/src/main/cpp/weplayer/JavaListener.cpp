@@ -30,33 +30,42 @@ JavaListener::~JavaListener() {
 }
 
 JNIEnv *JavaListener::initCallbackEnv() {
+    needDetach = false;
     pid_t currentTid = gettid();
     if (currentTid == _mainTid) {
         // 在 C++ 主线程中直接使用主线程 env
         return _mainEnv;
     }
 
-    // 在 C++ 子线程中要使用子线程 env，否则会报错 JNI ERROR: non-VM thread making JNI call
-    JNIEnv *env;
-    if (_jvm->AttachCurrentThread(&env, 0) != JNI_OK) {
+    JNIEnv *env1;
+    if (_jvm->GetEnv(reinterpret_cast<void **> (&env1), JNI_VERSION_1_6) == JNI_OK) {
+        // 虽然切换了线程，能 GetEnv 成功，说明这是直接从 Java 层切换的线程
+        return env1;
+    }
+
+    // 到这里，说明是在 C++ 中开启的子线程，此时需要用 AttachCurrentThread 来获取 env，
+    // 否则会报错 JNI ERROR: non-VM thread making JNI call
+    JNIEnv *env2;
+    if (_jvm->AttachCurrentThread(&env2, 0) != JNI_OK) {
         LOGE(LOG_TAG, "AttachCurrentThread exception! currentTid: %d", currentTid);
         return NULL;
     }
-    return env;
+    needDetach = true;
+    return env2;
 }
 
 void JavaListener::releaseCallbackEnv() {
     pid_t currentTid = gettid();
-    if (currentTid == _mainTid) {
+    if (currentTid == _mainTid || !needDetach) {
         return;
     }
 
     _jvm->DetachCurrentThread();
+    needDetach = false;
 }
 
 void JavaListener::callback(int argCount, ...) {
     JNIEnv *env = initCallbackEnv();
-
     if (_methodID == NULL) {
         _methodID = env->GetMethodID(env->GetObjectClass(_globalObj), getMethodName(),
                                      getMethodSignature());
@@ -73,6 +82,5 @@ void JavaListener::callback(int argCount, ...) {
     reallyCallback(env, _globalObj, _methodID, args);
 
     va_end(args);
-
     releaseCallbackEnv();
 }
