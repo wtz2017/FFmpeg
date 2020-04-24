@@ -74,6 +74,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     };
 
     private static final String[] mSources = {
+            "rtmp://192.168.0.101/myapp/mystream",
             // Local File
             "file:///sdcard/0001.优酷网-28 黄石天书-0001-joined.flv",
             "file:///sdcard/BINGO  Super Simple Songs.mp4",

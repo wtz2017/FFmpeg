@@ -84,6 +84,9 @@ bool AVPacketQueue::getAVpacket(AVPacket *packet) {
             break;
         } else if (!productDataComplete) {
             pthread_cond_wait(&condition, &mutex);
+        } else {
+            // 队列为空，也不再生产数据，那就退出
+            break;
         }
     }
 
