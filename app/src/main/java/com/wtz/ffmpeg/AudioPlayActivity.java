@@ -1,29 +1,40 @@
 package com.wtz.ffmpeg;
 
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.wtz.ffmpeg.utils.DateTimeUtil;
+import com.wtz.ffmpeg.utils.FileChooser;
 import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.AACEncoder;
+import com.wtz.ffmpegapi.MP3Encoder;
 import com.wtz.ffmpegapi.PCMRecorder;
 import com.wtz.ffmpegapi.WAVSaver;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.DecimalFormat;
 
 public class AudioPlayActivity extends AppCompatActivity implements View.OnClickListener, RadioGroup.OnCheckedChangeListener {
@@ -37,13 +48,11 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     private boolean isLoading;
 
     private PCMRecorder.Encoder mPCMEncoder;
-    private File mAACFile;
-    private File mWAVFile;
     private File mRecordAudioFile;
 
     private ProgressDialog mProgressDialog;
-    private TextView mPlayUrl;
-    private TextView mError;
+    private TextView mPlayUrlView;
+    private TextView mErrorView;
     private TextView mPlayTimeView;
     private String mDurationText;
     private SeekBar mPlaySeekBar;
@@ -94,17 +103,12 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         }
     };
 
-    private static final String[] mSources = {
-            // Local File
-            "file:///sdcard/但愿人长久 - 王菲.mp3",
-            "file:///sdcard/一千年以后 - 林俊杰.mp3",
-            "file:///sdcard/卡农 钢琴曲.wma",
-            "file:///sdcard/test.ac3",
-            "file:///sdcard/test.mp4",
-            "file:///sdcard/王铮亮-真爱你的云.ape",
-            "file:///sdcard/邓紫棋-爱你.flac",
+    private int mSelectLocalAudioRequestCode;
+    private String mLocalAudioPath;
 
-            // HLS(HTTP Live Streaming)
+    private int mNetSourceIndex = 0;
+    private int mTempSelectNetSourceIndex = 0;
+    private static final String[] mNetAudioSources = {
             "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清
             "http://ivi.bupt.edu.cn/hls/cctv6hd.m3u8",//CCTV6高清
             "http://rtmpcnr001.cnr.cn/live/zgzs/playlist.m3u8",//中国之声
@@ -115,29 +119,13 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
             "http://123.56.16.201:1935/live/fm994/96K/tzwj_video.m3u8",//北京教学广播
             "http://123.56.16.201:1935/live/am603/96K/tzwj_video.m3u8",//北京故事广播
             "http://audiolive.rbc.cn:1935/live/fm1043/96K/tzwj_video.m3u8",//北京长书广播
-            "https://lhttp.qingting.fm/live/20462/64k.mp3",//经典调频北京FM969
-
             "http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3",
             "http://music.163.com/song/media/outer/url?id=29750099.mp3",
             "http://music.163.com/song/media/outer/url?id=566435178.mp3",
-
-            // 1080P
-            "https://www.apple.com/105/media/us/iphone-x/2017/01df5b43-28e4-4848-bf20-490c34a926a7/films/feature/iphone-x-feature-tpl-cc-us-20170912_1920x1080h.mp4",
-
-            // 720P
-            "https://www.apple.com/105/media/cn/mac/family/2018/46c4b917_abfd_45a3_9b51_4e3054191797/films/bruce/mac-bruce-tpl-cn-2018_1280x720h.mp4",
-
-            // RTSP(Real Time Streaming Protocol)
-            "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov",// 大熊兔
-            "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4",// 大熊兔
-
-            // RTMP(Real Time Messaging Protocol)
-            "rtmp://live.hkstv.hk.lxdns.com/live/hks1",//香港卫视 打不开
-            "rtmp://live.hkstv.hk.lxdns.com/live/hks2",//香港卫视 打不开
-            "rtmp://202.69.69.180:443/webcast/bshdlive-pc",// 能打开，很卡
-            "rtmp://media3.sinovision.net:1935/live/livestream"// 能打开
     };
-    private int mIndex = 0;
+
+    private String mCurrentUrl;
+    private static final String RECORD_NAME_TAG = "_record_";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,6 +134,9 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         setContentView(R.layout.activity_audio_play);
 
         initViews();
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                mBroadcastReceiver, new IntentFilter(FileChooser.ACTION_FILE_CHOOSE_RESULT));
     }
 
     @Override
@@ -155,8 +146,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void initViews() {
-        findViewById(R.id.btn_open_media).setOnClickListener(this);
-        findViewById(R.id.btn_next_media).setOnClickListener(this);
+        findViewById(R.id.btn_select_local_audio).setOnClickListener(this);
+        findViewById(R.id.btn_select_net_audio).setOnClickListener(this);
         findViewById(R.id.btn_pause_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
@@ -171,9 +162,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         findViewById(R.id.btn_stop_record_audio).setOnClickListener(this);
         ((RadioGroup) findViewById(R.id.rg_record_type)).setOnCheckedChangeListener(this);
 
-        mPlayUrl = findViewById(R.id.tv_play_url);
-        mPlayUrl.setText(mSources[mIndex]);
-        mError = findViewById(R.id.tv_error_info);
+        mPlayUrlView = findViewById(R.id.tv_play_url);
+        mErrorView = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
         mDecibels = findViewById(R.id.tv_decibels);
         mVolume = findViewById(R.id.tv_volume);
@@ -294,20 +284,71 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         seekbar.setLayoutParams(lp);
     }
 
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            LogUtils.d(TAG, "mBroadcastReceiver onReceive: " + action);
+            if (FileChooser.ACTION_FILE_CHOOSE_RESULT.equals(action)) {
+                int code = intent.getIntExtra(FileChooser.RESULT_REQUEST_CODE, -1);
+                if (code == mSelectLocalAudioRequestCode) {
+                    String url = intent.getStringExtra(FileChooser.RESULT_FILE_PATH);
+                    LogUtils.d(TAG, "select local music path: " + url);
+                    toast("已选择：" + url);
+                    if (!TextUtils.isEmpty(url)) {
+                        resetUI();
+                        mLocalAudioPath = url;
+                        mRecordAudioFile = null;
+                        openAudio(mLocalAudioPath);
+                    }
+                }
+            }
+        }
+    };
+
+    private void showNetAudioListDialog(final Context context) {
+        mTempSelectNetSourceIndex = 0;
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setIcon(R.mipmap.ic_launcher_round)
+                .setTitle("网络音频选择")
+                .setSingleChoiceItems(mNetAudioSources, mTempSelectNetSourceIndex, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mTempSelectNetSourceIndex = which;
+                    }
+                })
+                .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        resetUI();
+                        mNetSourceIndex = mTempSelectNetSourceIndex;
+                        mRecordAudioFile = null;
+                        openAudio(mNetAudioSources[mNetSourceIndex]);
+                    }
+                }).create();
+        dialog.show();
+    }
+
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     public void onClick(View view) {
         LogUtils.d(TAG, "onClick " + view);
         switch (view.getId()) {
-            case R.id.btn_open_media:
-                openAudio(mSources[mIndex]);
+            case R.id.btn_select_local_audio:
+                mSelectLocalAudioRequestCode = FileChooser.chooseAudio(AudioPlayActivity.this);
                 break;
-            case R.id.btn_next_media:
-                mIndex++;
-                if (mIndex >= mSources.length) {
-                    mIndex = 0;
-                }
-                resetUI();
-                openAudio(mSources[mIndex]);
+            case R.id.btn_select_net_audio:
+                showNetAudioListDialog(AudioPlayActivity.this);
                 break;
             case R.id.btn_pause_audio:
                 if (mWePlayer == null) {
@@ -368,11 +409,10 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                     return;
                 }
                 if (mRecordAudioFile == null) {
-                    mRecordAudioFile = new File("/sdcard/pcm_record.aac");
+                    mPCMEncoder = new MP3Encoder();
+                    mRecordAudioFile = getRecordSaveFile(".mp3");
                 }
-                if (mPCMEncoder == null) {
-                    mPCMEncoder = new AACEncoder();
-                }
+                toast("录音文件保存在：" + mRecordAudioFile.getAbsolutePath());
                 mWePlayer.startRecord(mPCMEncoder, mRecordAudioFile);
                 startUpdateRecordTime();
                 break;
@@ -403,21 +443,30 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     @Override
     public void onCheckedChanged(RadioGroup radioGroup, int checkedId) {
         switch (checkedId) {
+            case R.id.rb_mp3:
+                mPCMEncoder = new MP3Encoder();
+                mRecordAudioFile = getRecordSaveFile(".mp3");
+                break;
             case R.id.rb_wav:
                 mPCMEncoder = new WAVSaver();
-                if (mWAVFile == null) {
-                    mWAVFile = new File("/sdcard/pcm_record.wav");
-                }
-                mRecordAudioFile = mWAVFile;
+                mRecordAudioFile = getRecordSaveFile(".wav");
                 break;
             case R.id.rb_aac:
                 mPCMEncoder = new AACEncoder();
-                if (mAACFile == null) {
-                    mAACFile = new File("/sdcard/pcm_record.aac");
-                }
-                mRecordAudioFile = mAACFile;
+                mRecordAudioFile = getRecordSaveFile(".aac");
                 break;
         }
+    }
+
+    private File getRecordSaveFile(String suffix) {
+        if (TextUtils.isEmpty(mCurrentUrl)) {
+            return null;
+        }
+        String baseName = mCurrentUrl.replaceAll("/", "_")
+                .replaceAll(":", "_");
+        String timeStr = DateTimeUtil.getCurrentDateTime("yyyyMMdd_HHmmss");
+        String finalName = baseName + RECORD_NAME_TAG + timeStr + suffix;
+        return new File("/sdcard/", finalName);
     }
 
     private void openAudio(String url) {
@@ -483,7 +532,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
                 @Override
                 public void onError(int code, String msg) {
                     LogUtils.e(TAG, "WePlayer onError: " + code + "; " + msg);
-                    mError.setText("Error " + code);
+                    mErrorView.setText("Error " + code);
+                    toast("Error:" + msg);
                 }
             });
             mWePlayer.setOnCompletionListener(new WePlayer.OnCompletionListener() {
@@ -495,7 +545,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
         } else {
             mWePlayer.reset();
         }
-        mPlayUrl.setText(url);
+        mCurrentUrl = url;
+        mPlayUrlView.setText(url);
         mWePlayer.setDataSource(url);
         mWePlayer.prepareAsync();
     }
@@ -525,8 +576,8 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void resetUI() {
-        mPlayUrl.setText("");
-        mError.setText("");
+        mPlayUrlView.setText("");
+        mErrorView.setText("");
         mPlayTimeView.setText("00:00:00/" + mDurationText);
         mPlaySeekBar.setProgress(0);
     }
@@ -590,6 +641,7 @@ public class AudioPlayActivity extends AppCompatActivity implements View.OnClick
     @Override
     protected void onDestroy() {
         LogUtils.d(TAG, "onDestroy");
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         if (mWePlayer != null) {
             mWePlayer.release();
             stopUpdateTime();

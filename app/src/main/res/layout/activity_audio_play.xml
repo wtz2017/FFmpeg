@@ -20,16 +20,16 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btn_open_media"
+            android:id="@+id/btn_select_local_audio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="打开媒体" />
+            android:text="选择本地音频" />
 
         <Button
-            android:id="@+id/btn_next_media"
+            android:id="@+id/btn_select_net_audio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="切换媒体" />
+            android:text="选择网络音频" />
 
         <TextView
             android:id="@+id/tv_error_info"
@@ -204,13 +204,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="5dp"
-            android:text="录制类型：" />
+            android:text="录制类型:" />
 
         <RadioGroup
             android:id="@+id/rg_record_type"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rb_mp3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="MP3" />
 
             <RadioButton
                 android:id="@+id/rb_wav"
@@ -222,7 +229,6 @@
                 android:id="@+id/rb_aac"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:checked="true"
                 android:text="AAC" />
 
         </RadioGroup>
@@ -230,8 +236,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="10dp"
-            android:text="录制时间：" />
+            android:layout_marginLeft="8dp"
+            android:text="时间:" />
 
         <TextView
             android:id="@+id/tv_record_time"

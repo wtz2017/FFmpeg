@@ -26,6 +26,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
         SurfaceTexture.OnFrameAvailableListener, WePlayer.OnYUVDataListener {
     private static final String TAG = "WeVideoView";
 
+    private boolean isPlayerInitReady;
     private WePlayer mWePlayer;
     private OnSurfaceCreatedListener mOnSurfaceCreatedListener;
     private OnSurfaceDestroyedListener mOnSurfaceDestroyedListener;
@@ -445,6 +446,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
                 }
             });
         }
+        isPlayerInitReady = true;
     }
 
     private void flushTexImage() {
@@ -727,6 +729,7 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
             if (mDestroyedPosition < 0) {
                 mDestroyedPosition = 0;
             }
+            isPlayerInitReady = false;
             mWePlayer.release();
 
             if (mOnSurfaceDestroyedListener != null) {
@@ -840,6 +843,10 @@ public class WeVideoView extends GLSurfaceView implements GLSurfaceView.Renderer
     }
 
     /* ============================== Player Function ============================== */
+    public boolean isPlayerInitReady() {
+        return isPlayerInitReady;
+    }
+
     public void setDataSource(String dataSource) {
         mDataSource = dataSource;
         if (mWePlayer != null) {

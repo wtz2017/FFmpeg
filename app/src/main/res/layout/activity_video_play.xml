@@ -20,16 +20,16 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btn_open_media"
+            android:id="@+id/btn_select_local_video"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="打开媒体" />
+            android:text="选择本地视频" />
 
         <Button
-            android:id="@+id/btn_next_media"
+            android:id="@+id/btn_select_net_video"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="切换媒体" />
+            android:text="选择网络视频" />
 
         <TextView
             android:id="@+id/tv_error_info"
@@ -113,14 +113,14 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btn_pause_audio"
+            android:id="@+id/btn_pause_video"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="暂停" />
 
         <Button
-            android:id="@+id/btn_resume_play_audio"
+            android:id="@+id/btn_resume_play_video"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

@@ -1,2 +1,3 @@
+include ':libmp3util'
 include ':app', ':ffmpegapi', ':liveplay'
 rootProject.name='FFmpeg'

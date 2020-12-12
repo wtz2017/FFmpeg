@@ -2,14 +2,19 @@ package com.wtz.ffmpeg;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.media.MediaCodecList;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.os.PowerManager;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,8 +23,10 @@ import android.view.WindowManager;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.wtz.ffmpeg.utils.DateTimeUtil;
+import com.wtz.ffmpeg.utils.FileChooser;
 import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.WeVideoView;
@@ -37,8 +44,8 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     private boolean isSeeking;
     private boolean isLoading;
     private boolean isPlaying;
-    private String mDestroyedDataSource;
-    private int mDestroyedPosition;
+    private String mAutoPlayData;
+    private int mAutoSeekPos;
 
     private View mVideoLayout;
     private WeVideoView mWeVideoView;
@@ -73,17 +80,10 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         }
     };
 
-    private static final String[] mSources = {
-            "rtmp://192.168.0.101/myapp/mystream",
-            // Local File
-            "file:///sdcard/0001.优酷网-28 黄石天书-0001-joined.flv",
-            "file:///sdcard/BINGO  Super Simple Songs.mp4",
-            "file:///sdcard/Open Shut Them  Super Simple Songs.mp4",
-            "file:///sdcard/冰河世纪4：大陆漂移.mp4",
-            "file:///sdcard/video-h265.mkv",
-            "file:///sdcard/掰手腕.wmv",
-            "file:///sdcard/机器人总动员.rmvb",
+    private int mSelectLocalVideoRequestCode;
+    private String mLocalVideoPath;
 
+    private static final String[] mNetVideoSources = {
             // HLS(HTTP Live Streaming)
             "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清
             "http://ivi.bupt.edu.cn/hls/cctv6hd.m3u8",//CCTV6高清
@@ -105,7 +105,8 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             "rtmp://202.69.69.180:443/webcast/bshdlive-pc",// 能打开，很卡
             "rtmp://media3.sinovision.net:1935/live/livestream"// 能打开
     };
-    private int mIndex = 0;
+    private int mNetSourceIndex = 0;
+    private int mTempSelectNetSourceIndex = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,6 +124,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
 
         initViews();
         initMachineDecoderInfo();
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                mBroadcastReceiver, new IntentFilter(FileChooser.ACTION_FILE_CHOOSE_RESULT));
     }
 
     private void initMachineDecoderInfo() {
@@ -161,16 +165,15 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     }
 
     private void initViews() {
-        findViewById(R.id.btn_open_media).setOnClickListener(this);
-        findViewById(R.id.btn_next_media).setOnClickListener(this);
-        findViewById(R.id.btn_pause_audio).setOnClickListener(this);
-        findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
+        findViewById(R.id.btn_select_local_video).setOnClickListener(this);
+        findViewById(R.id.btn_select_net_video).setOnClickListener(this);
+        findViewById(R.id.btn_pause_video).setOnClickListener(this);
+        findViewById(R.id.btn_resume_play_video).setOnClickListener(this);
 
         mVideoLayout = findViewById(R.id.fl_video_container);
         mProgressBar = findViewById(R.id.pb_normal);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
-        mPlayUrl.setText(mSources[mIndex]);
         mError = findViewById(R.id.tv_error_info);
         mPlayTimeView = findViewById(R.id.tv_play_time);
         mVolume = findViewById(R.id.tv_volume);
@@ -235,9 +238,9 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         mWeVideoView.setOnSurfaceCreatedListener(new WeVideoView.OnSurfaceCreatedListener() {
             @Override
             public void onSurfaceCreated() {
-                LogUtils.d(TAG, "mWeVideoView onSurfaceCreated mDestroyedDataSource: " + mDestroyedDataSource);
-                if (!TextUtils.isEmpty(mDestroyedDataSource)) {
-                    mWeVideoView.setDataSource(mDestroyedDataSource);
+                LogUtils.d(TAG, "mWeVideoView onSurfaceCreated mAutoPlayData: " + mAutoPlayData);
+                if (!TextUtils.isEmpty(mAutoPlayData)) {
+                    mWeVideoView.setDataSource(mAutoPlayData);
                     mWeVideoView.prepareAsync();
                 }
             }
@@ -246,18 +249,18 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             @Override
             public void onSurfaceDestroyed(String lastDataSource, int lastPosition) {
                 LogUtils.d(TAG, "mWeVideoView onSurfaceDestroyed: " + lastDataSource + ":" + lastPosition);
-                mDestroyedDataSource = lastDataSource;
-                mDestroyedPosition = lastPosition;
+                mAutoPlayData = lastDataSource;
+                mAutoSeekPos = lastPosition;
                 stopUpdateTime();
             }
         });
         mWeVideoView.setOnPreparedListener(new WePlayer.OnPreparedListener() {
             @Override
             public void onPrepared() {
-                LogUtils.d(TAG, "mWeVideoView onPrepared mDestroyedPosition=" + mDestroyedPosition);
-                if (mDestroyedPosition > 0) {
-                    mWeVideoView.seekTo(mDestroyedPosition);
-                    mDestroyedPosition = 0;
+                LogUtils.d(TAG, "mWeVideoView onPrepared mAutoSeekPos=" + mAutoSeekPos);
+                if (mAutoSeekPos > 0) {
+                    mWeVideoView.seekTo(mAutoSeekPos);
+                    mAutoSeekPos = 0;
                 }
 
                 if (isPlaying) {
@@ -310,6 +313,7 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
             public void onError(int code, String msg) {
                 LogUtils.e(TAG, "mWeVideoView onError: " + code + "; " + msg);
                 mError.setText("Error " + code);
+                toast("Error:" + msg);
             }
         });
         mWeVideoView.setOnCompletionListener(new WePlayer.OnCompletionListener() {
@@ -329,39 +333,94 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
         seekbar.setLayoutParams(lp);
     }
 
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            LogUtils.d(TAG, "mBroadcastReceiver onReceive: " + action);
+            if (FileChooser.ACTION_FILE_CHOOSE_RESULT.equals(action)) {
+                int code = intent.getIntExtra(FileChooser.RESULT_REQUEST_CODE, -1);
+                if (code == mSelectLocalVideoRequestCode) {
+                    String url = intent.getStringExtra(FileChooser.RESULT_FILE_PATH);
+                    LogUtils.d(TAG, "select local video path: " + url);
+                    toast("已选择：" + url);
+                    if (!TextUtils.isEmpty(url)) {
+                        resetUI();
+                        mLocalVideoPath = url;
+                        openMedia(mLocalVideoPath);
+                    }
+                }
+            }
+        }
+    };
+
+    private void showNetVideoListDialog(final Context context) {
+        mTempSelectNetSourceIndex = 0;
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setIcon(R.mipmap.ic_launcher_round)
+                .setTitle("网络视频选择")
+                .setSingleChoiceItems(mNetVideoSources, mTempSelectNetSourceIndex, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mTempSelectNetSourceIndex = which;
+                    }
+                })
+                .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        resetUI();
+                        mNetSourceIndex = mTempSelectNetSourceIndex;
+                        openMedia(mNetVideoSources[mNetSourceIndex]);
+                    }
+                }).create();
+        dialog.show();
+    }
+
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     public void onClick(View view) {
         LogUtils.d(TAG, "onClick " + view);
         switch (view.getId()) {
-            case R.id.btn_open_media:
-                openMedia(mSources[mIndex]);
+            case R.id.btn_select_local_video:
+                mSelectLocalVideoRequestCode = FileChooser.chooseVideo(VideoPlayActivity.this);
                 break;
-            case R.id.btn_next_media:
-                mIndex++;
-                if (mIndex >= mSources.length) {
-                    mIndex = 0;
-                }
-                resetUI();
-                openMedia(mSources[mIndex]);
+            case R.id.btn_select_net_video:
+                showNetVideoListDialog(VideoPlayActivity.this);
                 break;
-            case R.id.btn_pause_audio:
+            case R.id.btn_pause_video:
                 pause();
                 break;
-            case R.id.btn_resume_play_audio:
+            case R.id.btn_resume_play_video:
                 resumePlay();
                 break;
         }
     }
 
     private void openMedia(String url) {
+        LogUtils.d(TAG, "openMedia isPlayerInitReady=" + mWeVideoView.isPlayerInitReady() + ", url=" + url);
         isPlaying = true;
-        mDestroyedDataSource = null;
-        mDestroyedPosition = 0;
+        mAutoPlayData = null;
+        mAutoSeekPos = 0;
 
         mPlayUrl.setText(url);
-        mWeVideoView.reset();
-        mWeVideoView.setDataSource(url);
-        mWeVideoView.prepareAsync();
+
+        if (mWeVideoView.isPlayerInitReady()) {
+            mWeVideoView.reset();
+            mWeVideoView.setDataSource(url);
+            mWeVideoView.prepareAsync();
+        } else {
+            mAutoPlayData = url;
+        }
     }
 
     private void pause() {
@@ -467,8 +526,8 @@ public class VideoPlayActivity extends AppCompatActivity implements View.OnClick
     @Override
     protected void onDestroy() {
         LogUtils.d(TAG, "onDestroy");
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         stopUpdateTime();
-
         mHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }

@@ -13,7 +13,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="5dp"
         android:lines="2" />
 
     <LinearLayout
@@ -22,23 +22,17 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btn_open_media"
+            android:id="@+id/btn_select_local_audio"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="打开媒体" />
-
-        <Button
-            android:id="@+id/btn_next_media"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="切换媒体" />
+            android:text="选择本地音频" />
 
         <TextView
             android:id="@+id/tv_error_info"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginLeft="5dp" />
     </LinearLayout>
 
@@ -67,7 +61,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="5dp"
         android:orientation="horizontal">
 
         <Button
@@ -97,7 +91,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginLeft="5dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="5dp"
         android:text="设置裁减起始时间" />
 
     <LinearLayout
@@ -129,7 +123,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginLeft="2dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="5dp"
         android:text="设置裁减结束时间" />
 
     <LinearLayout
@@ -176,11 +170,18 @@
             android:orientation="horizontal">
 
             <RadioButton
-                android:id="@+id/rb_wav"
+                android:id="@+id/rb_mp3"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:checked="true"
+                android:text="MP3" />
+
+            <RadioButton
+                android:id="@+id/rb_wav"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:text="WAV" />
 
             <RadioButton
@@ -197,7 +198,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="5dp"
         android:orientation="horizontal">
 
         <Button

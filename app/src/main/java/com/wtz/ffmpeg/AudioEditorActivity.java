@@ -1,10 +1,10 @@
 package com.wtz.ffmpeg;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,10 +18,16 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
 import com.wtz.ffmpeg.utils.DateTimeUtil;
+import com.wtz.ffmpeg.utils.FileChooser;
 import com.wtz.ffmpeg.utils.ScreenUtils;
 import com.wtz.ffmpeg.view.ProgressRound;
 import com.wtz.ffmpegapi.AACEncoder;
+import com.wtz.ffmpegapi.MP3Encoder;
 import com.wtz.ffmpegapi.PCMRecorder;
 import com.wtz.ffmpegapi.WAVSaver;
 import com.wtz.ffmpegapi.WeEditor;
@@ -29,6 +35,7 @@ import com.wtz.ffmpegapi.WePlayer;
 import com.wtz.ffmpegapi.utils.LogUtils;
 
 import java.io.File;
+import java.io.IOException;
 
 public class AudioEditorActivity extends AppCompatActivity implements View.OnClickListener, RadioGroup.OnCheckedChangeListener {
     private static final String TAG = "AudioEditorActivity";
@@ -45,8 +52,6 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
 
     private PCMRecorder.Encoder mPCMEncoder;
     private File mRecordAudioFile;
-    private File mAACFile;
-    private File mWAVFile;
 
     private TextView mPlayUrl;
     private ProgressDialog mPlayProgressDialog;
@@ -81,32 +86,9 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
         }
     };
 
-    private static final String[] mSources = {
-            // Local File
-            "file:///sdcard/但愿人长久 - 王菲.mp3",
-            "file:///sdcard/一千年以后 - 林俊杰.mp3",
-            "file:///sdcard/卡农 钢琴曲.wma",
-            "file:///sdcard/test.ac3",
-            "file:///sdcard/test.mp4",
-            "file:///sdcard/王铮亮-真爱你的云.ape",
-            "file:///sdcard/邓紫棋-爱你.flac",
-
-            // HLS(HTTP Live Streaming)
-            "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8",//CCTV1高清
-            "http://ivi.bupt.edu.cn/hls/cctv6hd.m3u8",//CCTV6高清
-            "http://rtmpcnr001.cnr.cn/live/zgzs/playlist.m3u8",//中国之声
-            "http://rtmpcnr003.cnr.cn/live/yyzs/playlist.m3u8",//音乐之声
-            "http://rtmpcnr004.cnr.cn/live/dszs/playlist.m3u8",//经典音乐广播
-            "http://ngcdn004.cnr.cn/live/dszs/index.m3u8",//中央广播电台音乐频道
-            "http://123.56.16.201:1935/live/fm1006/96K/tzwj_video.m3u8",//北京新闻广播
-            "http://123.56.16.201:1935/live/fm994/96K/tzwj_video.m3u8",//北京教学广播
-            "http://123.56.16.201:1935/live/am603/96K/tzwj_video.m3u8",//北京故事广播
-            "http://audiolive.rbc.cn:1935/live/fm1043/96K/tzwj_video.m3u8",//北京长书广播
-            "http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3",
-            "http://music.163.com/song/media/outer/url?id=29750099.mp3",
-            "http://music.163.com/song/media/outer/url?id=566435178.mp3",
-    };
-    private int mIndex = 0;
+    private int mSelectLocalAudioRequestCode;
+    private String mLocalAudioPath;
+    private static final String CUT_NAME_TAG = "_cut_";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,6 +97,9 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
         setContentView(R.layout.activity_audio_editor);
 
         initViews();
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                mBroadcastReceiver, new IntentFilter(FileChooser.ACTION_FILE_CHOOSE_RESULT));
     }
 
     @Override
@@ -124,8 +109,7 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
     }
 
     private void initViews() {
-        findViewById(R.id.btn_open_media).setOnClickListener(this);
-        findViewById(R.id.btn_next_media).setOnClickListener(this);
+        findViewById(R.id.btn_select_local_audio).setOnClickListener(this);
         findViewById(R.id.btn_pause_audio).setOnClickListener(this);
         findViewById(R.id.btn_resume_play_audio).setOnClickListener(this);
         findViewById(R.id.btn_stop_play_audio).setOnClickListener(this);
@@ -136,7 +120,6 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
         ((RadioGroup) findViewById(R.id.rg_record_type)).setOnCheckedChangeListener(this);
 
         mPlayUrl = findViewById(R.id.tv_play_url);
-        mPlayUrl.setText(mSources[mIndex]);
         mPlayTimeView = findViewById(R.id.tv_play_time);
 
         mStartTimeEditor = findViewById(R.id.et_start_time);
@@ -182,21 +165,38 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
         seekbar.setLayoutParams(lp);
     }
 
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            LogUtils.d(TAG, "mBroadcastReceiver onReceive: " + action);
+            if (FileChooser.ACTION_FILE_CHOOSE_RESULT.equals(action)) {
+                int code = intent.getIntExtra(FileChooser.RESULT_REQUEST_CODE, -1);
+                if (code == mSelectLocalAudioRequestCode) {
+                    String url = intent.getStringExtra(FileChooser.RESULT_FILE_PATH);
+                    LogUtils.d(TAG, "select local music path: " + url);
+                    toast("已选择：" + url);
+                    if (!TextUtils.isEmpty(url)) {
+                        resetPlayUI();
+                        mRecordAudioFile = null;
+                        mLocalAudioPath = url;
+                        openAudio(mLocalAudioPath);
+                    }
+                }
+            }
+        }
+    };
+
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     public void onClick(View view) {
         LogUtils.d(TAG, "onClick " + view);
         switch (view.getId()) {
-            case R.id.btn_open_media:
-                resetPlayUI();
-                openAudio(mSources[mIndex]);
-                break;
-            case R.id.btn_next_media:
-                mIndex++;
-                if (mIndex >= mSources.length) {
-                    mIndex = 0;
-                }
-                resetPlayUI();
-                openAudio(mSources[mIndex]);
+            case R.id.btn_select_local_audio:
+                mSelectLocalAudioRequestCode = FileChooser.chooseAudio(AudioEditorActivity.this);
                 break;
             case R.id.btn_pause_audio:
                 if (mWePlayer == null) {
@@ -227,7 +227,7 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
                 mEndTimeEditor.setText("" + mPlayPositionMsec);
                 break;
             case R.id.btn_start_cut:
-                startCut(mSources[mIndex]);
+                startCut(mLocalAudioPath);
                 startUpdateCutTime();
                 break;
             case R.id.btn_stop_cut:
@@ -243,21 +243,46 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
     @Override
     public void onCheckedChanged(RadioGroup radioGroup, int checkedId) {
         switch (checkedId) {
+            case R.id.rb_mp3:
+                mPCMEncoder = new MP3Encoder();
+                mRecordAudioFile = getCutFile(".mp3");
+                break;
             case R.id.rb_wav:
                 mPCMEncoder = new WAVSaver();
-                if (mWAVFile == null) {
-                    mWAVFile = new File("/sdcard/pcm_cut.wav");
-                }
-                mRecordAudioFile = mWAVFile;
+                mRecordAudioFile = getCutFile(".wav");
                 break;
             case R.id.rb_aac:
                 mPCMEncoder = new AACEncoder();
-                if (mAACFile == null) {
-                    mAACFile = new File("/sdcard/pcm_cut.aac");
-                }
-                mRecordAudioFile = mAACFile;
+                mRecordAudioFile = getCutFile(".aac");
                 break;
         }
+    }
+
+    private File getCutFile(String suffix) {
+        if (TextUtils.isEmpty(mLocalAudioPath)) {
+            return null;
+        }
+        String cutPath;
+        int lastDotIndex = mLocalAudioPath.lastIndexOf(".");
+        if (lastDotIndex != -1) {
+            cutPath = mLocalAudioPath.substring(0, lastDotIndex);
+        } else {
+            cutPath = mLocalAudioPath;
+        }
+        String timeStr = DateTimeUtil.getCurrentDateTime("yyyyMMdd_HHmmss");
+        File file = new File(cutPath + CUT_NAME_TAG + timeStr + suffix);
+        boolean createSuccess = false;
+        try {
+            createSuccess = file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+            toast(e.toString());
+        }
+        if (!createSuccess) {
+            toast("没有权限保存在原文件同目录下！将会保存到/sdcard/下");
+            file = new File("/sdcard/", file.getName());
+        }
+        return file;
     }
 
     private void openAudio(String url) {
@@ -294,6 +319,7 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
                 @Override
                 public void onError(int code, String msg) {
                     LogUtils.e(TAG, "WePlayer onError: " + code + "; " + msg);
+                    toast("Error:" + msg);
                 }
             });
             mWePlayer.setOnCompletionListener(new WePlayer.OnCompletionListener() {
@@ -315,8 +341,7 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
         String startTimeStr = mStartTimeEditor.getText().toString();
         String endTimeStr = mEndTimeEditor.getText().toString();
         if (TextUtils.isEmpty(startTimeStr) || TextUtils.isEmpty(endTimeStr)) {
-            Toast.makeText(AudioEditorActivity.this, "请先设置时间范围！",
-                    Toast.LENGTH_SHORT).show();
+            toast("请先设置时间范围！");
             return;
         }
 
@@ -324,21 +349,21 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
         mEndEditTimeMsec = Integer.valueOf(endTimeStr);
         if (mStartEditTimeMsec < 0 || mEndEditTimeMsec > mDurationMsec
                 || mStartEditTimeMsec >= mEndEditTimeMsec) {
-            Toast.makeText(AudioEditorActivity.this, "时间范围设置无效！",
-                    Toast.LENGTH_SHORT).show();
+            toast("时间范围设置无效！");
             return;
         }
 
+        if (mRecordAudioFile == null) {
+            mPCMEncoder = new MP3Encoder();
+            mRecordAudioFile = getCutFile(".mp3");
+        }
+        toast("裁减文件将保存到" + mRecordAudioFile.getAbsolutePath());
         if (mWeEditor == null) {
             mWeEditor = new WeEditor();
             mWeEditor.setOnPreparedListener(new WeEditor.OnPreparedListener() {
                 @Override
                 public void onPrepared() {
                     LogUtils.d(TAG, "WeEditor onPrepared");
-                    if (mRecordAudioFile == null) {
-                        mPCMEncoder = new WAVSaver();
-                        mRecordAudioFile = new File("/sdcard/pcm_cut.wav");
-                    }
                     mWeEditor.start(mStartEditTimeMsec, mEndEditTimeMsec, mPCMEncoder, mRecordAudioFile);
                 }
             });
@@ -453,6 +478,7 @@ public class AudioEditorActivity extends AppCompatActivity implements View.OnCli
     @Override
     protected void onDestroy() {
         LogUtils.d(TAG, "onDestroy");
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         if (mWePlayer != null) {
             mWePlayer.release();
             stopUpdatePlayTime();
